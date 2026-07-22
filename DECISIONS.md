@@ -100,3 +100,24 @@ ser commitado. **Sempre conferir o conteúdo de arquivos `.env*` antes de
   imagem já hospedada, não um upload de arquivo para o Supabase Storage.
   Implementar upload exigiria configurar um bucket + policies extras fora
   do orçamento desta sessão — ver REPORT.md como pendência.
+
+## Etapa 4 — CRUD de serviços
+
+- **Server Actions + `useActionState` + `revalidatePath`**: mesmo padrão
+  do onboarding, mas sem `redirect()` — o diálogo fecha no client quando
+  `state.ok` fica `true`. O eslint (`react-hooks/set-state-in-effect`)
+  bloqueia `setOpen(false)` dentro de um `useEffect` reagindo a `state`;
+  segui o padrão oficial do React de ajustar estado durante a
+  renderização comparando com o valor anterior guardado em `useState`
+  (`if (state !== lastState) { setLastState(state); ... }`), em vez de
+  `useEffect`. Vale para qualquer diálogo futuro que precise fechar
+  sozinho após uma Server Action.
+- **Preço digitado em reais, salvo em centavos**: o formulário usa um
+  campo de texto "60,00" (`price_reais`) convertido para `price_cents`
+  dentro da própria Server Action — evita usuário lidar com centavos
+  diretamente e mantém a coluna do banco como inteiro (sem ponto
+  flutuante).
+- **Excluir sem tabela de confirmação dedicada**: usei `window.confirm()`
+  simples em vez de um `AlertDialog` (não instalei esse componente do
+  shadcn) — suficiente para a ação destrutiva de excluir um serviço, mas
+  vale trocar por um modal de verdade se o produto crescer.

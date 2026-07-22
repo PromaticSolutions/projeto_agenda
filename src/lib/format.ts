@@ -1,0 +1,49 @@
+const brlFormatter = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+
+export function formatPriceCents(cents: number): string {
+  return brlFormatter.format(cents / 100);
+}
+
+export function centsToReaisInput(cents: number): string {
+  return (cents / 100).toFixed(2).replace(".", ",");
+}
+
+export function formatDurationMin(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h === 0) return `${m}min`;
+  if (m === 0) return `${h}h`;
+  return `${h}h${String(m).padStart(2, "0")}`;
+}
+
+const timeFormatter = new Intl.DateTimeFormat("pt-BR", {
+  timeZone: "America/Sao_Paulo",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+export function formatTimeLocal(date: Date): string {
+  return timeFormatter.format(date);
+}
+
+const dateFormatter = new Intl.DateTimeFormat("pt-BR", {
+  timeZone: "America/Sao_Paulo",
+  weekday: "short",
+  day: "2-digit",
+  month: "short",
+});
+
+export function formatDateLocal(date: Date): string {
+  return dateFormatter.format(date);
+}
+
+const fullDateFormatter = new Intl.DateTimeFormat("pt-BR", {
+  timeZone: "America/Sao_Paulo",
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+});
+
+export function formatFullDateLocal(date: Date): string {
+  return fullDateFormatter.format(date);
+}
