@@ -7,6 +7,14 @@ import { localDateTimeToUtc } from "@/lib/availability";
  * .env.local). Existe só para o front funcionar isolado durante o
  * desenvolvimento — reseta a cada restart do processo e NÃO é compartilhado
  * entre instâncias serverless em produção. Ver DECISIONS.md e README.md.
+ *
+ * Guardado em `globalThis` (não em `const` de módulo): o Next.js instancia
+ * Route Handlers e Server Components em grafos de módulo separados (e o
+ * Fast Refresh do dev server re-executa módulos), então um simples array no
+ * topo do arquivo NÃO fica compartilhado entre a página pública e a API de
+ * disponibilidade/booking — cada um veria seus próprios dados "fantasma".
+ * `globalThis` é o mesmo truque usado pelo próprio Next.js para o singleton
+ * do Prisma Client em dev.
  */
 
 export const MOCK_OWNER_ID = "mock-owner-1";
@@ -27,113 +35,132 @@ function todayLocalDate(): string {
   }).format(now);
 }
 
-const studios: Studio[] = [
-  {
-    id: MOCK_STUDIO_ID,
-    owner_id: MOCK_OWNER_ID,
-    name: "Bella Studio",
-    slug: MOCK_STUDIO_SLUG,
-    whatsapp: "5511934476935",
-    brand_color: "#7C3AED",
-    logo_url: null,
-    created_at: new Date().toISOString(),
-  },
-];
+interface MockDb {
+  studios: Studio[];
+  services: Service[];
+  workingHours: WorkingHour[];
+  blocks: Block[];
+  bookings: Booking[];
+}
 
-const services: Service[] = [
-  {
-    id: uid(),
-    studio_id: MOCK_STUDIO_ID,
-    name: "Design de Sobrancelhas",
-    price_cents: 6000,
-    duration_min: 40,
-    color: "#7C3AED",
-    active: true,
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: uid(),
-    studio_id: MOCK_STUDIO_ID,
-    name: "Extensão de Cílios",
-    price_cents: 12000,
-    duration_min: 90,
-    color: "#8B5CF6",
-    active: true,
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: uid(),
-    studio_id: MOCK_STUDIO_ID,
-    name: "Micropigmentação",
-    price_cents: 35000,
-    duration_min: 120,
-    color: "#E23FA0",
-    active: true,
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: uid(),
-    studio_id: MOCK_STUDIO_ID,
-    name: "Limpeza de Pele (pausado)",
-    price_cents: 15000,
-    duration_min: 60,
-    color: "#A93CC9",
-    active: false,
-    created_at: new Date().toISOString(),
-  },
-];
+declare global {
+  var __agendaMockDb: MockDb | undefined;
+}
 
-const workingHours: WorkingHour[] = [1, 2, 3, 4, 5].flatMap((weekday) => [
-  { id: uid(), studio_id: MOCK_STUDIO_ID, weekday, start_time: "09:00", end_time: "12:00" },
-  { id: uid(), studio_id: MOCK_STUDIO_ID, weekday, start_time: "13:00", end_time: "18:00" },
-]);
-workingHours.push({
-  id: uid(),
-  studio_id: MOCK_STUDIO_ID,
-  weekday: 6,
-  start_time: "09:00",
-  end_time: "13:00",
-});
+function buildSeedDb(): MockDb {
+  const studios: Studio[] = [
+    {
+      id: MOCK_STUDIO_ID,
+      owner_id: MOCK_OWNER_ID,
+      name: "Bella Studio",
+      slug: MOCK_STUDIO_SLUG,
+      whatsapp: "5511934476935",
+      brand_color: "#7C3AED",
+      logo_url: null,
+      created_at: new Date().toISOString(),
+    },
+  ];
 
-const blocks: Block[] = [];
+  const services: Service[] = [
+    {
+      id: uid(),
+      studio_id: MOCK_STUDIO_ID,
+      name: "Design de Sobrancelhas",
+      price_cents: 6000,
+      duration_min: 40,
+      color: "#7C3AED",
+      active: true,
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: uid(),
+      studio_id: MOCK_STUDIO_ID,
+      name: "Extensão de Cílios",
+      price_cents: 12000,
+      duration_min: 90,
+      color: "#8B5CF6",
+      active: true,
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: uid(),
+      studio_id: MOCK_STUDIO_ID,
+      name: "Micropigmentação",
+      price_cents: 35000,
+      duration_min: 120,
+      color: "#E23FA0",
+      active: true,
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: uid(),
+      studio_id: MOCK_STUDIO_ID,
+      name: "Limpeza de Pele (pausado)",
+      price_cents: 15000,
+      duration_min: 60,
+      color: "#A93CC9",
+      active: false,
+      created_at: new Date().toISOString(),
+    },
+  ];
 
-const today = todayLocalDate();
-const [svcSobrancelhas, svcCilios, svcMicro] = services;
-const bookings: Booking[] = [
-  {
+  const workingHours: WorkingHour[] = [1, 2, 3, 4, 5].flatMap((weekday) => [
+    { id: uid(), studio_id: MOCK_STUDIO_ID, weekday, start_time: "09:00", end_time: "12:00" },
+    { id: uid(), studio_id: MOCK_STUDIO_ID, weekday, start_time: "13:00", end_time: "18:00" },
+  ]);
+  workingHours.push({
     id: uid(),
     studio_id: MOCK_STUDIO_ID,
-    service_id: svcSobrancelhas.id,
-    client_name: "Ana Paula Ferreira",
-    client_phone: "5511987654321",
-    start_at: localDateTimeToUtc(today, "09:00").toISOString(),
-    end_at: localDateTimeToUtc(today, "09:40").toISOString(),
-    status: "finalizado",
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: uid(),
-    studio_id: MOCK_STUDIO_ID,
-    service_id: svcCilios.id,
-    client_name: "Camila Rodrigues",
-    client_phone: "5511976543210",
-    start_at: localDateTimeToUtc(today, "10:00").toISOString(),
-    end_at: localDateTimeToUtc(today, "11:30").toISOString(),
-    status: "em_atendimento",
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: uid(),
-    studio_id: MOCK_STUDIO_ID,
-    service_id: svcMicro.id,
-    client_name: "Juliana Souza",
-    client_phone: "5511965432109",
-    start_at: localDateTimeToUtc(today, "14:00").toISOString(),
-    end_at: localDateTimeToUtc(today, "16:00").toISOString(),
-    status: "agendado",
-    created_at: new Date().toISOString(),
-  },
-];
+    weekday: 6,
+    start_time: "09:00",
+    end_time: "13:00",
+  });
+
+  const blocks: Block[] = [];
+
+  const today = todayLocalDate();
+  const [svcSobrancelhas, svcCilios, svcMicro] = services;
+  const bookings: Booking[] = [
+    {
+      id: uid(),
+      studio_id: MOCK_STUDIO_ID,
+      service_id: svcSobrancelhas.id,
+      client_name: "Ana Paula Ferreira",
+      client_phone: "5511987654321",
+      start_at: localDateTimeToUtc(today, "09:00").toISOString(),
+      end_at: localDateTimeToUtc(today, "09:40").toISOString(),
+      status: "finalizado",
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: uid(),
+      studio_id: MOCK_STUDIO_ID,
+      service_id: svcCilios.id,
+      client_name: "Camila Rodrigues",
+      client_phone: "5511976543210",
+      start_at: localDateTimeToUtc(today, "10:00").toISOString(),
+      end_at: localDateTimeToUtc(today, "11:30").toISOString(),
+      status: "em_atendimento",
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: uid(),
+      studio_id: MOCK_STUDIO_ID,
+      service_id: svcMicro.id,
+      client_name: "Juliana Souza",
+      client_phone: "5511965432109",
+      start_at: localDateTimeToUtc(today, "14:00").toISOString(),
+      end_at: localDateTimeToUtc(today, "16:00").toISOString(),
+      status: "agendado",
+      created_at: new Date().toISOString(),
+    },
+  ];
+
+  return { studios, services, workingHours, blocks, bookings };
+}
+
+const db = (globalThis.__agendaMockDb ??= buildSeedDb());
+const { studios, services, workingHours, blocks, bookings } = db;
 
 // ---------------------------------------------------------------------------
 // studios

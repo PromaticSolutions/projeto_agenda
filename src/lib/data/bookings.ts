@@ -58,7 +58,8 @@ async function listBookingsInRangeOwner(
   return data;
 }
 
-async function listBookingsInRangePublic(
+/** Bookings que intersectam [from, to) — usado no cálculo de disponibilidade pública. */
+export async function listPublicBookingsInRange(
   studioId: string,
   fromIso: string,
   toIso: string
@@ -141,7 +142,7 @@ export async function createBookingServerSide(
   const [workingHours, blocks, existingBookings] = await Promise.all([
     listPublicWorkingHours(input.studioId),
     listPublicBlocksInRange(input.studioId, from.toISOString(), to.toISOString()),
-    listBookingsInRangePublic(input.studioId, from.toISOString(), to.toISOString()),
+    listPublicBookingsInRange(input.studioId, from.toISOString(), to.toISOString()),
   ]);
 
   const stillAvailable = isSlotStillAvailable(

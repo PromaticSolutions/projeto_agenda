@@ -121,3 +121,45 @@ ser commitado. **Sempre conferir o conteúdo de arquivos `.env*` antes de
   simples em vez de um `AlertDialog` (não instalei esse componente do
   shadcn) — suficiente para a ação destrutiva de excluir um serviço, mas
   vale trocar por um modal de verdade se o produto crescer.
+
+## Etapas 6–7 — página pública + criação de booking (feitas juntas)
+
+- **Combinei as duas etapas num commit só**: a página pública sem a API de
+  criação de booking não demonstra a promessa central do produto ("nunca
+  duas clientes no mesmo horário"), e o formulário de dados do cliente
+  (parte da "etapa 6" no texto do spec) só faz sentido junto do botão que
+  chama a API (etapa 7). Separar teria deixado um commit intermediário com
+  um botão "Confirmar" morto — preferi um incremento genuinamente testável.
+- **Bug real encontrado e corrigido: store mock não era compartilhado
+  entre rotas**. Os arrays em memória de `src/lib/mock/store.ts` eram
+  `const` no topo do módulo; testei criando um booking pela página e
+  consultando pela API e as duas viam estúdios "fantasma" diferentes — o
+  Next.js (Turbopack, dev) instancia Route Handlers e Server Components em
+  grafos de módulo separados, então cada um tinha sua PRÓPRIA cópia dos
+  dados seed. Corrigido guardando tudo em `globalThis.__agendaMockDb`
+  (mesma técnica que o próprio Next.js recomenda para o singleton do
+  Prisma Client em dev, exatamente por essa razão). Sem esse fix, o modo
+  mock pareceria funcionar isoladamente em cada tela mas o agendamento
+  criado na página pública nunca apareceria no painel do dono nem geraria
+  conflito de horário — um bug silencioso e feio de pegar depois. Validado
+  com curl direto nas duas API routes após o fix (ver REPORT.md).
+- **`/api/availability` (GET) e `/api/bookings` (POST) são rotas "flat"**,
+  sem segmento dinâmico (`slug` vai por query string / body), justamente
+  para não precisar lidar com `params` assíncrono do Next 16 nelas — só a
+  página `/[slug]` precisa de `await props.params`.
+- **Seletor de data com `Popover` + `Calendar` (react-day-picker) em vez
+  de input nativo `<input type="date">`**: fica consistente com o resto
+  do design system (shadcn) e permite bloquear datas passadas
+  (`disabled={{ before: today }}`) com a mesma UI em qualquer navegador —
+  o input nativo teria aparência inconsistente entre Chrome/Safari/Firefox.
+- **Data escolhida no calendário nunca passa por conversão de fuso no
+  client**: uso `date.getFullYear()/getMonth()/getDate()` (métodos locais
+  do browser, não `toISOString()`) para montar a string "YYYY-MM-DD"
+  enviada à API — é só o rótulo do dia que o cliente clicou no calendário,
+  igual em qualquer fuso; toda a matemática de fuso horário de verdade
+  (America/Sao_Paulo) acontece só no servidor, em `availability.ts`.
+- **Fallback do redirect do WhatsApp implementado como no RISKS.md #7**: a
+  tela de sucesso nunca depende só do `window.open()` (que pop-up
+  blockers podem barrar) — sempre mostra a confirmação do agendamento
+  primeiro, com um botão "Abrir WhatsApp" (link `<a>` normal, sempre
+  clicável) e "Copiar link" como segunda camada de fallback.
