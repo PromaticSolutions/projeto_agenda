@@ -45,6 +45,12 @@ export function nextLocalDate(dateStr: string): string {
   return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
 }
 
+/** Data de calendário anterior (string "YYYY-MM-DD"), sem depender de timezone. */
+export function prevLocalDate(dateStr: string): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d - 1)).toISOString().slice(0, 10);
+}
+
 /** Intervalo [00:00, 24:00) de uma data local do estúdio, em instantes UTC — usado para consultar bookings/blocks do dia. */
 export function localDayRangeUtc(dateStr: string): Interval {
   return {
