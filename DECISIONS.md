@@ -181,3 +181,38 @@ ser commitado. **Sempre conferir o conteúdo de arquivos `.env*` antes de
   action nem uma API route, só uma função `"use server"` chamada e
   aguardada normalmente, que é o padrão mais simples do Next.js App
   Router para isso.
+
+## Etapa 10 — polimento
+
+- **`unstable_retry` em vez de `reset` nos `error.tsx`**: o Next.js 16.2
+  trocou o prop padrão do error boundary — `reset()` só re-renderiza sem
+  buscar dados de novo, `unstable_retry()` re-busca e re-renderiza (o que
+  eu quero: se o erro foi "a migração não rodou", tentar de novo depois
+  do usuário rodar o SQL precisa buscar de novo, não só re-renderizar o
+  mesmo estado com erro).
+- **Erro real testado contra o projeto Supabase real (ainda sem a
+  migração)**: `code` vem como `"PGRST205"` (PostgREST, "não achei essa
+  tabela no cache do schema"), não `"42P01"` (Postgres puro) como eu tinha
+  assumido inicialmente — corrigi `src/app/app/error.tsx` para checar os
+  dois. Validado com uma query direta ao projeto real via
+  `@supabase/supabase-js` (fora do Next) confirmando o shape exato do
+  erro antes de codar a checagem.
+- **API routes agora sempre devolvem JSON, mesmo em erro inesperado**:
+  descobri rodando contra o projeto real (sem migração) que uma exceção
+  não capturada em `/api/availability` ou `/api/bookings` fazia o Next.js
+  devolver uma resposta 500 com corpo VAZIO — o client (`await
+  res.json()`) quebraria tentando parsear isso. Envolvi as duas rotas em
+  `try/catch` retornando `{error: "..."}` com status 500 explícito.
+- **Nuance não resolvida, documentada e não bloqueante**: contra o
+  projeto real sem migração, `/[slug]` acaba mostrando a UI de
+  "Estúdio não encontrado" (`not-found.tsx`) em vez da UI de erro
+  genérico (`error.tsx`), mesmo com o log confirmando que
+  `getPublicStudioBySlug` lançou `PGRST205` (não retornou `null`). Não
+  investiguei a fundo por quê — a hipótese mais provável é alguma
+  interação entre o erro lançado em `generateMetadata` (que roda em
+  paralelo à página) e o mecanismo de dedupe de erro do Next 16 em dev.
+  Não é grave: o resultado ainda é uma mensagem limpa, sem stack trace
+  vazado, sem crash — só menos precisa que o ideal. Deixo registrado
+  porque é exatamente o tipo de comportamento que o AGENTS.md do Next 16
+  avisou para não assumir do treinamento. Some sozinho assim que a
+  migração for rodada (o erro para de existir).

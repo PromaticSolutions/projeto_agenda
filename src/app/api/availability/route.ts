@@ -18,38 +18,46 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Parâmetros inválidos" }, { status: 400 });
   }
 
-  const studio = await getPublicStudioBySlug(slug);
-  if (!studio) {
-    return NextResponse.json({ error: "Estúdio não encontrado" }, { status: 404 });
+  try {
+    const studio = await getPublicStudioBySlug(slug);
+    if (!studio) {
+      return NextResponse.json({ error: "Estúdio não encontrado" }, { status: 404 });
+    }
+
+    const service = await getPublicService(studio.id, serviceId);
+    if (!service || !service.active) {
+      return NextResponse.json({ error: "Serviço não encontrado" }, { status: 404 });
+    }
+
+    const range = localDayRangeUtc(date);
+    const [workingHours, blocks, bookings] = await Promise.all([
+      listPublicWorkingHours(studio.id),
+      listPublicBlocksInRange(studio.id, range.start.toISOString(), range.end.toISOString()),
+      listPublicBookingsInRange(studio.id, range.start.toISOString(), range.end.toISOString()),
+    ]);
+
+    const slots = getAvailableSlots({
+      date,
+      durationMin: service.duration_min,
+      workingHours,
+      blocks: blocks.map((b) => ({ start: new Date(b.start_at), end: new Date(b.end_at) })),
+      bookings: bookings
+        .filter((b) => b.status !== "cancelado")
+        .map((b) => ({ start: new Date(b.start_at), end: new Date(b.end_at) })),
+      now: new Date(),
+    });
+
+    return NextResponse.json({
+      slots: slots.map((slot) => ({
+        start: slot.start.toISOString(),
+        end: slot.end.toISOString(),
+      })),
+    });
+  } catch (err) {
+    console.error(err);
+    return NextResponse.json(
+      { error: "Não foi possível buscar os horários. Tente novamente." },
+      { status: 500 }
+    );
   }
-
-  const service = await getPublicService(studio.id, serviceId);
-  if (!service || !service.active) {
-    return NextResponse.json({ error: "Serviço não encontrado" }, { status: 404 });
-  }
-
-  const range = localDayRangeUtc(date);
-  const [workingHours, blocks, bookings] = await Promise.all([
-    listPublicWorkingHours(studio.id),
-    listPublicBlocksInRange(studio.id, range.start.toISOString(), range.end.toISOString()),
-    listPublicBookingsInRange(studio.id, range.start.toISOString(), range.end.toISOString()),
-  ]);
-
-  const slots = getAvailableSlots({
-    date,
-    durationMin: service.duration_min,
-    workingHours,
-    blocks: blocks.map((b) => ({ start: new Date(b.start_at), end: new Date(b.end_at) })),
-    bookings: bookings
-      .filter((b) => b.status !== "cancelado")
-      .map((b) => ({ start: new Date(b.start_at), end: new Date(b.end_at) })),
-    now: new Date(),
-  });
-
-  return NextResponse.json({
-    slots: slots.map((slot) => ({
-      start: slot.start.toISOString(),
-      end: slot.end.toISOString(),
-    })),
-  });
 }

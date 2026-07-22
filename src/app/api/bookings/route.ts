@@ -30,34 +30,42 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const studio = await getPublicStudioBySlug(slug);
-  if (!studio) {
-    return NextResponse.json({ error: "Estúdio não encontrado" }, { status: 404 });
+  try {
+    const studio = await getPublicStudioBySlug(slug);
+    if (!studio) {
+      return NextResponse.json({ error: "Estúdio não encontrado" }, { status: 404 });
+    }
+
+    const result = await createBookingServerSide({
+      studioId: studio.id,
+      serviceId: parsed.data.serviceId,
+      clientName: parsed.data.clientName,
+      clientPhone: parsed.data.clientPhone,
+      startAt: new Date(parsed.data.startAt),
+    });
+
+    if (!result.ok) {
+      const message =
+        result.error === "conflict"
+          ? "Esse horário acabou de ser ocupado. Escolha outro, por favor."
+          : "Serviço indisponível. Atualize a página e tente novamente.";
+      return NextResponse.json({ error: message, code: result.error }, { status: 409 });
+    }
+
+    return NextResponse.json({
+      booking: {
+        id: result.booking.id,
+        startAt: result.booking.start_at,
+        endAt: result.booking.end_at,
+        status: result.booking.status,
+      },
+      whatsapp: studio.whatsapp,
+    });
+  } catch (err) {
+    console.error(err);
+    return NextResponse.json(
+      { error: "Não foi possível confirmar o agendamento. Tente novamente." },
+      { status: 500 }
+    );
   }
-
-  const result = await createBookingServerSide({
-    studioId: studio.id,
-    serviceId: parsed.data.serviceId,
-    clientName: parsed.data.clientName,
-    clientPhone: parsed.data.clientPhone,
-    startAt: new Date(parsed.data.startAt),
-  });
-
-  if (!result.ok) {
-    const message =
-      result.error === "conflict"
-        ? "Esse horário acabou de ser ocupado. Escolha outro, por favor."
-        : "Serviço indisponível. Atualize a página e tente novamente.";
-    return NextResponse.json({ error: message, code: result.error }, { status: 409 });
-  }
-
-  return NextResponse.json({
-    booking: {
-      id: result.booking.id,
-      startAt: result.booking.start_at,
-      endAt: result.booking.end_at,
-      status: result.booking.status,
-    },
-    whatsapp: studio.whatsapp,
-  });
 }
