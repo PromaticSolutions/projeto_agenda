@@ -163,3 +163,21 @@ ser commitado. **Sempre conferir o conteúdo de arquivos `.env*` antes de
   blockers podem barrar) — sempre mostra a confirmação do agendamento
   primeiro, com um botão "Abrir WhatsApp" (link `<a>` normal, sempre
   clicável) e "Copiar link" como segunda camada de fallback.
+
+## Etapa 9 — exportação em PDF
+
+- **`autoTable` é named export, `jsPDF` é default export**: a versão
+  instalada (`jspdf-autotable@5`) mudou a API de `doc.autoTable(...)`
+  (plugin attachado ao protótipo, usado em versões antigas/tutoriais) para
+  `import { autoTable } from "jspdf-autotable"; autoTable(doc, opts)`.
+  Confirmei rodando a geração num script Node isolado (fora do Next) e
+  validando o PDF resultante com `file` — evita descobrir isso só depois
+  do usuário clicar em "Exportar" no navegador.
+- **PDF do dia usa os dados já carregados na página; PDF do mês busca sob
+  demanda**: o painel do dia já tem `bookings`/`services` em memória
+  (renderizados no server), então "Agenda do dia" monta o PDF só com esses
+  dados, sem round-trip. "Agenda do mês" chama uma Server Action
+  (`getMonthAgendaAction`) como RPC direto do client — não é um form
+  action nem uma API route, só uma função `"use server"` chamada e
+  aguardada normalmente, que é o padrão mais simples do Next.js App
+  Router para isso.

@@ -5,6 +5,7 @@ import { listMyServices } from "@/lib/data/services";
 import { listBookingsForDay, searchBookings } from "@/lib/data/bookings";
 import { DateNav } from "@/components/app/date-nav";
 import { BookingStatusSelect } from "@/components/app/booking-status-select";
+import { ExportPdfButton } from "@/components/app/export-pdf-button";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { formatDateLocal, formatTimeLocal } from "@/lib/format";
@@ -51,12 +52,20 @@ export default async function DashboardHomePage({ searchParams }: DashboardHomeP
           </p>
         </div>
         {!query && (
-          <DateNav
-            date={date}
-            prevDate={prevLocalDate(date)}
-            nextDate={nextLocalDate(date)}
-            todayDate={today}
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <DateNav
+              date={date}
+              prevDate={prevLocalDate(date)}
+              nextDate={nextLocalDate(date)}
+              todayDate={today}
+            />
+            <ExportPdfButton
+              studioName={studio.name}
+              date={date}
+              bookings={bookings}
+              serviceById={serviceById}
+            />
+          </div>
         )}
       </div>
 
