@@ -33,17 +33,19 @@ SUPABASE_SERVICE_ROLE_KEY=...       # secreta! nunca comitar, nunca prefixar com
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ```
 
-**Depois de preencher as chaves, rode a migração** —
-[`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql) — no
-SQL Editor do seu projeto (Dashboard → SQL Editor → New query, cole o
-arquivo inteiro e rode). Isso cria as tabelas, a constraint anti-colisão
-de horário e as policies de RLS.
+**Depois de preencher as chaves, rode as migrações** —
+[`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql) e
+[`supabase/migrations/0002_grants.sql`](supabase/migrations/0002_grants.sql)
+— no SQL Editor do seu projeto (Dashboard → SQL Editor → New query, cole o
+arquivo inteiro e rode), ou via qualquer conexão direta ao Postgres. Isso
+cria as tabelas, a constraint anti-colisão de horário, as policies de RLS
+e os grants de tabela.
 
-> Esta sessão não conseguiu aplicar a migração automaticamente: o MCP do
-> Supabase disponível aqui está autenticado numa conta diferente da dona
-> das chaves em `.env.local`, então rodar a migração por ele teria alterado
-> o projeto errado. Rode o SQL manualmente uma vez — depois disso tudo no
-> app já aponta para o banco real.
+> Já aplicadas no projeto `mcgecpnpxilrhavtbsfn` referenciado em
+> `.env.local` (2026-07-23): as 5 tabelas, RLS, a exclusion constraint
+> `bookings_no_overlap` e os grants estão todos confirmados via consulta
+> direta ao Postgres e via PostgREST. `npm run dev` já lê/escreve no banco
+> real — não precisa rodar nada manualmente para este projeto.
 
 Se quiser testar sem Supabase, **não precisa fazer nada**: sem
 `.env.local`, o app inteiro roda contra um store em memória (estúdio

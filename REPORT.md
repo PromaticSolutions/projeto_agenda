@@ -32,25 +32,37 @@ Trabalho autônomo das etapas 2 a 10, seguindo o system prompt original.
 
 ## 3. O que ficou mockado ou pendente
 
-### Bloqueado: migração ainda não aplicada no seu projeto real
-As chaves em `.env.local` apontam para um projeto Supabase real
-(`mcgecpnpxilrhavtbsfn`), mas o **MCP do Supabase disponível nesta sessão
-está autenticado numa conta diferente** (só enxerga
-`nztqgjffktrhbquvydvd`, de outro e-mail) — rodar a migração por ele teria
-alterado o projeto errado, então não fiz isso automaticamente.
+### Resolvido (2026-07-23): migração aplicada no projeto real
+Na sessão anterior o MCP do Supabase disponível estava autenticado numa
+conta diferente (`nztqgjffktrhbquvydvd`, não a dona de `mcgecpnpxilrhavtbsfn`
+em `.env.local`), então a migração não foi aplicada automaticamente.
 
-**O que você precisa fazer ao acordar:**
-1. Abrir https://supabase.com/dashboard/project/mcgecpnpxilrhavtbsfn/sql/new
-2. Colar o conteúdo de `supabase/migrations/0001_init.sql` e rodar.
-3. (Opcional, só se quiser testar cadastro sem configurar e-mail)
-   Desativar "Confirm email" em Authentication → Providers → Email.
-4. Pronto — a partir daí `npm run dev` já usa o banco real (as chaves já
-   estão em `.env.local`, só faltava a tabela existir).
+Nesta sessão o usuário forneceu a senha do Postgres. A conexão direta ao
+host `db.mcgecpnpxilrhavtbsfn.supabase.co` falhou (esse host só resolve em
+IPv6 e o sandbox não tem rota IPv6); a saída foi conectar via connection
+pooler (Supavisor) — `aws-0-ca-central-1.pooler.supabase.com:6543`, usuário
+`postgres.mcgecpnpxilrhavtbsfn` — que tem IPv4. `0001_init.sql` rodou limpo,
+mas o PostgREST retornou `permission denied` (42501) em todas as tabelas:
+as tabelas criadas via conexão direta como `postgres` não herdaram os
+grants padrão que o Supabase normalmente configura para `anon` /
+`authenticated` / `service_role`. Corrigido com uma nova migração,
+`supabase/migrations/0002_grants.sql` (grants explícitos + `alter default
+privileges`, idempotente), também aplicada.
 
-Sem esse passo, `/app` mostra uma tela de erro explicando exatamente isso
-(`src/app/app/error.tsx`, detecta o erro `PGRST205` do Postgrest e mostra
-a instrução) em vez de quebrar — mas nada foi testado ainda contra o
-banco real de produção porque, até o fim desta sessão, ele seguia vazio.
+**Confirmado por consulta direta ao Postgres e via PostgREST:**
+- As 5 tabelas existem (`studios`, `services`, `working_hours`, `blocks`,
+  `bookings`), todas com `rowsecurity = true`.
+- As 5 policies de dono (`owner manages own ...`) estão no lugar.
+- A exclusion constraint `bookings_no_overlap` existe (`contype = 'x'`).
+- `service_role` lê todas as tabelas (antes: 42501); `anon` lê e recebe
+  `[]` (RLS filtrando corretamente, sem erro de permissão).
+
+`npm run dev` já lê/escreve no banco real — não sobrou nenhum passo manual
+pendente para este projeto. O único cuidado: se você recriar o projeto do
+zero, rode as duas migrações (`0001_init.sql` **e** `0002_grants.sql`) —
+rodar só a primeira via conexão direta reproduz o mesmo erro de permissão
+(rodar pelo SQL Editor do Dashboard normalmente já inclui os grants por
+padrão, mas rodar 0002 depois não tem custo).
 
 ### Funciona, mas é mock (sem exigir nada seu)
 Se você preferir só ver o app rodando antes de mexer no Supabase:
