@@ -1,13 +1,13 @@
 import { redirect } from "next/navigation";
 import { DashboardShell } from "@/components/app/dashboard-shell";
 import { getMyStudio } from "@/lib/data/studios";
+import { getStudioPublicUrl } from "@/lib/format";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const studio = await getMyStudio();
   if (!studio) redirect("/app/onboarding");
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
-  const publicUrl = `${siteUrl}/${studio.slug}`;
+  const publicUrl = getStudioPublicUrl(studio.slug);
 
   return (
     <DashboardShell studio={studio} publicUrl={publicUrl}>

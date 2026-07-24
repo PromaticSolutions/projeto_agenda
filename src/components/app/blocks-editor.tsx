@@ -38,7 +38,7 @@ export function BlocksEditor({ blocks }: { blocks: Block[] }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <form action={formAction} className="flex flex-wrap items-end gap-2 rounded-lg border border-border p-3">
+      <form action={formAction} className="flex flex-wrap items-end gap-2 rounded-2xl bg-card p-4 shadow-sm ring-1 ring-plum-900/5">
         <div className="flex flex-col gap-1">
           <Label htmlFor="block-date" className="text-xs">Data</Label>
           <Input id="block-date" type="date" name="date" required className="h-8 w-36 text-xs" />
@@ -64,14 +64,14 @@ export function BlocksEditor({ blocks }: { blocks: Block[] }) {
       {sorted.length === 0 ? (
         <p className="text-sm text-muted-foreground">Nenhum bloqueio cadastrado.</p>
       ) : (
-        <div className="flex flex-col divide-y divide-border rounded-lg border border-border">
+        <div className="flex flex-col divide-y divide-border/70 rounded-2xl bg-card px-4 shadow-sm ring-1 ring-plum-900/5">
           {sorted.map((block) => {
             const start = new Date(block.start_at);
             const end = new Date(block.end_at);
             return (
-              <div key={block.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
+              <div key={block.id} className="flex items-center justify-between gap-3 py-2.5">
                 <div className="text-sm">
-                  <p className="font-medium">
+                  <p className="font-medium text-plum-900">
                     {formatFullDateLocal(start)} · {formatTimeLocal(start)}–{formatTimeLocal(end)}
                   </p>
                   {block.reason && <p className="text-xs text-muted-foreground">{block.reason}</p>}

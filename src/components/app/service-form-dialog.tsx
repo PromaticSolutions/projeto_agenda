@@ -21,6 +21,7 @@ import {
   type ServiceActionState,
 } from "@/app/app/(dashboard)/services/actions";
 import { centsToReaisInput } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import type { Service } from "@/lib/types";
 
 const PRESET_COLORS = ["#7C3AED", "#8B5CF6", "#E23FA0", "#A93CC9", "#25D366", "#241238"];
@@ -101,31 +102,39 @@ export function ServiceFormDialog({ service }: { service?: Service }) {
 
           <div className="flex flex-col gap-2">
             <Label htmlFor="color">Cor</Label>
-            <div className="flex items-center gap-2">
-              <Input
-                id="color"
-                name="color"
-                type="color"
-                value={color}
-                onChange={(e) => setColor(e.target.value)}
-                className="h-9 w-12 p-1"
-              />
+            <div className="flex items-center gap-3 rounded-xl border border-input px-2.5 py-2">
+              <div className="relative size-8 shrink-0 overflow-hidden rounded-full ring-1 ring-plum-900/10">
+                <Input
+                  id="color"
+                  name="color"
+                  type="color"
+                  value={color}
+                  onChange={(e) => setColor(e.target.value)}
+                  className="size-12 -translate-x-2 -translate-y-2 cursor-pointer border-0 p-0"
+                />
+              </div>
               <div className="flex gap-1.5">
-                {PRESET_COLORS.map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    onClick={() => setColor(preset)}
-                    className="size-6 rounded-full ring-1 ring-border ring-offset-1 ring-offset-background"
-                    style={{ backgroundColor: preset }}
-                    aria-label={preset}
-                  />
-                ))}
+                {PRESET_COLORS.map((preset) => {
+                  const selected = preset.toLowerCase() === color.toLowerCase();
+                  return (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setColor(preset)}
+                      className={cn(
+                        "size-6 rounded-full ring-offset-2 ring-offset-background transition-shadow",
+                        selected ? "ring-2 ring-plum-900" : "ring-1 ring-border hover:ring-plum-900/30"
+                      )}
+                      style={{ backgroundColor: preset }}
+                      aria-label={preset}
+                    />
+                  );
+                })}
               </div>
             </div>
           </div>
 
-          <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+          <div className="flex items-center justify-between rounded-xl bg-muted/40 px-3.5 py-2.5">
             <Label htmlFor="active" className="cursor-pointer">
               Serviço ativo (visível na página pública)
             </Label>

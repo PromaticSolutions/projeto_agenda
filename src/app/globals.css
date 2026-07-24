@@ -157,3 +157,42 @@
     #e23fa0 100%
   );
 }
+
+/* Motivo "comprovante de agendamento": mordida circular na lateral do
+   cartão, na altura da linha pontilhada que separa as seções — como o
+   picote de um ticket. --seam-bg deve ser a cor do fundo por trás do
+   cartão (a mordida "revela" esse fundo). */
+@utility ticket-seam {
+  position: relative;
+
+  &::before,
+  &::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    width: 18px;
+    height: 18px;
+    border-radius: 9999px;
+    background: var(--seam-bg, var(--blush-50));
+    transform: translateY(-50%);
+  }
+
+  &::before {
+    left: -9px;
+  }
+
+  &::after {
+    right: -9px;
+  }
+}
+
+/* Motivo "trilho do dia": linha vertical em degradê da marca, usada na
+   agenda do painel para ancorar os agendamentos no tempo. */
+@utility day-rail-line {
+  background-image: linear-gradient(
+    to bottom,
+    var(--violet-600),
+    var(--magenta) 60%,
+    transparent
+  );
+}

@@ -47,3 +47,8 @@ const fullDateFormatter = new Intl.DateTimeFormat("pt-BR", {
 export function formatFullDateLocal(date: Date): string {
   return fullDateFormatter.format(date);
 }
+
+export function getStudioPublicUrl(slug: string): string {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  return `${siteUrl}/${slug}`;
+}

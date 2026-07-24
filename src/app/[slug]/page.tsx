@@ -26,9 +26,9 @@ export default async function PublicStudioPage(props: StudioPageProps) {
   const services = await listPublicServices(studio.id);
 
   return (
-    <div className="flex flex-1 flex-col">
+    <div className="flex flex-1 flex-col bg-blush-50">
       <header
-        className="flex flex-col items-center gap-3 px-4 py-10 text-center text-white"
+        className="relative flex flex-col items-center gap-3 rounded-b-[2.5rem] px-4 pt-12 pb-16 text-center text-white"
         style={{ backgroundColor: studio.brand_color }}
       >
         {studio.logo_url ? (
@@ -36,20 +36,22 @@ export default async function PublicStudioPage(props: StudioPageProps) {
           <img
             src={studio.logo_url}
             alt={studio.name}
-            className="size-16 rounded-full border-2 border-white/40 object-cover"
+            className="size-20 rounded-full border-2 border-white/40 object-cover shadow-lg"
           />
         ) : (
-          <span className="flex size-16 items-center justify-center rounded-full bg-white/15 font-heading text-2xl font-semibold">
+          <span className="flex size-20 items-center justify-center rounded-full bg-white/15 font-heading text-3xl font-semibold shadow-lg ring-4 ring-white/15">
             {studio.name.slice(0, 1).toUpperCase()}
           </span>
         )}
-        <h1 className="font-heading text-2xl font-semibold">{studio.name}</h1>
-        <p className="text-sm text-white/85">Escolha o serviço, o dia e o horário</p>
+        <div>
+          <h1 className="font-heading text-2xl font-semibold">{studio.name}</h1>
+          <p className="mt-1 text-sm text-white/80">Escolha o serviço, o dia e o horário</p>
+        </div>
       </header>
 
-      <main className="mx-auto w-full max-w-lg flex-1 px-4 py-6">
+      <main className="relative mx-auto -mt-9 w-full max-w-lg flex-1 px-4 pb-10">
         {services.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-border p-8 text-center text-muted-foreground">
+          <p className="rounded-2xl border border-dashed border-plum-900/15 bg-card p-8 text-center text-muted-foreground shadow-sm">
             Nenhum serviço disponível para agendamento no momento.
           </p>
         ) : (
@@ -58,7 +60,8 @@ export default async function PublicStudioPage(props: StudioPageProps) {
       </main>
 
       <footer className="px-4 py-6 text-center text-xs text-muted-foreground">
-        Agendamento por Agenda Online
+        Agendamento por{" "}
+        <span className="font-medium text-plum-900">Agenda Online</span>
       </footer>
     </div>
   );
