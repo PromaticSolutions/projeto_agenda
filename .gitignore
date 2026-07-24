@@ -37,6 +37,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# claude skills (instalados localmente, não fazem parte do código do produto)
+/.claude/skills
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
