@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { getPublicStudioBySlug } from "@/lib/data/studios";
 import { listPublicServices } from "@/lib/data/services";
 import { BookingFlow } from "@/components/public/booking-flow";
+import { CalendarCheck2, ShieldCheck, Sparkles } from "lucide-react";
 
 interface StudioPageProps {
   params: Promise<{ slug: string }>;
@@ -26,11 +27,17 @@ export default async function PublicStudioPage(props: StudioPageProps) {
   const services = await listPublicServices(studio.id);
 
   return (
-    <div className="flex flex-1 flex-col bg-blush-50">
+    <div className="public-booking-page relative flex flex-1 flex-col overflow-hidden bg-[#f8f7ff]">
+      <div aria-hidden className="public-orb public-orb-one" />
+      <div aria-hidden className="public-orb public-orb-two" />
       <header
-        className="relative flex flex-col items-center gap-3 rounded-b-[2.5rem] px-4 pt-12 pb-16 text-center text-white"
+        className="relative mx-3 mt-3 flex flex-col items-center gap-4 overflow-hidden rounded-[2rem] px-5 pt-10 pb-20 text-center text-white shadow-2xl shadow-violet-950/15 sm:mx-5 sm:rounded-[2.5rem]"
         style={{ backgroundColor: studio.brand_color }}
       >
+        <div aria-hidden className="absolute inset-0 bg-[radial-gradient(circle_at_15%_0%,rgba(255,255,255,.3),transparent_32%),radial-gradient(circle_at_90%_95%,rgba(21,7,47,.35),transparent_45%)]" />
+        <div className="relative inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-bold tracking-[0.12em] uppercase backdrop-blur">
+          <Sparkles className="size-3" /> agenda online
+        </div>
         {studio.logo_url ? (
           // eslint-disable-next-line @next/next/no-img-element -- logo hospedado externamente pelo dono
           <img
@@ -44,12 +51,16 @@ export default async function PublicStudioPage(props: StudioPageProps) {
           </span>
         )}
         <div>
-          <h1 className="font-heading text-2xl font-semibold">{studio.name}</h1>
-          <p className="mt-1 text-sm text-white/80">Escolha o serviço, o dia e o horário</p>
+          <h1 className="font-heading text-3xl font-semibold tracking-tight">{studio.name}</h1>
+          <p className="mt-1 text-sm text-white/80">Seu próximo momento começa por aqui.</p>
+        </div>
+        <div className="relative mt-1 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs font-medium text-white/80">
+          <span className="flex items-center gap-1.5"><CalendarCheck2 className="size-3.5" /> reserva em poucos passos</span>
+          <span className="flex items-center gap-1.5"><ShieldCheck className="size-3.5" /> confirmação imediata</span>
         </div>
       </header>
 
-      <main className="relative mx-auto -mt-9 w-full max-w-lg flex-1 px-4 pb-10">
+      <main className="relative mx-auto -mt-12 w-full max-w-xl flex-1 px-4 pb-10 sm:px-5">
         {services.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-plum-900/15 bg-card p-8 text-center text-muted-foreground shadow-sm">
             Nenhum serviço disponível para agendamento no momento.
@@ -59,9 +70,10 @@ export default async function PublicStudioPage(props: StudioPageProps) {
         )}
       </main>
 
-      <footer className="px-4 py-6 text-center text-xs text-muted-foreground">
-        Agendamento por{" "}
-        <span className="font-medium text-plum-900">Agenda Online</span>
+      <footer className="relative px-4 py-7 text-center text-xs text-muted-foreground">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-950/8 bg-white/60 px-3 py-1.5 shadow-sm">
+          <Sparkles className="size-3 text-violet-600" /> Agendamento por <span className="font-semibold text-plum-900">Agenda Online</span>
+        </span>
       </footer>
     </div>
   );

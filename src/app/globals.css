@@ -196,3 +196,55 @@
     transparent
   );
 }
+
+@layer base {
+  ::selection {
+    background: color-mix(in srgb, var(--violet-500) 26%, white);
+  }
+}
+
+.public-booking-page {
+  background-image: linear-gradient(180deg, #f4f0ff 0%, #fbfaff 38%, #f7f7fc 100%);
+}
+
+.public-orb {
+  position: fixed;
+  z-index: 0;
+  pointer-events: none;
+  width: 26rem;
+  height: 26rem;
+  border-radius: 9999px;
+  filter: blur(72px);
+  opacity: .28;
+}
+
+.public-orb-one { top: 18rem; left: -17rem; background: #a855f7; }
+.public-orb-two { right: -18rem; bottom: 3rem; background: #ec4899; }
+
+/* Componentes mais antigos ainda usam o token de marca diretamente para texto.
+   No tema escuro ele passa a respeitar a cor semântica de primeiro plano. */
+.dark .text-plum-900 { color: var(--foreground); }
+
+.auth-motion-bg::before,
+.auth-motion-bg::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  border-radius: 9999px;
+  pointer-events: none;
+  filter: blur(50px);
+  animation: ambient-drift 13s ease-in-out infinite alternate;
+}
+.auth-motion-bg::before { width: 19rem; height: 19rem; top: 8%; right: -9rem; background: rgb(168 85 247 / .18); }
+.auth-motion-bg::after { width: 15rem; height: 15rem; bottom: 2%; left: -7rem; background: rgb(226 63 160 / .13); animation-delay: -6s; }
+.auth-float { position: absolute; z-index: 0; pointer-events: none; color: rgb(124 58 237 / .32); border: 1px solid rgb(124 58 237 / .12); background: rgb(255 255 255 / .36); backdrop-filter: blur(8px); animation: float-soft 7s ease-in-out infinite; }
+.auth-float-one { top: 18%; right: 12%; display: flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; border-radius: 1rem; transform: rotate(10deg); }
+.auth-float-two { bottom: 16%; right: 20%; width: .8rem; height: .8rem; border-radius: 9999px; animation-delay: -2s; }
+.auth-float-three { top: 28%; left: 13%; width: 1.2rem; height: 1.2rem; border-radius: .4rem; transform: rotate(28deg); animation-delay: -4s; }
+@keyframes ambient-drift { from { transform: translate3d(0, 0, 0) scale(1); } to { transform: translate3d(3rem, 1.5rem, 0) scale(1.12); } }
+@keyframes float-soft { 0%, 100% { translate: 0 0; } 50% { translate: 0 -14px; } }
+@media (prefers-reduced-motion: reduce) { .auth-motion-bg::before, .auth-motion-bg::after, .auth-float { animation: none; } }
+
+.account-card { transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease; }
+@media (hover: hover) { .account-card:hover { transform: translateY(-3px); box-shadow: 0 18px 40px rgb(36 18 56 / .10); border-color: rgb(124 58 237 / .22); } }
+.dark .account-card:hover { box-shadow: 0 18px 40px rgb(0 0 0 / .25); }

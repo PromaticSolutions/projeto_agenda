@@ -2,17 +2,19 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, Clock, Scissors } from "lucide-react";
+import { CalendarDays, CircleUserRound, Clock, Scissors, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SignOutButton } from "@/components/app/sign-out-button";
 import { CopyLinkButton } from "@/components/app/copy-link-button";
 import { CommandPalette } from "@/components/app/command-palette";
+import { ThemeToggle } from "@/components/app/theme-toggle";
 import type { Studio } from "@/lib/types";
 
 const NAV_ITEMS = [
   { href: "/app", label: "Painel do dia", icon: CalendarDays },
   { href: "/app/services", label: "Serviços", icon: Scissors },
   { href: "/app/hours", label: "Horários", icon: Clock },
+  { href: "/app/account", label: "Conta", icon: CircleUserRound },
 ];
 
 export function DashboardShell({
@@ -27,8 +29,10 @@ export function DashboardShell({
   const pathname = usePathname();
 
   return (
-    <div className="flex min-h-screen w-full flex-col md:flex-row">
-      <aside className="flex shrink-0 flex-col gap-6 bg-plum-900 px-4 py-5 md:w-64 md:px-5 md:py-6">
+    <div className="flex min-h-screen w-full flex-col bg-[#f7f5fc] transition-colors dark:bg-[#171020] md:flex-row">
+      <aside className="relative flex shrink-0 flex-col gap-6 overflow-hidden bg-plum-900 px-4 py-5 md:w-70 md:px-5 md:py-6">
+        <div aria-hidden className="pointer-events-none absolute -top-20 -right-20 size-48 rounded-full bg-violet-500/25 blur-3xl" />
+        <div aria-hidden className="pointer-events-none absolute bottom-24 -left-20 size-44 rounded-full bg-magenta/15 blur-3xl" />
         <div className="flex items-center gap-2.5">
           <span
             className="flex size-9 items-center justify-center rounded-full text-sm font-semibold text-white ring-2 ring-white/15"
@@ -44,7 +48,7 @@ export function DashboardShell({
           </div>
         </div>
 
-        <nav className="flex flex-row gap-1 overflow-x-auto md:flex-col md:overflow-visible">
+        <nav className="relative flex flex-row gap-1 overflow-x-auto md:flex-col md:overflow-visible">
           {NAV_ITEMS.map((item) => {
             const active = pathname === item.href;
             const Icon = item.icon;
@@ -53,7 +57,7 @@ export function DashboardShell({
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                  "flex items-center gap-2.5 whitespace-nowrap rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
                   active
                     ? "bg-cta text-white shadow-sm shadow-black/20"
                     : "text-white/60 hover:bg-white/8 hover:text-white"
@@ -66,8 +70,8 @@ export function DashboardShell({
           })}
         </nav>
 
-        <div className="mt-auto hidden flex-col gap-2 border-t border-white/10 pt-4 md:flex">
-          <p className="text-xs text-white/45">Link público</p>
+        <div className="relative mt-auto hidden flex-col gap-2 rounded-2xl border border-white/10 bg-white/5 p-3 md:flex">
+          <p className="flex items-center gap-1.5 text-xs text-white/55"><Sparkles className="size-3 text-magenta" /> Link público</p>
           <CopyLinkButton
             url={publicUrl}
             className="border-white/15 bg-white/5 text-white hover:bg-white/10"
@@ -76,14 +80,14 @@ export function DashboardShell({
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center justify-between border-b border-border px-4 py-3 md:px-8">
+        <header className="flex items-center justify-between border-b border-violet-950/6 bg-white/70 px-4 py-3 backdrop-blur-xl transition-colors dark:border-white/8 dark:bg-[#21172c]/80 md:px-8">
           <div className="flex flex-col gap-2 md:hidden">
             <CopyLinkButton url={publicUrl} />
           </div>
           <CommandPalette />
-          <SignOutButton />
+          <div className="flex items-center gap-1"><ThemeToggle /><SignOutButton /></div>
         </header>
-        <main className="flex-1 bg-blush-50 px-4 py-6 md:px-8 md:py-8">{children}</main>
+        <main className="flex-1 bg-[radial-gradient(circle_at_88%_0%,#eee6ff_0,transparent_27%),linear-gradient(180deg,#faf9ff_0%,#f7f5fc_100%)] px-4 py-6 transition-colors dark:bg-[radial-gradient(circle_at_88%_0%,#30203f_0,transparent_28%),linear-gradient(180deg,#171020_0%,#20152b_100%)] md:px-8 md:py-9">{children}</main>
       </div>
     </div>
   );

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties } from "react";
-import { CalendarIcon, Check, Copy } from "lucide-react";
+import { CalendarIcon, Check, CheckCircle2, Copy, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -53,6 +53,8 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
     </p>
   );
 }
+
+const FLOW_STEPS = ["Escolha", "Horário", "Seus dados"];
 
 export function BookingFlow({ studio, services }: { studio: Studio; services: Service[] }) {
   const [step, setStep] = useState<Step>("service");
@@ -139,6 +141,11 @@ export function BookingFlow({ studio, services }: { studio: Studio; services: Se
     setService(svc);
     setStep("datetime");
     void fetchSlots(svc, date);
+  }
+
+  function backToServices() {
+    setStep("service");
+    setSelectedSlot(null);
   }
 
   function handleSelectDate(newDate: Date | undefined) {
@@ -307,9 +314,31 @@ export function BookingFlow({ studio, services }: { studio: Studio; services: Se
         )}
       </div>
 
-      <div className="ticket-card relative overflow-hidden rounded-3xl bg-card shadow-xl shadow-plum-900/10 ring-1 ring-plum-900/5">
-      <div className="flex flex-col gap-3 p-5">
-        <FieldLabel>Serviço</FieldLabel>
+      <div className="ticket-card relative overflow-hidden rounded-[1.75rem] bg-card shadow-2xl shadow-violet-950/10 ring-1 ring-violet-950/5">
+      <div className="border-b border-violet-950/6 bg-[linear-gradient(120deg,#fff_0%,#fbf8ff_52%,#f7f0ff_100%)] px-5 py-4 sm:px-6">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[11px] font-bold tracking-[0.14em] text-violet-600 uppercase">Reserva inteligente</p>
+            <p className="mt-0.5 text-sm text-muted-foreground">Leva menos de um minuto.</p>
+          </div>
+          <Sparkles className="size-5 text-magenta" />
+        </div>
+        <ol className="mt-4 grid grid-cols-3 gap-2" aria-label="Progresso da reserva">
+          {FLOW_STEPS.map((label, index) => {
+            const isActive = (step === "service" && index === 0) || (step === "datetime" && index === 1) || (step === "details" && index === 2);
+            const isDone = (step === "datetime" && index === 0) || (step === "details" && index < 2);
+            return <li key={label} className="min-w-0">
+              <div className={cn("h-1 rounded-full transition-colors duration-500", isActive || isDone ? "bg-violet-600" : "bg-violet-950/8")} />
+              <p className={cn("mt-1.5 truncate text-[10px] font-bold tracking-wide uppercase", isActive ? "text-violet-700" : isDone ? "text-violet-500" : "text-muted-foreground/60")}>{label}</p>
+            </li>;
+          })}
+        </ol>
+      </div>
+      <div className="flex flex-col gap-3 p-5 sm:p-6">
+        <div className="flex items-center justify-between">
+          <FieldLabel>Escolha seu serviço</FieldLabel>
+          {service && <button type="button" onClick={backToServices} className="text-xs font-semibold text-violet-600 hover:text-violet-800">Alterar</button>}
+        </div>
         <div className="flex flex-col gap-2.5">
           {services.map((svc) => {
             const selected = service?.id === svc.id;
@@ -320,14 +349,14 @@ export function BookingFlow({ studio, services }: { studio: Studio; services: Se
                 type="button"
                 onClick={() => handleSelectService(svc)}
                 className={cn(
-                  "flex items-center justify-between gap-3 rounded-2xl border p-3.5 text-left transition-colors",
+                  "group flex items-center justify-between gap-3 rounded-2xl border p-3.5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-violet-950/5",
                   selected
-                    ? "border-violet-600 bg-violet-600/5 ring-1 ring-violet-600"
+                    ? "border-violet-600 bg-violet-600/5 ring-1 ring-violet-600 shadow-md shadow-violet-950/5"
                     : "border-border hover:border-violet-500/50"
                 )}
               >
                 <div className="flex items-center gap-3">
-                  <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: svc.color }} />
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-violet-950/[.04]" style={{ color: svc.color }}><span className="size-2.5 rounded-full shadow-[0_0_0_4px_currentColor]" style={{ backgroundColor: "currentColor" }} /></span>
                   <div>
                     <p className="font-medium text-plum-900">{svc.name}</p>
                     <p className="text-sm text-muted-foreground">
@@ -338,7 +367,7 @@ export function BookingFlow({ studio, services }: { studio: Studio; services: Se
                     </p>
                   </div>
                 </div>
-                <p className="shrink-0 font-heading font-semibold text-violet-600">
+                <p className="shrink-0 font-heading font-semibold text-violet-600 transition-transform group-hover:scale-105">
                   {formatPriceCents(svc.price_cents)}
                 </p>
               </button>
@@ -350,9 +379,9 @@ export function BookingFlow({ studio, services }: { studio: Studio; services: Se
       {service && (
         <>
           <TicketDivider />
-          <div className="flex flex-col gap-4 p-5">
+          <div className="flex flex-col gap-4 p-5 sm:p-6">
             <div className="flex items-center justify-between gap-3">
-              <FieldLabel>Data e horário</FieldLabel>
+              <div><FieldLabel>Data e horário</FieldLabel><p className="mt-1 text-sm text-muted-foreground">Escolha o melhor momento para você.</p></div>
               <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
                 <PopoverTrigger
                   render={<Button variant="outline" size="sm" className="gap-2" />}
@@ -395,7 +424,7 @@ export function BookingFlow({ studio, services }: { studio: Studio; services: Se
                       type="button"
                       onClick={() => handleSelectSlot(slot)}
                       className={cn(
-                        "rounded-xl border px-2 py-2 text-sm font-medium transition-colors",
+                        "rounded-xl border px-2 py-2 text-sm font-semibold tabular-nums transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md",
                         selectedSlot?.start === slot.start
                           ? "border-violet-600 bg-violet-600 text-white"
                           : "border-border hover:border-violet-500/50"
@@ -417,9 +446,9 @@ export function BookingFlow({ studio, services }: { studio: Studio; services: Se
           <form
             id="booking-details-form"
             onSubmit={handleSubmit}
-            className="flex flex-col gap-4 p-5 pb-2"
+            className="flex flex-col gap-4 p-5 pb-2 sm:p-6 sm:pb-2"
           >
-            <FieldLabel>Seus dados</FieldLabel>
+            <div className="flex items-center justify-between"><FieldLabel>Quase pronto</FieldLabel><span className="flex items-center gap-1 text-xs font-semibold text-wa"><CheckCircle2 className="size-3.5" /> horário reservado para você</span></div>
             <p className="-mt-2 text-sm text-muted-foreground">
               {service.name} · {formatDateLocal(date)} às {formatTimeLocal(new Date(selectedSlot.start))}
             </p>
