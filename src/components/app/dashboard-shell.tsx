@@ -30,7 +30,7 @@ export function DashboardShell({
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-[#f7f5fc] transition-colors dark:bg-[#171020] md:flex-row">
-      <aside className="relative flex shrink-0 flex-col gap-6 overflow-hidden bg-plum-900 px-4 py-5 md:w-70 md:px-5 md:py-6">
+      <aside className="relative flex shrink-0 flex-col gap-6 overflow-hidden bg-white/95 border border-violet-950/5 px-4 py-5 shadow-sm dark:bg-plum-900 dark:border-transparent md:w-70 md:px-5 md:py-6">
         <div aria-hidden className="pointer-events-none absolute -top-20 -right-20 size-48 rounded-full bg-violet-500/25 blur-3xl" />
         <div aria-hidden className="pointer-events-none absolute bottom-24 -left-20 size-44 rounded-full bg-magenta/15 blur-3xl" />
         <div className="flex items-center gap-2.5">
@@ -41,10 +41,10 @@ export function DashboardShell({
             {studio.name.slice(0, 1).toUpperCase()}
           </span>
           <div className="min-w-0">
-            <p className="truncate font-heading text-base font-semibold text-blush-50">
+            <p className="truncate font-heading text-base font-semibold text-plum-900 dark:text-blush-50">
               {studio.name}
             </p>
-            <p className="truncate text-xs text-white/45">/{studio.slug}</p>
+            <p className="truncate text-xs text-plum-500 dark:text-white/45">/{studio.slug}</p>
           </div>
         </div>
 
@@ -60,7 +60,7 @@ export function DashboardShell({
                   "flex items-center gap-2.5 whitespace-nowrap rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
                   active
                     ? "bg-cta text-white shadow-sm shadow-black/20"
-                    : "text-white/60 hover:bg-white/8 hover:text-white"
+                    : "text-plum-900/75 hover:bg-violet-100 hover:text-plum-900 dark:text-white/60 dark:hover:bg-white/8 dark:hover:text-white"
                 )}
               >
                 <Icon className="size-4" />
@@ -70,11 +70,11 @@ export function DashboardShell({
           })}
         </nav>
 
-        <div className="relative mt-auto hidden flex-col gap-2 rounded-2xl border border-white/10 bg-white/5 p-3 md:flex">
-          <p className="flex items-center gap-1.5 text-xs text-white/55"><Sparkles className="size-3 text-magenta" /> Link público</p>
+        <div className="relative mt-auto hidden flex-col gap-2 rounded-2xl border border-violet-950/10 bg-slate-50/80 p-3 text-plum-900 shadow-sm dark:flex dark:border-white/10 dark:bg-white/5 dark:text-white md:flex">
+          <p className="flex items-center gap-1.5 text-xs text-plum-500 dark:text-white/55"><Sparkles className="size-3 text-magenta" /> Link público</p>
           <CopyLinkButton
             url={publicUrl}
-            className="border-white/15 bg-white/5 text-white hover:bg-white/10"
+            className="border-violet-950/10 bg-white/80 text-plum-900 hover:bg-violet-100 dark:border-white/15 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
           />
         </div>
       </aside>

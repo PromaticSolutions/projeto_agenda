@@ -13,21 +13,21 @@ export default function LoginPage() {
   return (
     <div className="flex flex-1 lg:grid lg:grid-cols-2">
       <AuthShowcasePanel className="hidden lg:flex" />
-      <div className="auth-motion-bg relative flex flex-1 flex-col items-center justify-center gap-6 overflow-hidden px-4 py-16">
+      <div className="auth-motion-bg relative flex flex-1 flex-col items-center justify-center gap-8 overflow-hidden px-4 py-16 sm:px-6 lg:px-8">
         <AuthBackdrop />
         <div aria-hidden className="auth-float auth-float-one"><Sparkles className="size-4" /></div>
         <div aria-hidden className="auth-float auth-float-two" />
         <div aria-hidden className="auth-float auth-float-three" />
         <BrandMark />
         {!isSupabaseConfigured && <div className="w-full max-w-sm"><DemoModeNotice /></div>}
-        <Card className="relative w-full max-w-sm overflow-hidden border-violet-950/8 bg-white/85 shadow-2xl shadow-violet-950/10 backdrop-blur-xl">
+        <Card className="relative w-full max-w-sm overflow-hidden border border-violet-500/20 bg-violet-950/100 shadow-[0_24px_70px_rgba(0,0,0,0.35)] backdrop-blur-xl">
           <div className="h-1 bg-cta" />
-          <CardHeader className="pb-4">
-            <p className="mb-2 text-[11px] font-bold tracking-[.14em] text-violet-600 uppercase">Bem-vindo de volta</p>
-            <CardTitle className="font-heading text-2xl">Sua agenda te espera.</CardTitle>
-            <CardDescription>Entre para acompanhar cada atendimento em tempo real.</CardDescription>
+          <CardHeader className="px-6 pb-5 pt-6">
+            <p className="mb-2 text-[11px] font-bold tracking-[.18em] text-violet-300 uppercase">Bem-vindo de volta</p>
+            <CardTitle className="font-heading text-[1.7rem] leading-tight text-white">Sua agenda te espera.</CardTitle>
+            <CardDescription className="mt-2 text-sm leading-6 text-violet-200/80">Entre para acompanhar cada atendimento em tempo real.</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-6 pb-6">
             <Suspense>
               <LoginForm />
             </Suspense>

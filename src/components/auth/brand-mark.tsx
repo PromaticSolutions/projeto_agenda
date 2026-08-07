@@ -25,14 +25,14 @@ export function AuthShowcasePanel({ className }: { className?: string }) {
         <span className="flex size-9 items-center justify-center rounded-xl bg-cta text-white shadow-md shadow-violet-600/25">
           <CalendarDays className="size-5" />
         </span>
-        <span className="font-heading text-xl font-semibold">Agenda Online</span>
+        <span className="font-heading text-[1.3rem] font-semibold tracking-[0.01em]">Agenda Online</span>
       </div>
 
       <div className="relative max-w-sm">
-        <h2 className="font-heading text-3xl leading-tight font-semibold">
+        <h2 className="font-heading text-[2rem] leading-tight font-semibold tracking-[0.01em] sm:text-[2.35rem]">
           Sua agenda, sempre aberta — mesmo enquanto você atende.
         </h2>
-        <ul className="mt-6 flex flex-col gap-4 text-sm text-blush-50/80">
+        <ul className="mt-6 flex flex-col gap-4 text-sm leading-6 text-blush-50/80">
           {SHOWCASE_BENEFITS.map((benefit) => (
             <li key={benefit} className="flex items-start gap-3">
               <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-white/10">
@@ -57,7 +57,7 @@ export function BrandMark() {
       <span className="flex size-9 items-center justify-center rounded-xl bg-cta text-white shadow-md shadow-violet-600/25">
         <CalendarDays className="size-5" />
       </span>
-      <span className="font-heading text-xl font-semibold text-plum-900">Agenda Online</span>
+      <span className="font-heading text-[1.2rem] font-semibold tracking-[0.01em] text-plum-900">Agenda Online</span>
     </Link>
   );
 }
@@ -70,6 +70,7 @@ export function AuthBackdrop() {
     >
       <div className="absolute left-1/2 top-[-12rem] size-[36rem] -translate-x-1/2 rounded-full bg-violet-500/20 blur-3xl" />
       <div className="absolute bottom-[-10rem] right-[-6rem] size-[28rem] rounded-full bg-magenta/15 blur-3xl" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.08),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(226,63,160,0.16),transparent_38%)]" />
     </div>
   );
 }

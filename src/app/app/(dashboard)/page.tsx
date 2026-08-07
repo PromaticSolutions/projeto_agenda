@@ -45,19 +45,19 @@ export default async function DashboardHomePage({ searchParams }: DashboardHomeP
 
   return (
     <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-7">
-      <div className="relative overflow-hidden rounded-[2rem] border border-violet-950/6 bg-plum-900 px-6 py-7 text-white shadow-2xl shadow-violet-950/15 sm:px-9 sm:py-9">
-        <div aria-hidden className="absolute -top-20 right-0 size-56 rounded-full bg-violet-500/45 blur-3xl" />
-        <div aria-hidden className="absolute -bottom-28 left-1/3 size-52 rounded-full bg-magenta/25 blur-3xl" />
+      <div className="relative overflow-hidden rounded-[2rem] border border-violet-950/6 bg-white text-plum-900 shadow-2xl shadow-violet-950/5 sm:px-9 sm:py-9 dark:bg-plum-900 dark:text-white dark:shadow-violet-950/15">
+        <div aria-hidden className="absolute -top-20 right-0 size-56 rounded-full bg-violet-500/20 blur-3xl dark:bg-violet-500/45" />
+        <div aria-hidden className="absolute -bottom-28 left-1/3 size-52 rounded-full bg-magenta/10 blur-3xl dark:bg-magenta/25" />
         <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold tracking-[.14em] text-white/60 uppercase"><Sparkles className="size-3.5 text-magenta" /> central de atendimento</p>
-          <h1 className="font-heading text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+          <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold tracking-[.14em] text-violet-600 uppercase dark:text-white/60"><Sparkles className="size-3.5 text-magenta" /> central de atendimento</p>
+          <h1 className="font-heading text-3xl font-semibold tracking-tight text-plum-900 sm:text-4xl dark:text-white">
             {query ? "Busca" : "Painel do dia"}
           </h1>
-          <p className="mt-1 text-white/65">
+          <p className="mt-1 text-slate-500 dark:text-white/65">
             {query ? `Resultados para "${query}"` : formatDateLocal(new Date(`${date}T12:00:00`))}
           </p>
-          {!query && <p className="mt-3 inline-flex rounded-full border border-white/10 bg-white/8 px-2.5 py-1 text-xs font-medium text-white/75">{counters.total === 0 ? "Sua agenda está livre por enquanto" : `${counters.total} ${counters.total === 1 ? "reserva prevista" : "reservas previstas"} para este dia`}</p>}
+          {!query && <p className="mt-3 inline-flex rounded-full border border-violet-950/10 bg-violet-50/70 px-2.5 py-1 text-xs font-medium text-plum-900/75 dark:border-white/10 dark:bg-white/10 dark:text-white/75">{counters.total === 0 ? "Sua agenda está livre por enquanto" : `${counters.total} ${counters.total === 1 ? "reserva prevista" : "reservas previstas"} para este dia`}</p>}
         </div>
         {!query && (
           <div className="flex flex-wrap items-center gap-2">
@@ -128,12 +128,12 @@ export default async function DashboardHomePage({ searchParams }: DashboardHomeP
               {counters.total ? `${counters.finalizado} de ${counters.total} atendimentos concluídos.` : "Compartilhe seu link público para começar a receber reservas."}
             </p>
           </div>
-          <div className="rounded-3xl bg-[linear-gradient(135deg,#7c3aed,#a93cc9_58%,#e23fa0)] p-5 text-white shadow-lg shadow-violet-600/15">
-            <div className="flex items-center gap-2 text-white/70"><Clock3 className="size-4" /><p className="text-xs font-bold tracking-[.13em] uppercase">Próximo passo</p></div>
+          <div className="rounded-3xl bg-violet-50 p-5 text-plum-900 shadow-lg shadow-violet-950/10 dark:bg-[linear-gradient(135deg,#7c3aed,#a93cc9_58%,#e23fa0)] dark:text-white dark:shadow-violet-600/15">
+            <div className="flex items-center gap-2 text-violet-700/70 dark:text-white/70"><Clock3 className="size-4" /><p className="text-xs font-bold tracking-[.13em] uppercase">Próximo passo</p></div>
             <p className="mt-3 font-heading text-xl font-semibold">
               {counters.agendado ? `${counters.agendado} ${counters.agendado === 1 ? "cliente aguardando" : "clientes aguardando"}` : "Agenda em dia"}
             </p>
-            <p className="mt-1 text-sm text-white/75">{counters.agendado ? "Atualize o status assim que iniciar cada atendimento." : "Use este tempo para ajustar serviços e disponibilidade."}</p>
+            <p className="mt-1 text-sm text-violet-700/75 dark:text-white/75">{counters.agendado ? "Atualize o status assim que iniciar cada atendimento." : "Use este tempo para ajustar serviços e disponibilidade."}</p>
           </div>
         </section>
       )}
