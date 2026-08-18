@@ -9,6 +9,7 @@ import {
   mockUpdateBookingStatus,
 } from "@/lib/mock/store";
 import {
+  getAvailableSlots,
   isSlotStillAvailable,
   localDayRangeUtc,
   nextLocalDate,
@@ -197,4 +198,135 @@ export async function createBookingServerSide(
     throw error;
   }
   return { ok: true, booking: data };
+}
+
+export interface CreateOwnerBookingInput {
+  studioId: string;
+  serviceId: string;
+  clientName: string;
+  clientPhone: string;
+  startAt: Date;
+  durationMin: number;
+  /**
+   * Encaixe: aceita horário fora do expediente e por cima de bloqueios.
+   * NUNCA aceita sobrepor outro agendamento ativo — isso continua barrado
+   * aqui e, em última instância, pela exclusion constraint do Postgres.
+   */
+  allowOffGrid: boolean;
+}
+
+/**
+ * Criação manual, feita pelo DONO dentro do painel (/app). Diferente do
+ * caminho público, aqui a grade de horários é só o modo padrão: com
+ * `allowOffGrid` o dono encaixa um cliente em qualquer horário, e a única
+ * regra que permanece inegociável é não haver dois atendimentos ao mesmo
+ * tempo no mesmo estúdio.
+ *
+ * O INSERT usa o client autenticado (não o service role), então a policy
+ * "owner manages own bookings" ainda vale como checagem de tenant.
+ */
+export async function createOwnerBooking(
+  input: CreateOwnerBookingInput
+): Promise<CreateBookingOutcome> {
+  const service = await getPublicService(input.studioId, input.serviceId);
+  if (!service) return { ok: false, error: "service_not_found" };
+
+  const endAt = new Date(input.startAt.getTime() + input.durationMin * 60_000);
+  const dateStr = utcToLocalDate(input.startAt);
+  const from = localDayRangeUtc(dateStr).start;
+  const to = localDayRangeUtc(nextLocalDate(dateStr)).end;
+
+  const [workingHours, blocks, existingBookings] = await Promise.all([
+    listPublicWorkingHours(input.studioId),
+    listPublicBlocksInRange(input.studioId, from.toISOString(), to.toISOString()),
+    listPublicBookingsInRange(input.studioId, from.toISOString(), to.toISOString()),
+  ]);
+
+  const activeBookings = existingBookings
+    .filter((b) => b.status !== "cancelado")
+    .map((b) => ({ start: new Date(b.start_at), end: new Date(b.end_at) }));
+
+  if (input.allowOffGrid) {
+    const overlaps = activeBookings.some(
+      (b) => input.startAt < b.end && b.start < endAt
+    );
+    if (overlaps) return { ok: false, error: "conflict" };
+  } else {
+    const stillAvailable = isSlotStillAvailable(
+      { start: input.startAt, end: endAt },
+      {
+        date: dateStr,
+        durationMin: input.durationMin,
+        workingHours,
+        blocks: blocks.map((b) => ({ start: new Date(b.start_at), end: new Date(b.end_at) })),
+        bookings: activeBookings,
+        now: new Date(),
+      }
+    );
+    if (!stillAvailable) return { ok: false, error: "conflict" };
+  }
+
+  if (!isSupabaseConfigured) {
+    const result = mockCreateBooking({
+      studio_id: input.studioId,
+      service_id: input.serviceId,
+      client_name: input.clientName,
+      client_phone: input.clientPhone,
+      start_at: input.startAt.toISOString(),
+      end_at: endAt.toISOString(),
+    });
+    if (!result.ok) return { ok: false, error: "conflict" };
+    return { ok: true, booking: result.booking };
+  }
+
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("bookings")
+    .insert({
+      studio_id: input.studioId,
+      service_id: input.serviceId,
+      client_name: input.clientName,
+      client_phone: input.clientPhone,
+      start_at: input.startAt.toISOString(),
+      end_at: endAt.toISOString(),
+      status: "agendado",
+    })
+    .select("*")
+    .single();
+
+  if (error) {
+    if ((error as { code?: string }).code === "23P01") {
+      return { ok: false, error: "conflict" };
+    }
+    throw error;
+  }
+  return { ok: true, booking: data };
+}
+
+/** Horários livres do estúdio do dono para um serviço/data — alimenta a grade do agendamento manual. */
+export async function listOwnerAvailableSlots(
+  studioId: string,
+  serviceId: string,
+  date: string
+): Promise<{ start: string; end: string }[] | null> {
+  const service = await getPublicService(studioId, serviceId);
+  if (!service) return null;
+
+  const range = localDayRangeUtc(date);
+  const [workingHours, blocks, bookings] = await Promise.all([
+    listPublicWorkingHours(studioId),
+    listPublicBlocksInRange(studioId, range.start.toISOString(), range.end.toISOString()),
+    listPublicBookingsInRange(studioId, range.start.toISOString(), range.end.toISOString()),
+  ]);
+
+  return getAvailableSlots({
+    date,
+    durationMin: service.duration_min,
+    workingHours,
+    blocks: blocks.map((b) => ({ start: new Date(b.start_at), end: new Date(b.end_at) })),
+    bookings: bookings
+      .filter((b) => b.status !== "cancelado")
+      .map((b) => ({ start: new Date(b.start_at), end: new Date(b.end_at) })),
+    now: new Date(),
+  }).map((slot) => ({ start: slot.start.toISOString(), end: slot.end.toISOString() }));
 }

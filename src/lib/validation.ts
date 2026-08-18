@@ -96,3 +96,24 @@ export const bookingStatusSchema = z.enum([
   "finalizado",
   "cancelado",
 ]);
+
+/**
+ * Agendamento criado manualmente pelo dono no painel. Diferente do público
+ * (createBookingSchema), o horário chega como data + hora local do estúdio e
+ * a duração é editável, porque o modo "encaixe" permite fugir da grade de
+ * horários sugerida.
+ */
+export const manualBookingSchema = z.object({
+  serviceId: z.string().uuid("Selecione um serviço"),
+  clientName: clientNameSchema,
+  clientPhone: clientPhoneSchema,
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida"),
+  time: z.string().regex(/^\d{2}:\d{2}$/, "Horário inválido"),
+  durationMin: z
+    .number()
+    .int()
+    .min(5, "Duração mínima de 5 minutos")
+    .max(600, "Duração máxima de 10 horas"),
+  /** true = encaixe: ignora expediente e bloqueios (nunca ignora colisão com outro agendamento). */
+  encaixe: z.boolean(),
+});

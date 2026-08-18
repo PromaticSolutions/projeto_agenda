@@ -7,6 +7,7 @@ import { DateNav } from "@/components/app/date-nav";
 import { WeekStrip } from "@/components/app/week-strip";
 import { BookingStatusSelect } from "@/components/app/booking-status-select";
 import { ExportPdfButton } from "@/components/app/export-pdf-button";
+import { ManualBookingDialog } from "@/components/app/manual-booking-dialog";
 import { CopyLinkButton } from "@/components/app/copy-link-button";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -73,6 +74,7 @@ export default async function DashboardHomePage({ searchParams }: DashboardHomeP
               bookings={bookings}
               serviceById={serviceById}
             />
+            <ManualBookingDialog services={services} defaultDate={date} />
           </div>
         )}
         </div>
@@ -145,6 +147,7 @@ export default async function DashboardHomePage({ searchParams }: DashboardHomeP
           </p>
           {!query && (
             <div className="flex flex-wrap items-center justify-center gap-2">
+              <ManualBookingDialog services={services} defaultDate={date} />
               <CopyLinkButton url={getStudioPublicUrl(studio.slug)} />
               <Button variant="outline" size="sm" render={<Link href="/app/services" />}>
                 Cadastrar serviços

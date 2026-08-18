@@ -216,3 +216,37 @@ ser commitado. **Sempre conferir o conteúdo de arquivos `.env*` antes de
   porque é exatamente o tipo de comportamento que o AGENTS.md do Next 16
   avisou para não assumir do treinamento. Some sozinho assim que a
   migração for rodada (o erro para de existir).
+
+## Agendamento manual pelo painel (grade + encaixe)
+
+- **Motivação**: a maior parte dos clientes de estúdio marca por WhatsApp,
+  telefone ou no balcão. Sem um caminho de criação dentro de `/app`, o dono
+  teria que abrir a própria página pública fingindo ser cliente — e ainda
+  ficaria refém das regras de expediente para um encaixe.
+- **Dois modos, uma única regra inegociável.** No modo padrão o dono escolhe
+  na MESMA grade de horários livres da página pública (`getAvailableSlots`,
+  revalidada no servidor por `isSlotStillAvailable`). Com o switch "Encaixe",
+  ele digita horário e duração livremente: aí o expediente e os bloqueios são
+  ignorados de propósito, mas a colisão com outro atendimento ativo continua
+  barrada — em código e, por baixo, pela exclusion constraint
+  `bookings_no_overlap`. Nenhum modo permite dois clientes no mesmo horário,
+  que é a promessa central do produto.
+- **Server Actions em vez de nova API route.** O caminho público precisa de
+  rota HTTP (o cliente é anônimo e passa `slug`); o painel não — a action
+  resolve o estúdio por `getMyStudio()` e o INSERT usa o client autenticado,
+  então a policy "owner manages own bookings" ainda vale como checagem de
+  tenant. Menos superfície exposta que uma rota nova aceitando `studioId`.
+- **`createOwnerBooking` não é `createBookingServerSide` com um flag.** As
+  duas compartilham a lógica de disponibilidade (`src/lib/availability.ts`,
+  nunca reimplementada), mas divergem em quem escreve (service role x usuário
+  autenticado) e no que é negociável (duração fixa do serviço x duração
+  editável). Um único função com três booleans ficaria mais difícil de
+  auditar do que duas funções curtas lado a lado.
+- **Grade buscada nos handlers, não em `useEffect`.** Os horários só mudam em
+  resposta a uma ação do dono (abrir o diálogo, trocar serviço/data/modo);
+  usar efeito para isso dispara o lint `react-hooks/set-state-in-effect` e
+  renders em cascata sem necessidade — mesmo padrão do `BookingFlow` público.
+- **`vitest.config.ts` passou a apontar `server-only` para um stub**, porque
+  `src/lib/data/bookings.test.ts` exercita as funções de dados reais em Node
+  puro (modo mock, sem `.env.local`). O marcador `server-only` lança fora do
+  runtime de Server Component — o alias o neutraliza só nos testes.
