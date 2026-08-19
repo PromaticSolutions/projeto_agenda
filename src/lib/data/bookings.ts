@@ -41,6 +41,24 @@ export async function listBookingsForMonth(
   return listBookingsInRangeOwner(studioId, rangeStart.toISOString(), rangeEnd.toISOString());
 }
 
+/**
+ * Agendamentos do estúdio entre duas datas locais, INCLUSIVE nas duas pontas
+ * — a fonte do módulo /app/bookings.
+ *
+ * Recebe datas de calendário ("YYYY-MM-DD") em vez de instantes porque o
+ * filtro da tela é por dia; a conversão para o intervalo UTC correspondente
+ * fica aqui, num lugar só, como em `listBookingsForDay`.
+ */
+export async function listBookingsForRange(
+  studioId: string,
+  fromDate: string,
+  toDate: string
+): Promise<Booking[]> {
+  const start = localDayRangeUtc(fromDate).start;
+  const end = localDayRangeUtc(toDate).end;
+  return listBookingsInRangeOwner(studioId, start.toISOString(), end.toISOString());
+}
+
 async function listBookingsInRangeOwner(
   studioId: string,
   fromIso: string,

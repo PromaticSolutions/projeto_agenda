@@ -250,3 +250,40 @@ ser commitado. **Sempre conferir o conteúdo de arquivos `.env*` antes de
   `src/lib/data/bookings.test.ts` exercita as funções de dados reais em Node
   puro (modo mock, sem `.env.local`). O marcador `server-only` lança fora do
   runtime de Server Component — o alias o neutraliza só nos testes.
+
+## Módulo de agendamentos (/app/bookings)
+
+- **Por que uma tela nova em vez de expandir o painel.** O "Painel do dia"
+  responde *o que acontece hoje* — um dia por vez, régua do agora, contadores.
+  A pergunta *onde está o atendimento da fulana* é outra: atravessa dias,
+  filtra por status e serviço e quer densidade ajustável. Enfiar as duas no
+  mesmo lugar transformaria o painel num formulário de busca com um dia
+  dentro. As duas telas compartilham os componentes (`BookingStatusSelect`,
+  `BookingFormDialog`, `ManualBookingDialog`), não o layout.
+- **Os filtros moram na URL, não em `useState`.** `periodo`, `status`,
+  `servico`, `q` e `view` são `searchParams`: o botão voltar funciona, o dono
+  pode favoritar "cancelados dos últimos 30 dias", e a página continua um
+  Server Component que busca os dados uma vez — nada de refazer a consulta no
+  cliente. A `BookingsToolbar` só escreve na URL; quem lê é a página.
+- **Vocabulário dos filtros centralizado em `src/lib/bookings-filter.ts`.**
+  Barra e página importam as MESMAS constantes e os mesmos `parse*`. Se cada
+  lado tivesse a sua lista, um dia a barra ofereceria uma opção que a página
+  não sabe ler e o filtro cairia calado no padrão. Todo `parse*` é total:
+  valor desconhecido na URL vira o padrão, nunca `undefined`.
+- **Período por presets, não por intervalo livre.** Quatro opções (hoje, 7
+  dias, 30 dias, últimos 30 dias) cobrem o uso real de um estúdio e mantêm a
+  consulta limitada. O intervalo é inclusivo nas duas pontas, e "últimos 30
+  dias" inclui o próprio dia de propósito: um atendimento das 9h já é passado
+  às 15h, e escondê-lo faria procurar em dois lugares.
+- **Filtro de status/serviço/busca é em memória, sobre o intervalo já
+  carregado.** Uma ida ao banco por filtro seria mais consultas para o mesmo
+  conjunto de linhas. Como o filtro roda em JS, a busca por nome dobra acento
+  e caixa ("monica" acha "Mônica") — coisa que o `ilike` do `searchBookings`,
+  no painel, não faz.
+- **O movimento do hover é 100% CSS.** `BookingCard` continua Server
+  Component; só os dois controles internos descem como JavaScript. O
+  movimento sinaliza "este é o cartão sob o cursor" e nada mais: elevação de
+  2px, borda assumindo a primária, a faixa do serviço engrossando e os
+  controles indo de 60% a 100% de opacidade. **Nada aparece ou some no
+  hover** — quem usa toque ou teclado vê a mesma interface, `focus-within`
+  repete o destaque no Tab, e `motion-reduce` deixa só a cor.

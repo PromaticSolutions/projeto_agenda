@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   BellRing,
   CalendarDays,
+  CalendarRange,
   CircleUserRound,
   Clock,
   MessageCircle,
@@ -30,6 +31,7 @@ const NAV_GROUPS = [
     label: "Operação",
     items: [
       { href: "/app", label: "Painel do dia", icon: CalendarDays },
+      { href: "/app/bookings", label: "Agendamentos", icon: CalendarRange },
       { href: "/app/clients", label: "Clientes", icon: Users },
       { href: "/app/services", label: "Serviços", icon: Scissors },
       { href: "/app/hours", label: "Horários", icon: Clock },
