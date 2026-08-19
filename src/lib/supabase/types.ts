@@ -16,6 +16,13 @@ export type BookingStatus =
   | "finalizado"
   | "cancelado";
 
+/** enum `whatsapp_connection_status` — 0009_whatsapp_connections.sql */
+export type WhatsAppConnectionStatus =
+  | "desconectado"
+  | "conectando"
+  | "conectado"
+  | "erro";
+
 export interface Database {
   public: {
     Tables: {
@@ -28,6 +35,14 @@ export interface Database {
           whatsapp: string;
           brand_color: string;
           logo_url: string | null;
+          /** 0006_studio_profile.sql */
+          banner_url: string | null;
+          owner_name: string | null;
+          /** Somente dígitos. Dado pessoal — ver comentário na migração 0006. */
+          owner_cpf: string | null;
+          /** `date` do Postgres chega como "YYYY-MM-DD". */
+          owner_birth_date: string | null;
+          acquired_at: string | null;
           created_at: string;
         };
         Insert: {
@@ -38,6 +53,11 @@ export interface Database {
           whatsapp: string;
           brand_color?: string;
           logo_url?: string | null;
+          banner_url?: string | null;
+          owner_name?: string | null;
+          owner_cpf?: string | null;
+          owner_birth_date?: string | null;
+          acquired_at?: string | null;
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["studios"]["Insert"]>;
@@ -52,6 +72,10 @@ export interface Database {
           duration_min: number;
           color: string;
           active: boolean;
+          /** 0005_services_notes_archive.sql — observações internas, opcional. */
+          notes: string | null;
+          /** Não-nulo = serviço arquivado (tinha bookings e não pode ser apagado). */
+          archived_at: string | null;
           created_at: string;
         };
         Insert: {
@@ -62,6 +86,8 @@ export interface Database {
           duration_min: number;
           color?: string;
           active?: boolean;
+          notes?: string | null;
+          archived_at?: string | null;
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["services"]["Insert"]>;
@@ -110,6 +136,7 @@ export interface Database {
           id: string;
           studio_id: string;
           service_id: string;
+          client_id: string | null;
           client_name: string;
           client_phone: string;
           start_at: string;
@@ -121,6 +148,7 @@ export interface Database {
           id?: string;
           studio_id: string;
           service_id: string;
+          client_id?: string | null;
           client_name: string;
           client_phone: string;
           start_at: string;
@@ -129,6 +157,74 @@ export interface Database {
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["bookings"]["Insert"]>;
+        Relationships: [];
+      };
+      clients: {
+        Row: {
+          id: string;
+          studio_id: string;
+          name: string;
+          phone: string;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          studio_id: string;
+          name: string;
+          phone: string;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["clients"]["Insert"]>;
+        Relationships: [];
+      };
+      /** 0008_reminder_settings.sql — 1 linha por estúdio (studio_id é a PK). */
+      reminder_settings: {
+        Row: {
+          studio_id: string;
+          enabled: boolean;
+          lead_time_minutes: number;
+          message_template: string;
+          include_link: boolean;
+          link_url: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          studio_id: string;
+          enabled?: boolean;
+          lead_time_minutes?: number;
+          message_template?: string;
+          include_link?: boolean;
+          link_url?: string | null;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["reminder_settings"]["Insert"]>;
+        Relationships: [];
+      };
+      /** 0009_whatsapp_connections.sql — estrutura sem integração ativa. */
+      whatsapp_connections: {
+        Row: {
+          studio_id: string;
+          status: WhatsAppConnectionStatus;
+          instance_name: string | null;
+          connected_phone: string | null;
+          last_error: string | null;
+          last_connected_at: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          studio_id: string;
+          status?: WhatsAppConnectionStatus;
+          instance_name?: string | null;
+          connected_phone?: string | null;
+          last_error?: string | null;
+          last_connected_at?: string | null;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["whatsapp_connections"]["Insert"]>;
         Relationships: [];
       };
       platform_admins: {

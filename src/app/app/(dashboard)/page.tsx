@@ -6,6 +6,7 @@ import { listBookingsForDay, searchBookings } from "@/lib/data/bookings";
 import { DateNav } from "@/components/app/date-nav";
 import { WeekStrip } from "@/components/app/week-strip";
 import { BookingStatusSelect } from "@/components/app/booking-status-select";
+import { BookingFormDialog } from "@/components/app/booking-form-dialog";
 import { ExportPdfButton } from "@/components/app/export-pdf-button";
 import { CopyLinkButton } from "@/components/app/copy-link-button";
 import { Input } from "@/components/ui/input";
@@ -73,6 +74,7 @@ export default async function DashboardHomePage({ searchParams }: DashboardHomeP
               bookings={bookings}
               serviceById={serviceById}
             />
+            {services.length > 0 && <BookingFormDialog services={services} defaultDate={date} />}
           </div>
         )}
         </div>
@@ -206,7 +208,10 @@ export default async function DashboardHomePage({ searchParams }: DashboardHomeP
                             {service?.name ?? "Serviço removido"} · {booking.client_phone}
                           </p>
                         </div>
-                        <BookingStatusSelect bookingId={booking.id} status={booking.status} />
+                        <div className="flex items-center gap-1">
+                          <BookingFormDialog services={services} booking={booking} clientName={booking.client_name} />
+                          <BookingStatusSelect bookingId={booking.id} status={booking.status} />
+                        </div>
                       </div>
                     </div>
                   );

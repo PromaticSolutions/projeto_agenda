@@ -7,9 +7,13 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-plus-jakarta-sans);
-  --font-mono: var(--font-plus-jakarta-sans);
-  --font-heading: var(--font-fraunces);
+  --font-sans: var(--font-ibm-plex-sans);
+  --font-mono: var(--font-ibm-plex-mono);
+  /* Headings usam a MESMA família do corpo: a hierarquia vem de peso,
+     corpo e tracking, não de uma segunda fonte display. Um sistema de
+     gestão fica mais formal com uma única voz tipográfica. O token é
+     mantido para não quebrar as ~40 chamadas de `font-heading` no app. */
+  --font-heading: var(--font-ibm-plex-sans);
   --color-plum-900: var(--plum-900);
   --color-violet-600: var(--violet-600);
   --color-violet-500: var(--violet-500);
@@ -45,90 +49,99 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* Escala de raio deliberadamente CURTA e quase linear. Antes era
+     `calc(var(--radius) * 2.6)` no topo, o que levava `rounded-4xl` a ~2rem
+     e dava ao painel aparência de cartão de app, não de sistema de gestão.
+     Agora o maior raio é 10px: cantos suaves, nunca "pílula". Componentes
+     que precisam de círculo continuam usando `rounded-full` explicitamente
+     (avatar, marcador de status). */
+  --radius-sm: 0.125rem;
+  --radius-md: 0.1875rem;
+  --radius-lg: 0.25rem;
+  --radius-xl: 0.3125rem;
+  --radius-2xl: 0.375rem;
+  --radius-3xl: 0.5rem;
+  --radius-4xl: 0.625rem;
 }
 
 :root {
   /* Promatic brand tokens */
   --plum-900: #241238;
-  --violet-600: #7c3aed;
+  --violet-600: #6d3ad4;
   --violet-500: #8b5cf6;
-  --magenta: #e23fa0;
+  --magenta: #c62f86;
   --blush-50: #fbf4fa;
-  --wa: #25d366;
+  --wa: #128c4a;
 
-  --background: var(--blush-50);
-  --foreground: var(--plum-900);
+  /* Fundo neutro-frio em vez do blush rosado: menos "template", mais
+     ferramenta de trabalho. A marca segue presente nos acentos. */
+  --background: #f4f5f7;
+  --foreground: #1c1b22;
   --card: #ffffff;
-  --card-foreground: var(--plum-900);
+  --card-foreground: #1c1b22;
   --popover: #ffffff;
-  --popover-foreground: var(--plum-900);
+  --popover-foreground: #1c1b22;
   --primary: var(--violet-600);
   --primary-foreground: #ffffff;
-  --secondary: #f3e8fa;
-  --secondary-foreground: var(--plum-900);
-  --muted: #f3e8fa;
-  --muted-foreground: #6b5b7a;
+  --secondary: #eceef2;
+  --secondary-foreground: #2b2a33;
+  --muted: #f1f2f5;
+  --muted-foreground: #61616e;
   --accent: var(--magenta);
   --accent-foreground: #ffffff;
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: #e7d9f0;
-  --input: #e7d9f0;
-  --ring: var(--violet-500);
+  --destructive: #c3312f;
+  --border: #dcdee4;
+  --input: #cfd2da;
+  --ring: var(--violet-600);
   --chart-1: var(--violet-600);
   --chart-2: var(--magenta);
-  --chart-3: var(--violet-500);
-  --chart-4: #a93cc9;
-  --chart-5: var(--plum-900);
-  --radius: 0.75rem;
+  --chart-3: #3f7fb8;
+  --chart-4: #b0862d;
+  --chart-5: #4b4a57;
+  --radius: 0.25rem;
   --sidebar: #ffffff;
-  --sidebar-foreground: var(--plum-900);
+  --sidebar-foreground: #1c1b22;
   --sidebar-primary: var(--violet-600);
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #f3e8fa;
-  --sidebar-accent-foreground: var(--plum-900);
-  --sidebar-border: #e7d9f0;
-  --sidebar-ring: var(--violet-500);
+  --sidebar-accent: #eceef2;
+  --sidebar-accent-foreground: #1c1b22;
+  --sidebar-border: #dcdee4;
+  --sidebar-ring: var(--violet-600);
 }
 
 .dark {
-  --background: var(--plum-900);
-  --foreground: var(--blush-50);
-  --card: #2f1a47;
-  --card-foreground: var(--blush-50);
-  --popover: #2f1a47;
-  --popover-foreground: var(--blush-50);
-  --primary: var(--violet-500);
-  --primary-foreground: var(--plum-900);
-  --secondary: #3a2154;
-  --secondary-foreground: var(--blush-50);
-  --muted: #3a2154;
-  --muted-foreground: #c9b8d6;
-  --accent: var(--magenta);
-  --accent-foreground: #ffffff;
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 12%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: var(--violet-500);
-  --chart-1: var(--violet-500);
-  --chart-2: var(--magenta);
-  --chart-3: var(--violet-600);
-  --chart-4: #a93cc9;
-  --chart-5: var(--blush-50);
-  --sidebar: #2f1a47;
-  --sidebar-foreground: var(--blush-50);
-  --sidebar-primary: var(--violet-500);
-  --sidebar-primary-foreground: var(--plum-900);
-  --sidebar-accent: #3a2154;
-  --sidebar-accent-foreground: var(--blush-50);
-  --sidebar-border: oklch(1 0 0 / 12%);
-  --sidebar-ring: var(--violet-500);
+  --background: #16161a;
+  --foreground: #e8e8ed;
+  --card: #1e1e24;
+  --card-foreground: #e8e8ed;
+  --popover: #1e1e24;
+  --popover-foreground: #e8e8ed;
+  --primary: #9b74f0;
+  --primary-foreground: #16161a;
+  --secondary: #2a2a32;
+  --secondary-foreground: #e8e8ed;
+  --muted: #26262d;
+  --muted-foreground: #a0a0ad;
+  --accent: #e05fa4;
+  --accent-foreground: #16161a;
+  --destructive: #e5726f;
+  --border: #33333d;
+  --input: #3c3c47;
+  --ring: #9b74f0;
+  --chart-1: #9b74f0;
+  --chart-2: #e05fa4;
+  --chart-3: #6ba3d8;
+  --chart-4: #d4a94a;
+  --chart-5: #b8b8c4;
+  --sidebar: #1a1a1f;
+  --sidebar-foreground: #e8e8ed;
+  --sidebar-primary: #9b74f0;
+  --sidebar-primary-foreground: #16161a;
+  --sidebar-accent: #2a2a32;
+  --sidebar-accent-foreground: #e8e8ed;
+  --sidebar-border: #33333d;
+  --sidebar-ring: #9b74f0;
 }
 
 @layer base {
@@ -146,105 +159,59 @@
   h3,
   h4 {
     @apply font-heading;
+    /* Títulos formais: sem tracking solto, sem peso display. */
+    letter-spacing: -0.011em;
+  }
+  /* Números em contexto tabular (horários, preços, contadores) alinham em
+     coluna — detalhe que separa sistema de gestão de dashboard genérico. */
+  th,
+  td,
+  time,
+  output {
+    font-variant-numeric: tabular-nums;
   }
 }
 
+/* Preenchimento de ação primária. Era um gradiente de 3 paradas
+   (violeta → magenta) aplicado em botões, nav ativa e barras — a assinatura
+   visual mais forte de "dashboard gerado por IA". Agora é a cor primária
+   sólida. O nome do utilitário foi mantido porque é referenciado em ~30
+   lugares (auth, página pública, onboarding); trocar por `bg-primary` é
+   feito arquivo a arquivo conforme cada tela é revisada. */
 @utility bg-cta {
-  background-image: linear-gradient(
-    135deg,
-    #7c3aed 0%,
-    #a93cc9 48%,
-    #e23fa0 100%
-  );
+  background-color: var(--primary);
 }
 
-/* Motivo "comprovante de agendamento": mordida circular na lateral do
-   cartão, na altura da linha pontilhada que separa as seções — como o
-   picote de um ticket. --seam-bg deve ser a cor do fundo por trás do
-   cartão (a mordida "revela" esse fundo). */
-@utility ticket-seam {
-  position: relative;
-
-  &::before,
-  &::after {
-    content: "";
-    position: absolute;
-    top: 50%;
-    width: 18px;
-    height: 18px;
-    border-radius: 9999px;
-    background: var(--seam-bg, var(--blush-50));
-    transform: translateY(-50%);
-  }
-
-  &::before {
-    left: -9px;
-  }
-
-  &::after {
-    right: -9px;
-  }
+/* Superfície padrão de bloco de conteúdo: um contorno de 1px e nada de
+   sombra colorida. Usado no lugar dos `rounded-[2rem] shadow-2xl
+   shadow-violet-950/5` que existiam antes. */
+@utility panel {
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-2xl);
 }
 
-/* Motivo "trilho do dia": linha vertical em degradê da marca, usada na
-   agenda do painel para ancorar os agendamentos no tempo. */
-@utility day-rail-line {
-  background-image: linear-gradient(
-    to bottom,
-    var(--violet-600),
-    var(--magenta) 60%,
-    transparent
-  );
+/* Rótulo de seção: caixa alta discreta, para nomear blocos sem gastar um
+   heading. Substitui os `text-violet-600 uppercase tracking-[.14em]`
+   espalhados, que competiam com os títulos de verdade. */
+@utility section-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
 }
 
 @layer base {
   ::selection {
-    background: color-mix(in srgb, var(--violet-500) 26%, white);
+    background: color-mix(in srgb, var(--primary) 22%, white);
   }
 }
 
-.public-booking-page {
-  background-image: linear-gradient(180deg, #f4f0ff 0%, #fbfaff 38%, #f7f7fc 100%);
-}
-
-.public-orb {
-  position: fixed;
-  z-index: 0;
-  pointer-events: none;
-  width: 26rem;
-  height: 26rem;
-  border-radius: 9999px;
-  filter: blur(72px);
-  opacity: .28;
-}
-
-.public-orb-one { top: 18rem; left: -17rem; background: #a855f7; }
-.public-orb-two { right: -18rem; bottom: 3rem; background: #ec4899; }
-
 /* Componentes mais antigos ainda usam o token de marca diretamente para texto.
-   No tema escuro ele passa a respeitar a cor semântica de primeiro plano. */
-.dark .text-plum-900 { color: var(--foreground); }
-
-.auth-motion-bg::before,
-.auth-motion-bg::after {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  border-radius: 9999px;
-  pointer-events: none;
-  filter: blur(50px);
-  animation: ambient-drift 13s ease-in-out infinite alternate;
+   Nos dois temas ele passa a respeitar a cor semântica de primeiro plano —
+   `--plum-900` era escuro demais para servir de cor de texto no claro e
+   ilegível no escuro. */
+.text-plum-900 {
+  color: var(--foreground);
 }
-.auth-motion-bg::before { width: 19rem; height: 19rem; top: 8%; right: -9rem; background: rgb(168 85 247 / .18); }
-.auth-motion-bg::after { width: 15rem; height: 15rem; bottom: 2%; left: -7rem; background: rgb(226 63 160 / .13); animation-delay: -6s; }
-.auth-float { position: absolute; z-index: 0; pointer-events: none; color: rgb(124 58 237 / .32); border: 1px solid rgb(124 58 237 / .12); background: rgb(255 255 255 / .36); backdrop-filter: blur(8px); animation: float-soft 7s ease-in-out infinite; }
-.auth-float-one { top: 18%; right: 12%; display: flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; border-radius: 1rem; transform: rotate(10deg); }
-.auth-float-two { bottom: 16%; right: 20%; width: .8rem; height: .8rem; border-radius: 9999px; animation-delay: -2s; }
-.auth-float-three { top: 28%; left: 13%; width: 1.2rem; height: 1.2rem; border-radius: .4rem; transform: rotate(28deg); animation-delay: -4s; }
-@keyframes ambient-drift { from { transform: translate3d(0, 0, 0) scale(1); } to { transform: translate3d(3rem, 1.5rem, 0) scale(1.12); } }
-@keyframes float-soft { 0%, 100% { translate: 0 0; } 50% { translate: 0 -14px; } }
-@media (prefers-reduced-motion: reduce) { .auth-motion-bg::before, .auth-motion-bg::after, .auth-float { animation: none; } }
-
-.account-card { transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease; }
-@media (hover: hover) { .account-card:hover { transform: translateY(-3px); box-shadow: 0 18px 40px rgb(36 18 56 / .10); border-color: rgb(124 58 237 / .22); } }
-.dark .account-card:hover { box-shadow: 0 18px 40px rgb(0 0 0 / .25); }

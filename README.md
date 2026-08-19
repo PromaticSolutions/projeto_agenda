@@ -33,13 +33,16 @@ SUPABASE_SERVICE_ROLE_KEY=...       # secreta! nunca comitar, nunca prefixar com
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ```
 
-**Depois de preencher as chaves, rode as migrações** —
-[`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql) e
-[`supabase/migrations/0002_grants.sql`](supabase/migrations/0002_grants.sql)
-— no SQL Editor do seu projeto (Dashboard → SQL Editor → New query, cole o
-arquivo inteiro e rode), ou via qualquer conexão direta ao Postgres. Isso
-cria as tabelas, a constraint anti-colisão de horário, as policies de RLS
-e os grants de tabela.
+**Depois de preencher as chaves, rode as migrações, em ordem** —
+[`0001_init.sql`](supabase/migrations/0001_init.sql),
+[`0002_grants.sql`](supabase/migrations/0002_grants.sql),
+[`0003_platform_admins.sql`](supabase/migrations/0003_platform_admins.sql) e
+[`0004_clients.sql`](supabase/migrations/0004_clients.sql) — no SQL Editor
+do seu projeto (Dashboard → SQL Editor → New query, cole o arquivo inteiro
+e rode), ou via qualquer conexão direta ao Postgres. Isso cria as tabelas,
+a constraint anti-colisão de horário, as policies de RLS, os grants de
+tabela e (0004) a tabela de clientes + o backfill a partir dos bookings
+já existentes.
 
 > Já aplicadas no projeto `mcgecpnpxilrhavtbsfn` referenciado em
 > `.env.local` (2026-07-23): as 5 tabelas, RLS, a exclusion constraint
@@ -64,7 +67,8 @@ um provedor de e-mail, desative em Authentication → Providers → Email →
 
 - `src/app/[slug]` — página pública de agendamento.
 - `src/app/app/onboarding` — criação do estúdio (fora do grupo autenticado).
-- `src/app/app/(dashboard)` — painel do dono (serviços, horários, agenda do dia).
+- `src/app/app/(dashboard)` — painel do dono (serviços, horários, agenda do dia, agendamento manual, clientes).
+- `src/app/app/(dashboard)/clients` — CRM básico: lista de clientes, histórico de agendamentos e notas.
 - `src/app/api/bookings` — API route que revalida disponibilidade e cria o booking.
 - `src/lib/availability.ts` — algoritmo de horários livres (com testes).
 - `src/lib/data/*` — camada de dados; alterna Supabase real ↔ mock conforme `.env.local`.

@@ -48,6 +48,17 @@ export function formatFullDateLocal(date: Date): string {
   return fullDateFormatter.format(date);
 }
 
+/** "5511987654321" -> "(11) 98765-4321". Assume DDI 55 + DDD + número (padrão salvo no banco). */
+export function formatPhoneDisplay(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  const local = digits.startsWith("55") ? digits.slice(2) : digits;
+  const ddd = local.slice(0, 2);
+  const rest = local.slice(2);
+  if (!ddd || !rest) return phone;
+  if (rest.length <= 4) return `(${ddd}) ${rest}`;
+  return `(${ddd}) ${rest.slice(0, -4)}-${rest.slice(-4)}`;
+}
+
 export function getStudioPublicUrl(slug: string): string {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
   return `${siteUrl}/${slug}`;

@@ -31,9 +31,9 @@ export default function LoginPage() {
             <Suspense>
               <LoginForm />
             </Suspense>
-            <p className="mt-4 text-center text-sm text-muted-foreground">
+            <p className="mt-4 text-center text-sm text-violet-200/80">
               Ainda não tem conta?{" "}
-              <Link href="/signup" className="font-medium text-violet-600 underline underline-offset-4">
+              <Link href="/signup" className="font-medium text-violet-300 underline underline-offset-4 hover:text-violet-200">
                 Criar estúdio
               </Link>
             </p>

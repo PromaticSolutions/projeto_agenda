@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, CircleUserRound, Clock, Scissors, Sparkles } from "lucide-react";
+import { CalendarDays, CircleUserRound, Clock, Scissors, Sparkles, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SignOutButton } from "@/components/app/sign-out-button";
 import { CopyLinkButton } from "@/components/app/copy-link-button";
@@ -12,6 +12,7 @@ import type { Studio } from "@/lib/types";
 
 const NAV_ITEMS = [
   { href: "/app", label: "Painel do dia", icon: CalendarDays },
+  { href: "/app/clients", label: "Clientes", icon: Users },
   { href: "/app/services", label: "Serviços", icon: Scissors },
   { href: "/app/hours", label: "Horários", icon: Clock },
   { href: "/app/account", label: "Conta", icon: CircleUserRound },
@@ -50,7 +51,9 @@ export function DashboardShell({
 
         <nav className="relative flex flex-row gap-1 overflow-x-auto md:flex-col md:overflow-visible">
           {NAV_ITEMS.map((item) => {
-            const active = pathname === item.href;
+            const active =
+              pathname === item.href ||
+              (item.href !== "/app" && pathname.startsWith(`${item.href}/`));
             const Icon = item.icon;
             return (
               <Link
