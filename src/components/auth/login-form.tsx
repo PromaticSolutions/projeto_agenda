@@ -54,7 +54,7 @@ export function LoginForm() {
       <div className="flex flex-col gap-2.5">
         <div className="flex items-center justify-between gap-3">
           <Label htmlFor="password" className="text-sm font-medium text-foreground">Senha</Label>
-          <Link href="/forgot-password" className="text-xs font-semibold text-violet-600 transition-colors hover:text-violet-700">Esqueci minha senha</Link>
+          <Link href="/forgot-password" className="text-xs font-semibold text-violet-300 transition-colors hover:text-violet-200">Esqueci minha senha</Link>
         </div>
         <div className="relative">
           <LockKeyhole className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />

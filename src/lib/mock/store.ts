@@ -1,5 +1,5 @@
 import "server-only";
-import type { Block, Booking, BookingStatus, Service, Studio, WorkingHour } from "@/lib/types";
+import type { Block, Booking, BookingStatus, Client, Service, Studio, WorkingHour } from "@/lib/types";
 import { localDateTimeToUtc } from "@/lib/availability";
 
 /**
@@ -41,6 +41,7 @@ interface MockDb {
   workingHours: WorkingHour[];
   blocks: Block[];
   bookings: Booking[];
+  clients: Client[];
 }
 
 declare global {
@@ -57,6 +58,11 @@ function buildSeedDb(): MockDb {
       whatsapp: "5511934476935",
       brand_color: "#7C3AED",
       logo_url: null,
+      banner_url: null,
+      owner_name: null,
+      owner_cpf: null,
+      owner_birth_date: null,
+      acquired_at: null,
       created_at: new Date().toISOString(),
     },
   ];
@@ -70,6 +76,8 @@ function buildSeedDb(): MockDb {
       duration_min: 40,
       color: "#7C3AED",
       active: true,
+      notes: null,
+      archived_at: null,
       created_at: new Date().toISOString(),
     },
     {
@@ -80,6 +88,8 @@ function buildSeedDb(): MockDb {
       duration_min: 90,
       color: "#8B5CF6",
       active: true,
+      notes: null,
+      archived_at: null,
       created_at: new Date().toISOString(),
     },
     {
@@ -90,6 +100,8 @@ function buildSeedDb(): MockDb {
       duration_min: 120,
       color: "#E23FA0",
       active: true,
+      notes: null,
+      archived_at: null,
       created_at: new Date().toISOString(),
     },
     {
@@ -100,6 +112,8 @@ function buildSeedDb(): MockDb {
       duration_min: 60,
       color: "#A93CC9",
       active: false,
+      notes: null,
+      archived_at: null,
       created_at: new Date().toISOString(),
     },
   ];
@@ -120,13 +134,46 @@ function buildSeedDb(): MockDb {
 
   const today = todayLocalDate();
   const [svcSobrancelhas, svcCilios, svcMicro] = services;
+
+  const clients: Client[] = [
+    {
+      id: uid(),
+      studio_id: MOCK_STUDIO_ID,
+      name: "Ana Paula Ferreira",
+      phone: "5511987654321",
+      notes: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    {
+      id: uid(),
+      studio_id: MOCK_STUDIO_ID,
+      name: "Camila Rodrigues",
+      phone: "5511976543210",
+      notes: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    {
+      id: uid(),
+      studio_id: MOCK_STUDIO_ID,
+      name: "Juliana Souza",
+      phone: "5511965432109",
+      notes: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+  ];
+  const [clientAna, clientCamila, clientJuliana] = clients;
+
   const bookings: Booking[] = [
     {
       id: uid(),
       studio_id: MOCK_STUDIO_ID,
       service_id: svcSobrancelhas.id,
-      client_name: "Ana Paula Ferreira",
-      client_phone: "5511987654321",
+      client_id: clientAna.id,
+      client_name: clientAna.name,
+      client_phone: clientAna.phone,
       start_at: localDateTimeToUtc(today, "09:00").toISOString(),
       end_at: localDateTimeToUtc(today, "09:40").toISOString(),
       status: "finalizado",
@@ -136,8 +183,9 @@ function buildSeedDb(): MockDb {
       id: uid(),
       studio_id: MOCK_STUDIO_ID,
       service_id: svcCilios.id,
-      client_name: "Camila Rodrigues",
-      client_phone: "5511976543210",
+      client_id: clientCamila.id,
+      client_name: clientCamila.name,
+      client_phone: clientCamila.phone,
       start_at: localDateTimeToUtc(today, "10:00").toISOString(),
       end_at: localDateTimeToUtc(today, "11:30").toISOString(),
       status: "em_atendimento",
@@ -147,8 +195,9 @@ function buildSeedDb(): MockDb {
       id: uid(),
       studio_id: MOCK_STUDIO_ID,
       service_id: svcMicro.id,
-      client_name: "Juliana Souza",
-      client_phone: "5511965432109",
+      client_id: clientJuliana.id,
+      client_name: clientJuliana.name,
+      client_phone: clientJuliana.phone,
       start_at: localDateTimeToUtc(today, "14:00").toISOString(),
       end_at: localDateTimeToUtc(today, "16:00").toISOString(),
       status: "agendado",
@@ -156,11 +205,11 @@ function buildSeedDb(): MockDb {
     },
   ];
 
-  return { studios, services, workingHours, blocks, bookings };
+  return { studios, services, workingHours, blocks, bookings, clients };
 }
 
 const db = (globalThis.__agendaMockDb ??= buildSeedDb());
-const { studios, services, workingHours, blocks, bookings } = db;
+const { studios, services, workingHours, blocks, bookings, clients } = db;
 
 // ---------------------------------------------------------------------------
 // studios
@@ -173,8 +222,41 @@ export function mockFindStudioByOwnerId(ownerId: string): Studio | null {
   return studios.find((s) => s.owner_id === ownerId) ?? null;
 }
 
-export function mockCreateStudio(input: Omit<Studio, "id" | "created_at">): Studio {
-  const studio: Studio = { ...input, id: uid(), created_at: new Date().toISOString() };
+/**
+ * Colunas nullable ficam opcionais no INSERT: no Postgres elas assumem NULL
+ * quando omitidas, e o mock precisa espelhar isso — senão cada coluna nova da
+ * 0006 obrigaria todos os chamadores a repetir `null`.
+ */
+type MockStudioInput = Omit<
+  Studio,
+  | "id"
+  | "created_at"
+  | "logo_url"
+  | "banner_url"
+  | "owner_name"
+  | "owner_cpf"
+  | "owner_birth_date"
+  | "acquired_at"
+> &
+  Partial<
+    Pick<
+      Studio,
+      "logo_url" | "banner_url" | "owner_name" | "owner_cpf" | "owner_birth_date" | "acquired_at"
+    >
+  >;
+
+export function mockCreateStudio(input: MockStudioInput): Studio {
+  const studio: Studio = {
+    ...input,
+    logo_url: input.logo_url ?? null,
+    banner_url: input.banner_url ?? null,
+    owner_name: input.owner_name ?? null,
+    owner_cpf: input.owner_cpf ?? null,
+    owner_birth_date: input.owner_birth_date ?? null,
+    acquired_at: input.acquired_at ?? null,
+    id: uid(),
+    created_at: new Date().toISOString(),
+  };
   studios.push(studio);
   return studio;
 }
@@ -200,8 +282,18 @@ export function mockGetService(id: string): Service | null {
   return services.find((s) => s.id === id) ?? null;
 }
 
-export function mockCreateService(input: Omit<Service, "id" | "created_at">): Service {
-  const service: Service = { ...input, id: uid(), created_at: new Date().toISOString() };
+/** Ver `MockStudioInput`: `notes` e `archived_at` são nullable e opcionais. */
+type MockServiceInput = Omit<Service, "id" | "created_at" | "notes" | "archived_at"> &
+  Partial<Pick<Service, "notes" | "archived_at">>;
+
+export function mockCreateService(input: MockServiceInput): Service {
+  const service: Service = {
+    ...input,
+    notes: input.notes ?? null,
+    archived_at: input.archived_at ?? null,
+    id: uid(),
+    created_at: new Date().toISOString(),
+  };
   services.push(service);
   return service;
 }
@@ -288,19 +380,30 @@ export type CreateBookingResult =
   | { ok: true; booking: Booking }
   | { ok: false; error: "conflict" };
 
-export function mockCreateBooking(
-  input: Omit<Booking, "id" | "created_at" | "status">
-): CreateBookingResult {
-  const newStart = new Date(input.start_at).getTime();
-  const newEnd = new Date(input.end_at).getTime();
-  const conflict = bookings.some(
+function hasScheduleConflict(
+  studioId: string,
+  startIso: string,
+  endIso: string,
+  excludeBookingId?: string
+): boolean {
+  const newStart = new Date(startIso).getTime();
+  const newEnd = new Date(endIso).getTime();
+  return bookings.some(
     (b) =>
-      b.studio_id === input.studio_id &&
+      b.studio_id === studioId &&
+      b.id !== excludeBookingId &&
       b.status !== "cancelado" &&
       newStart < new Date(b.end_at).getTime() &&
       new Date(b.start_at).getTime() < newEnd
   );
-  if (conflict) return { ok: false, error: "conflict" };
+}
+
+export function mockCreateBooking(
+  input: Omit<Booking, "id" | "created_at" | "status">
+): CreateBookingResult {
+  if (hasScheduleConflict(input.studio_id, input.start_at, input.end_at)) {
+    return { ok: false, error: "conflict" };
+  }
 
   const booking: Booking = {
     ...input,
@@ -317,4 +420,70 @@ export function mockUpdateBookingStatus(id: string, status: BookingStatus): Book
   if (idx === -1) throw new Error("Agendamento não encontrado");
   bookings[idx] = { ...bookings[idx], status };
   return bookings[idx];
+}
+
+export type UpdateBookingScheduleInput = {
+  serviceId: string;
+  startAt: string;
+  endAt: string;
+};
+
+export function mockUpdateBookingSchedule(
+  id: string,
+  input: UpdateBookingScheduleInput
+): CreateBookingResult {
+  const idx = bookings.findIndex((b) => b.id === id);
+  if (idx === -1) throw new Error("Agendamento não encontrado");
+  const current = bookings[idx];
+  if (hasScheduleConflict(current.studio_id, input.startAt, input.endAt, id)) {
+    return { ok: false, error: "conflict" };
+  }
+  bookings[idx] = {
+    ...current,
+    service_id: input.serviceId,
+    start_at: input.startAt,
+    end_at: input.endAt,
+  };
+  return { ok: true, booking: bookings[idx] };
+}
+
+export function mockGetBooking(id: string): Booking | null {
+  return bookings.find((b) => b.id === id) ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// clients
+// ---------------------------------------------------------------------------
+export function mockListClients(studioId: string): Client[] {
+  return clients.filter((c) => c.studio_id === studioId).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export function mockGetClient(id: string): Client | null {
+  return clients.find((c) => c.id === id) ?? null;
+}
+
+export function mockUpsertClient(input: { studio_id: string; name: string; phone: string }): Client {
+  const idx = clients.findIndex((c) => c.studio_id === input.studio_id && c.phone === input.phone);
+  if (idx !== -1) {
+    clients[idx] = { ...clients[idx], name: input.name, updated_at: new Date().toISOString() };
+    return clients[idx];
+  }
+  const client: Client = {
+    id: uid(),
+    studio_id: input.studio_id,
+    name: input.name,
+    phone: input.phone,
+    notes: null,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  clients.push(client);
+  return client;
+}
+
+export function mockUpdateClientNotes(id: string, notes: string | null): Client {
+  const idx = clients.findIndex((c) => c.id === id);
+  if (idx === -1) throw new Error("Cliente não encontrado");
+  clients[idx] = { ...clients[idx], notes, updated_at: new Date().toISOString() };
+  return clients[idx];
 }

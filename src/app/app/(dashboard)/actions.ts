@@ -3,12 +3,18 @@
 import { revalidatePath } from "next/cache";
 import {
   createOwnerBooking,
+  getMyBooking,
   listOwnerAvailableSlots,
+  updateBookingSchedule,
   updateBookingStatus,
 } from "@/lib/data/bookings";
 import { getMyStudio } from "@/lib/data/studios";
 import { localDateTimeToUtc } from "@/lib/availability";
-import { bookingStatusSchema, manualBookingSchema } from "@/lib/validation";
+import {
+  bookingScheduleSchema,
+  bookingStatusSchema,
+  manualBookingSchema,
+} from "@/lib/validation";
 
 export async function updateBookingStatusAction(id: string, status: string): Promise<void> {
   const parsed = bookingStatusSchema.safeParse(status);
@@ -100,9 +106,53 @@ export async function createManualBookingAction(
     }
 
     revalidatePath("/app");
+    // O agendamento manual também cria/atualiza a ficha do cliente.
+    revalidatePath("/app/clients");
     return { ok: true, startAt: result.booking.start_at };
   } catch (err) {
     console.error(err);
     return { ok: false, error: "Não foi possível criar o agendamento. Tente novamente." };
   }
+}
+
+export type BookingFormState = { ok: false; error: string } | { ok: true } | null;
+
+function conflictMessage(error: "conflict" | "service_not_found"): string {
+  return error === "conflict"
+    ? "Esse horário não está mais disponível. Escolha outro."
+    : "Serviço indisponível. Atualize a página e tente novamente.";
+}
+
+export async function updateBookingScheduleAction(
+  bookingId: string,
+  _prevState: BookingFormState,
+  formData: FormData
+): Promise<BookingFormState> {
+  const studio = await getMyStudio();
+  if (!studio) return { ok: false, error: "Estúdio não encontrado" };
+
+  const existing = await getMyBooking(studio.id, bookingId);
+  if (!existing) return { ok: false, error: "Agendamento não encontrado" };
+
+  const parsed = bookingScheduleSchema.safeParse({
+    serviceId: String(formData.get("serviceId") ?? ""),
+    date: String(formData.get("date") ?? ""),
+    time: String(formData.get("time") ?? ""),
+  });
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
+  }
+
+  const startAt = localDateTimeToUtc(parsed.data.date, `${parsed.data.time}:00`);
+  const result = await updateBookingSchedule({
+    studioId: studio.id,
+    bookingId,
+    serviceId: parsed.data.serviceId,
+    startAt,
+  });
+
+  if (!result.ok) return { ok: false, error: conflictMessage(result.error) };
+
+  revalidatePath("/app");
+  return { ok: true };
 }
