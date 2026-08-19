@@ -196,7 +196,16 @@ password_requirements = ""
 
 [auth.rate_limit]
 # Number of emails that can be sent per hour. Requires auth.email.smtp to be enabled.
-email_sent = 2
+#
+# Este número vale para o Supabase LOCAL, onde nenhum e-mail sai de verdade —
+# todos caem no capturador em http://127.0.0.1:54324. Por isso está alto: em
+# desenvolvimento não existe razão para racionar cadastro de teste.
+#
+# NÃO é este valor que produz o "email rate limit exceeded" no projeto
+# hospedado. Lá o limite é do painel (Authentication > Rate Limits) e, enquanto
+# o SMTP for o embutido do Supabase, ele é um teto da plataforma que nem o
+# painel levanta. Ver o bloco [auth.email.smtp] mais abaixo.
+email_sent = 200
 # Number of SMS messages that can be sent per hour. Requires auth.sms to be enabled.
 sms_sent = 30
 # Number of anonymous sign-ins that can be made per hour per IP address. Requires enable_anonymous_sign_ins = true.
@@ -223,25 +232,54 @@ enable_signup = true
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
-enable_confirmations = false
+# Ligado para o fluxo local ser o mesmo da produção: sem isto o cadastro já
+# devolve sessão, o e-mail de confirmação nunca sai e o modal de "confirme seu
+# e-mail" não tem como aparecer.
+enable_confirmations = true
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
+# 1s: em teste local a espera só atrapalha.
 max_frequency = "1s"
 # Number of characters used in the email OTP.
 otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 
-# Use a production-ready SMTP server
+# SMTP próprio — o único caminho para o produto mandar e-mail de verdade.
+#
+# Sem isto, o Supabase usa o servidor embutido dele, que tem DUAS travas:
+#   1. teto de mensagens por hora, definido pela plataforma e sujeito a mudar;
+#   2. só entrega para endereços que são membros da organização no Supabase.
+#      Qualquer outro destinatário volta "Email address not authorized" — ou
+#      seja, cadastrar a cliente com o e-mail dela NÃO funciona no embutido,
+#      por mais que o limite por hora seja respeitado.
+#
+# Descomente depois de escolher um provedor (Resend, Brevo, SendGrid, SES) e
+# preencha as variáveis em .env.local. Os mesmos dados precisam ser repetidos
+# no painel do projeto hospedado, em Authentication > Emails > SMTP Settings —
+# este arquivo sozinho não configura o projeto na nuvem.
 # [auth.email.smtp]
 # enabled = true
-# host = "smtp.sendgrid.net"
+# host = "env(SMTP_HOST)"
 # port = 587
-# user = "apikey"
-# pass = "env(SENDGRID_API_KEY)"
-# admin_email = "admin@email.com"
-# sender_name = "Admin"
+# user = "env(SMTP_USER)"
+# pass = "env(SMTP_PASS)"
+# admin_email = "env(SMTP_SENDER_EMAIL)"
+# sender_name = "Agenda Online"
+
+# E-mail de confirmação de cadastro, com a identidade do produto no lugar do
+# padrão do Supabase. O template usa {{ .SiteURL }} para montar o endereço do
+# logo, então o Site URL precisa apontar para o app publicado — em
+# desenvolvimento a imagem não carrega, e sobra o alt "Agenda Online".
+#
+# ATENÇÃO: este arquivo vale para o Supabase LOCAL (`supabase start`). No
+# projeto hospedado, o template é aplicado pelo painel (Authentication >
+# Emails) ou por `supabase config push` — e o push leva junto TODO o resto
+# deste [auth], incluindo o site_url de localhost logo acima.
+[auth.email.template.confirmation]
+subject = "Confirme seu e-mail — Agenda Online"
+content_path = "./supabase/templates/confirmation.html"
 
 # Uncomment to customize email template
 # [auth.email.template.invite]
