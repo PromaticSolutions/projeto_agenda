@@ -475,3 +475,27 @@ export async function listOwnerAvailableSlots(
     now: new Date(),
   }).map((slot) => ({ start: slot.start.toISOString(), end: slot.end.toISOString() }));
 }
+
+/**
+ * Agendamentos de VÁRIOS estúdios num intervalo — a leitura do planejador de
+ * lembretes. Uma consulta só, em vez de uma por estúdio: os intervalos de
+ * antecedência diferem entre salões, então o disparador busca a janela mais
+ * larga de todas e recorta cada estúdio em memória.
+ */
+export async function listBookingsForStudiosInRange(
+  studioIds: string[],
+  fromIso: string,
+  toIso: string
+): Promise<Booking[]> {
+  if (studioIds.length === 0) return [];
+  const supabase = createServiceRoleSupabaseClient();
+  const { data, error } = await supabase
+    .from("bookings")
+    .select("*")
+    .in("studio_id", studioIds)
+    .gte("start_at", fromIso)
+    .lte("start_at", toIso)
+    .order("start_at");
+  if (error) throw error;
+  return data ?? [];
+}

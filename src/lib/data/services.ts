@@ -125,3 +125,12 @@ export async function getPublicService(studioId: string, serviceId: string): Pro
   if (error) throw error;
   return data;
 }
+
+/** Serviços de vários estúdios — o disparador precisa do NOME para a mensagem. */
+export async function listServicesByStudioIds(studioIds: string[]): Promise<Service[]> {
+  if (studioIds.length === 0) return [];
+  const supabase = createServiceRoleSupabaseClient();
+  const { data, error } = await supabase.from("services").select("*").in("studio_id", studioIds);
+  if (error) throw error;
+  return data ?? [];
+}

@@ -298,3 +298,62 @@ ser commitado. **Sempre conferir o conteúdo de arquivos `.env*` antes de
   `transform` em `<tr>` é tratado de forma inconsistente entre navegadores, e
   uma linha subindo dentro de uma lista dividida quebra o alinhamento das
   divisórias vizinhas.
+
+## Envio de lembretes no WhatsApp (fila + disparador + Evolution)
+
+- **Fila, e não "o cron varre `bookings` e manda".** Varrer e enviar direto não
+  tem memória: duas execuções do disparador (retry da plataforma, dois cron
+  apontando para a mesma rota, deploy no meio) mandam o mesmo lembrete duas
+  vezes. Mensagem repetida no WhatsApp da cliente é o erro que faz o salão
+  desligar o recurso. A tabela `message_outbox` (0010) dá idempotência por
+  índice único `(booking_id, kind)`, retentativa com contagem, e histórico
+  auditável — dá para responder "esse lembrete saiu?".
+- **A reivindicação é uma função SQL, não `select` + `update` no app.** Entre
+  ler e marcar existe janela de corrida; `for update skip locked` fecha essa
+  janela dentro do banco e ainda deixa duas execuções simultâneas pegarem
+  lotes diferentes em vez de esperar uma pela outra. Como o PostgREST não
+  expõe isso, virou `claim_pending_messages`, com `revoke` de `anon` e
+  `authenticated` — `security definer` em tabela multi-tenant sem revoke é
+  como um estúdio acabaria reivindicando mensagem de outro.
+- **Guardamos o texto final, não o template + os dados.** Se o dono editar a
+  mensagem amanhã, o que já estava na fila não muda de conteúdo no meio do
+  caminho, e o histórico mostra o que a cliente de fato recebeu. O preço é o
+  horizonte curto de enfileiramento (60 min), para uma edição de template
+  ainda alcançar o lembrete de amanhã.
+- **Planejar e enviar são etapas separadas na mesma execução.** Sem gateway
+  configurado, o planejamento continua rodando e a fila é visível em
+  `/app/whatsapp` — o que tornou o disparador verificável antes de existir
+  VPS. `getWhatsAppProvider()` devolve `null` nesse caso, e não um dublê que
+  finge enviar: um dublê marcaria mensagens como "enviado" sem ninguém
+  receber, e o histórico passaria a mentir.
+- **Três regras que existem por causa de casos reais**, todas em
+  `src/lib/reminders.ts` e `src/lib/data/outbox.ts`:
+  agendamento que já começou não gera lembrete (senão ligar o recurso hoje
+  dispararia mensagem para a agenda da semana passada); mensagem vencida há
+  mais de 2h é cancelada em vez de enviada (o estúdio que passou dias
+  desconectado e reconecta numa terça de manhã); e lembrete cujo horário ideal
+  já passou sai agora em vez de ser descartado (melhor um aviso em cima da
+  hora do que nenhum).
+- **Consulta de estado, não webhook.** A tela de conexão e o disparador
+  perguntam o estado à Evolution no momento em que ele importa
+  (`syncWhatsAppConnection`). Webhook exigiria endpoint público recebendo
+  callback e ainda deixaria o painel mentindo quando uma entrega se perdesse
+  num deploy. O custo é uma requisição por estúdio por execução — e ela evita
+  o pior cenário: o banco dizendo "conectado" com a sessão caída, e todas as
+  mensagens gastando as quatro tentativas até virarem falha.
+- **A rota do disparador é agnóstica de agendador, e falha fechada.** Aceita
+  `GET` e `POST` com segredo em header, então serve tanto ao Cron da Vercel
+  quanto a um `curl` no crontab da VPS — o que importa aqui porque o Cron da
+  Vercel no plano gratuito roda 1x/dia, inviabilizando "1 hora antes". Sem
+  `CRON_SECRET` no ambiente ela devolve 404: uma rota de disparo aberta na
+  internet deixaria qualquer um enviando mensagem em nome dos estúdios.
+- **Interface de gateway com cinco operações, sem nada de caixa de entrada.**
+  O escopo decidido é só envio; prever recebimento na interface seria projetar
+  para um produto que ninguém pediu. Trocar a Evolution por um gateway
+  hospedado é escrever outro arquivo em `src/lib/whatsapp/` e mudar uma linha.
+- **O que ficou de fora, e por quê**: o aviso ao DONO quando entra agendamento
+  novo (hoje ainda é o link `wa.me` que a cliente toca). Falta uma decisão de
+  produto que não é minha: a mensagem sairia do número do salão para o próprio
+  número do salão — o único que o cadastro conhece —, o que funciona mas é
+  esquisito. A alternativa é guardar um número pessoal do dono só para
+  notificação, e isso é campo novo no cadastro.

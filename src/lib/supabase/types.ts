@@ -16,6 +16,16 @@ export type BookingStatus =
   | "finalizado"
   | "cancelado";
 
+/** enums da fila de mensagens — 0010_message_outbox.sql */
+export type MessageOutboxKind = "lembrete" | "novo_agendamento";
+
+export type MessageOutboxStatus =
+  | "pendente"
+  | "enviando"
+  | "enviado"
+  | "falhou"
+  | "cancelado";
+
 /** enum `whatsapp_connection_status` — 0009_whatsapp_connections.sql */
 export type WhatsAppConnectionStatus =
   | "desconectado"
@@ -227,6 +237,43 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["whatsapp_connections"]["Insert"]>;
         Relationships: [];
       };
+      /** 0010_message_outbox.sql — fila de envio de WhatsApp. */
+      message_outbox: {
+        Row: {
+          id: string;
+          studio_id: string;
+          booking_id: string | null;
+          kind: MessageOutboxKind;
+          to_phone: string;
+          body: string;
+          scheduled_for: string;
+          status: MessageOutboxStatus;
+          attempts: number;
+          last_error: string | null;
+          provider_message_id: string | null;
+          sent_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          studio_id: string;
+          booking_id?: string | null;
+          kind: MessageOutboxKind;
+          to_phone: string;
+          body: string;
+          scheduled_for: string;
+          status?: MessageOutboxStatus;
+          attempts?: number;
+          last_error?: string | null;
+          provider_message_id?: string | null;
+          sent_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["message_outbox"]["Insert"]>;
+        Relationships: [];
+      };
       platform_admins: {
         Row: {
           user_id: string;
@@ -241,6 +288,12 @@ export interface Database {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      /** 0010_message_outbox.sql — reivindicação atômica do lote a enviar. */
+      claim_pending_messages: {
+        Args: { p_limit: number };
+        Returns: Database["public"]["Tables"]["message_outbox"]["Row"][];
+      };
+    };
   };
 }

@@ -1,0 +1,80 @@
+# Evolution API — ponto de partida para a VPS
+#
+# CONFIRA A VERSÃO ANTES DE SUBIR: a Evolution muda nome de variável entre
+# versões menores com mais frequência do que a documentação sugere. Fixe uma
+# tag (nunca `latest`) e confira o nome das variáveis abaixo na documentação da
+# tag que você escolher. Se algo não subir, é quase sempre isso.
+#
+# Requisitos da máquina: 2 vCPU e 4 GB de RAM aguentam bem algumas dezenas de
+# instâncias. Cada estúdio conectado = uma instância = uma sessão do WhatsApp
+# Web viva na memória.
+#
+#   docker compose up -d
+#   docker compose logs -f evolution
+#
+# Depois: aponte um domínio para a máquina e ponha um proxy com HTTPS na
+# frente (Caddy resolve em duas linhas). A porta 8080 NÃO deve ficar exposta
+# na internet sem TLS — a chave de API viaja em cada requisição.
+
+services:
+  evolution:
+    image: atendai/evolution-api:v2.1.1
+    restart: always
+    ports:
+      # Só o loopback: quem publica para fora é o proxy com HTTPS.
+      - "127.0.0.1:8080:8080"
+    environment:
+      SERVER_URL: ${SERVER_URL}
+
+      # Chave GLOBAL da instalação: é o valor de EVOLUTION_API_KEY no .env do
+      # app. Gere com `openssl rand -hex 32` — o padrão da documentação é
+      # público e vira porta aberta.
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY}
+
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://evolution:${POSTGRES_PASSWORD}@postgres:5432/evolution
+      DATABASE_SAVE_DATA_INSTANCE: "true"
+
+      # O escopo do produto é só ENVIO. Guardar mensagem recebida encheria o
+      # disco e traria conversa de cliente para dentro da sua infraestrutura
+      # sem ninguém ter pedido — inclusive do ponto de vista de LGPD.
+      DATABASE_SAVE_DATA_NEW_MESSAGE: "false"
+      DATABASE_SAVE_MESSAGE_UPDATE: "false"
+      DATABASE_SAVE_DATA_CONTACTS: "false"
+      DATABASE_SAVE_DATA_CHATS: "false"
+
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://redis:6379/6
+      CACHE_REDIS_PREFIX_KEY: evolution
+      CACHE_LOCAL_ENABLED: "false"
+
+      # O app consulta o estado quando precisa (ver DECISIONS.md), então não há
+      # webhook configurado aqui.
+      LOG_LEVEL: ERROR
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - evolution_instances:/evolution/instances
+
+  postgres:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: evolution
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: evolution
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    volumes:
+      - redis_data:/data
+
+volumes:
+  evolution_instances:
+  postgres_data:
+  redis_data:
