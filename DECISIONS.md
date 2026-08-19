@@ -281,9 +281,20 @@ ser commitado. **Sempre conferir o conteúdo de arquivos `.env*` antes de
   e caixa ("monica" acha "Mônica") — coisa que o `ilike` do `searchBookings`,
   no painel, não faz.
 - **O movimento do hover é 100% CSS.** `BookingCard` continua Server
-  Component; só os dois controles internos descem como JavaScript. O
-  movimento sinaliza "este é o cartão sob o cursor" e nada mais: elevação de
-  2px, borda assumindo a primária, a faixa do serviço engrossando e os
-  controles indo de 60% a 100% de opacidade. **Nada aparece ou some no
-  hover** — quem usa toque ou teclado vê a mesma interface, `focus-within`
-  repete o destaque no Tab, e `motion-reduce` deixa só a cor.
+  Component; só os dois controles internos descem como JavaScript. **Nada
+  aparece ou some no hover** — quem usa toque ou teclado vê a mesma
+  interface, `focus-within` repete o destaque no Tab, e `motion-reduce` deixa
+  só a cor.
+- **O deslocamento virou o utilitário `card-lift`** (globals.css), aplicado
+  aos cards de agendamento, aos cards de serviço e aos tiles do painel. Duas
+  razões para não repetir a corrente de classes em cada tela: o movimento
+  precisa ser idêntico em todo lugar (repetido à mão, cada tela acabaria com
+  uma distância e uma duração ligeiramente diferentes), e a sombra depende do
+  tema — daí o token `--shadow-lift`, que no escuro precisa de bem mais
+  opacidade para não sumir contra o fundo. Sobe 4px, não 2px: 2px era um
+  movimento que o olho registrava sem perceber.
+- **Linha de tabela não sobe.** Em `/app/clients` (e na visualização em lista
+  dos agendamentos) a reação ao cursor é de cor, não de deslocamento:
+  `transform` em `<tr>` é tratado de forma inconsistente entre navegadores, e
+  uma linha subindo dentro de uma lista dividida quebra o alinhamento das
+  divisórias vizinhas.

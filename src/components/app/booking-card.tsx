@@ -12,11 +12,11 @@ import type { Booking, Service } from "@/lib/types";
  * cartão continua sendo Server Component e só os dois controles internos
  * (reagendar e status) descem como JavaScript para o navegador.
  *
- * A regra do movimento: ele sinaliza "este é o cartão sob o cursor" e nada
- * mais. Elevação de 2px, a borda assumindo a cor primária, a faixa do serviço
- * engrossando e os controles saindo de 60% para 100% de opacidade. Nada
- * aparece ou some no hover — quem usa toque ou teclado enxerga a mesma
- * interface, e `focus-within` reproduz o mesmo destaque ao navegar por Tab.
+ * O deslocamento em si vem do utilitário `card-lift` (globals.css), o mesmo
+ * usado nos cards de serviço e nos tiles do painel. Aqui em cima dele entram
+ * só os detalhes deste cartão: a faixa do serviço engrossando e os controles
+ * saindo de 60% para 100% de opacidade. Nada aparece ou some no hover — quem
+ * usa toque ou teclado enxerga a mesma interface.
  */
 export function BookingCard({
   booking,
@@ -35,11 +35,7 @@ export function BookingCard({
   return (
     <li
       className={cn(
-        "group panel relative overflow-hidden pl-4 transition-[transform,border-color,box-shadow] duration-200 ease-out",
-        "hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg hover:shadow-foreground/5",
-        "focus-within:-translate-y-0.5 focus-within:border-primary/40",
-        // Quem pediu menos movimento no sistema operacional recebe só a cor.
-        "motion-reduce:transition-[border-color] motion-reduce:hover:translate-y-0 motion-reduce:focus-within:translate-y-0",
+        "group panel card-lift relative overflow-hidden pl-4",
         canceled && "opacity-65"
       )}
     >

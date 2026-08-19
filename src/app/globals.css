@@ -100,6 +100,10 @@
   --chart-4: #b0862d;
   --chart-5: #4b4a57;
   --radius: 0.25rem;
+  /* Sombra do movimento de hover (ver o utilitário `card-lift`). Fica em
+     token porque a mesma sombra precisa de opacidades diferentes nos dois
+     temas: no escuro, uma sombra fraca some contra o fundo. */
+  --shadow-lift: 0 14px 28px -14px rgb(28 27 34 / 0.3);
   --sidebar: #ffffff;
   --sidebar-foreground: #1c1b22;
   --sidebar-primary: var(--violet-600);
@@ -129,6 +133,7 @@
   --border: #33333d;
   --input: #3c3c47;
   --ring: #9b74f0;
+  --shadow-lift: 0 14px 28px -14px rgb(0 0 0 / 0.65);
   --chart-1: #9b74f0;
   --chart-2: #e05fa4;
   --chart-3: #6ba3d8;
@@ -189,6 +194,45 @@
   background-color: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius-2xl);
+}
+
+/* Movimento de hover dos objetos que aparecem em coleção: cards de
+   agendamento, de serviço, tiles de resumo. O card sobe 4px, a borda assume a
+   cor primária e a sombra abre embaixo — o suficiente para o cursor "pegar" o
+   objeto sem que a tela pareça flutuar.
+   
+   Fica num utilitário só porque o movimento precisa ser IGUAL em todo lugar:
+   repetido à mão, cada tela acabaria com uma duração e uma distância
+   ligeiramente diferentes.
+
+   Três decisões dentro dele:
+   - `focus-within` repete o destaque, então navegar por Tab mostra o mesmo
+     que passar o mouse;
+   - a curva é ease-out rápida no fim (sem repique), que combina com um
+     sistema de gestão melhor do que uma mola;
+   - com `prefers-reduced-motion` sobra só a cor da borda, sem deslocamento. */
+@utility card-lift {
+  transition:
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 220ms ease-out,
+    border-color 220ms ease-out;
+
+  &:hover,
+  &:focus-within {
+    transform: translateY(-4px);
+    border-color: color-mix(in srgb, var(--primary) 45%, transparent);
+    box-shadow: var(--shadow-lift);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: border-color 220ms ease-out;
+
+    &:hover,
+    &:focus-within {
+      transform: none;
+      box-shadow: none;
+    }
+  }
 }
 
 /* Rótulo de seção: caixa alta discreta, para nomear blocos sem gastar um

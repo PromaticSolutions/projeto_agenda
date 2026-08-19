@@ -59,7 +59,13 @@ export default async function ClientsPage() {
               </thead>
               <tbody>
                 {sorted.map((client) => (
-                  <tr key={client.id} className="border-b border-border last:border-0">
+                  <tr
+                    key={client.id}
+                    // Linha de tabela não sobe como um card (o layout de
+                    // tabela ignoraria o transform de forma inconsistente
+                    // entre navegadores): aqui a reação ao cursor é a cor.
+                    className="border-b border-border transition-colors last:border-0 hover:bg-muted/50 focus-within:bg-muted/50"
+                  >
                     <td className="px-4 py-3">
                       <Link
                         href={`/app/clients/${client.id}`}
