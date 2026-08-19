@@ -215,3 +215,65 @@
 .text-plum-900 {
   color: var(--foreground);
 }
+
+/* ---------------------------------------------------------------------------
+   Partículas flutuantes das telas de autenticação.
+
+   Só `transform` e `opacity` são animados: são as duas propriedades que o
+   navegador compõe na GPU, sem recalcular layout nem repintar. Animar `top`
+   ou `left` com dezenas de elementos travaria a página.
+
+   O movimento é um LOOP FECHADO (0% e 100% no mesmo ponto), então não há
+   salto ao reiniciar. Deslocamento, duração e fase vêm de custom properties
+   definidas por partícula, o que deixa uma única regra servir para todas.
+--------------------------------------------------------------------------- */
+@keyframes auth-particle-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  25% {
+    transform: translate3d(var(--p-dx), calc(var(--p-dy) * -1), 0);
+  }
+  50% {
+    transform: translate3d(calc(var(--p-dx) * -0.6), calc(var(--p-dy) * -1.7), 0);
+  }
+  75% {
+    transform: translate3d(calc(var(--p-dx) * -1), calc(var(--p-dy) * -0.5), 0);
+  }
+}
+
+/* Cintilação em duração diferente da do movimento: os dois ciclos entram e
+   saem de fase, e o conjunto nunca parece pulsar em bloco. */
+@keyframes auth-particle-fade {
+  0%,
+  100% {
+    opacity: var(--p-opacity);
+  }
+  50% {
+    opacity: calc(var(--p-opacity) * 0.35);
+  }
+}
+
+.auth-particle {
+  position: absolute;
+  border-radius: 9999px;
+  background-color: currentColor;
+  /* Promove a uma camada própria e avisa o compositor do que vai mudar. */
+  will-change: transform, opacity;
+  animation:
+    auth-particle-float var(--p-duration) ease-in-out infinite,
+    auth-particle-fade var(--p-fade-duration) ease-in-out infinite;
+  /* Atraso negativo: cada partícula já entra no meio do próprio ciclo, então
+     não existe o instante inicial em que todas se movem juntas. */
+  animation-delay: var(--p-delay), var(--p-delay);
+}
+
+/* Quem pediu menos movimento no sistema recebe o campo parado — as partículas
+   continuam compondo o fundo, sem animação nenhuma. */
+@media (prefers-reduced-motion: reduce) {
+  .auth-particle {
+    animation: none;
+    will-change: auto;
+  }
+}

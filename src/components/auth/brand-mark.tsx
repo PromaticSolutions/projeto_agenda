@@ -12,24 +12,21 @@ export function AuthShowcasePanel({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "relative flex-col justify-between overflow-hidden bg-plum-900 px-10 py-12 text-blush-50",
+        // Sem fundo próprio: o escuro vem do AuthShell, e as partículas
+        // atravessam esta coluna em vez de pararem na divisa.
+        "relative flex-col justify-between border-r border-white/10 px-10 py-12",
         className
       )}
     >
-      <div aria-hidden className="pointer-events-none absolute inset-0">
-        <div className="absolute -top-24 -left-24 size-72 rounded-full bg-violet-500/25 blur-3xl" />
-        <div className="absolute -right-16 -bottom-24 size-80 rounded-full bg-magenta/20 blur-3xl" />
-      </div>
-
-      <div className="relative flex items-center gap-2.5">
-        <span className="flex size-9 items-center justify-center rounded-xl bg-cta text-white shadow-md shadow-violet-600/25">
+      <div className="flex items-center gap-2.5">
+        <span className="flex size-9 items-center justify-center rounded-md bg-cta text-white">
           <CalendarDays className="size-5" />
         </span>
-        <span className="font-heading text-[1.3rem] font-semibold tracking-[0.01em]">Agenda Online</span>
+        <span className="text-[1.25rem] font-semibold">Agenda Online</span>
       </div>
 
-      <div className="relative max-w-sm">
-        <h2 className="font-heading text-[2rem] leading-tight font-semibold tracking-[0.01em] sm:text-[2.35rem]">
+      <div className="max-w-sm">
+        <h2 className="text-[2rem] leading-tight font-semibold sm:text-[2.3rem]">
           Sua agenda, sempre aberta — mesmo enquanto você atende.
         </h2>
         <ul className="mt-6 flex flex-col gap-4 text-sm leading-6 text-blush-50/80">
@@ -44,7 +41,7 @@ export function AuthShowcasePanel({ className }: { className?: string }) {
         </ul>
       </div>
 
-      <p className="relative text-xs text-blush-50/50">
+      <p className="text-xs text-blush-50/50">
         Feito para estúdios de beleza, barbearias e clínicas.
       </p>
     </div>
@@ -54,23 +51,13 @@ export function AuthShowcasePanel({ className }: { className?: string }) {
 export function BrandMark() {
   return (
     <Link href="/" className="flex items-center gap-2.5">
-      <span className="flex size-9 items-center justify-center rounded-xl bg-cta text-white shadow-md shadow-violet-600/25">
+      <span className="flex size-9 items-center justify-center rounded-md bg-cta text-white">
         <CalendarDays className="size-5" />
       </span>
-      <span className="font-heading text-[1.2rem] font-semibold tracking-[0.01em] text-plum-900">Agenda Online</span>
+      {/* Sem cor própria: herda do contexto. As telas de auth são escuras
+          (AuthShell define claro) e o onboarding é claro — fixar a cor aqui
+          apagaria a marca em um dos dois. */}
+      <span className="text-[1.15rem] font-semibold">Agenda Online</span>
     </Link>
-  );
-}
-
-export function AuthBackdrop() {
-  return (
-    <div
-      aria-hidden
-      className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
-    >
-      <div className="absolute left-1/2 top-[-12rem] size-[36rem] -translate-x-1/2 rounded-full bg-violet-500/20 blur-3xl" />
-      <div className="absolute bottom-[-10rem] right-[-6rem] size-[28rem] rounded-full bg-magenta/15 blur-3xl" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.08),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(226,63,160,0.16),transparent_38%)]" />
-    </div>
   );
 }

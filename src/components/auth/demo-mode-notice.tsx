@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 
 export function DemoModeNotice() {
   return (
-    <Alert className="border border-violet-500/20 bg-violet-950/80 p-3 shadow-sm shadow-violet-950/20">
+    <Alert className="border border-violet-500/20 bg-violet-950/80 p-3">
       <AlertTriangle className="size-3.5 text-violet-300" />
       <AlertTitle className="text-[0.95rem] font-semibold text-white">Supabase ainda não configurado</AlertTitle>
       <AlertDescription className="mt-1 text-sm leading-6 text-violet-200/80">
@@ -18,7 +18,7 @@ export function DemoModeNotice() {
           render={<Link href="/app" />}
           nativeButton={false}
           size="sm"
-          className="mt-3 h-9 bg-cta text-white shadow-sm shadow-violet-600/20 transition-all duration-200 hover:-translate-y-0.5 hover:opacity-90"
+          className="mt-3 h-9 bg-cta text-white hover:opacity-90"
         >
           Entrar no modo demonstração
         </Button>

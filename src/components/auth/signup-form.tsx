@@ -76,7 +76,7 @@ export function SignupForm() {
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="h-12 rounded-2xl border border-violet-500/20 bg-white/5 px-3 text-white shadow-sm shadow-violet-950/20 focus-visible:border-violet-500 focus-visible:ring-3 focus-visible:ring-violet-500/15"
+          className="h-12 rounded-2xl border border-violet-500/20 bg-white/5 px-3 text-white focus-visible:border-white/30 focus-visible:ring-3 focus-visible:ring-white/10"
         />
       </div>
       <div className="flex flex-col gap-2.5">
@@ -89,7 +89,7 @@ export function SignupForm() {
           required
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="h-12 rounded-2xl border border-violet-500/20 bg-white/5 px-3 text-white shadow-sm shadow-violet-950/20 focus-visible:border-violet-500 focus-visible:ring-3 focus-visible:ring-violet-500/15"
+          className="h-12 rounded-2xl border border-violet-500/20 bg-white/5 px-3 text-white focus-visible:border-white/30 focus-visible:ring-3 focus-visible:ring-white/10"
         />
         <div className="flex items-center gap-1.5" aria-label="Força da senha">
           {[1, 2, 3].map((level) => <span key={level} className={`h-1 flex-1 rounded-full transition-colors ${level <= passwordStrength ? passwordStrength === 1 ? "bg-magenta" : passwordStrength === 2 ? "bg-violet-500" : "bg-violet-600" : "bg-border"}`} />)}
@@ -97,7 +97,7 @@ export function SignupForm() {
         <p className="text-xs text-violet-200/75">Use pelo menos 6 caracteres. Quanto maior, mais segura.</p>
       </div>
       {error && <p className="rounded-xl border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
-      <Button type="submit" className="mt-1 h-12 bg-cta text-white shadow-lg shadow-violet-600/20 transition-all duration-200 hover:-translate-y-0.5 hover:opacity-90" disabled={loading}>
+      <Button type="submit" className="mt-1 h-11 bg-cta text-white hover:opacity-90" disabled={loading}>
         {loading ? "Criando conta..." : <><Check className="size-4" /> Criar minha conta</>}
       </Button>
     </form>

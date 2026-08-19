@@ -42,11 +42,11 @@ export function PasswordRecoveryForm() {
         <Label htmlFor="recovery-email" className="text-sm font-medium text-violet-100">E-mail cadastrado</Label>
         <div className="relative">
           <Mail className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-violet-400/80" />
-          <Input id="recovery-email" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} className="h-12 rounded-2xl border border-violet-500/20 bg-violet-950/75 px-3 pl-10 text-white shadow-sm shadow-violet-950/20 transition-all duration-200 placeholder:text-violet-300/60 focus-visible:border-violet-500 focus-visible:ring-3 focus-visible:ring-violet-500/15" />
+          <Input id="recovery-email" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} className="h-11 border border-white/12 bg-white/[0.06] px-3 pl-10 text-white transition-colors placeholder:text-violet-300/60 focus-visible:border-white/30 focus-visible:ring-3 focus-visible:ring-white/10" />
         </div>
       </div>
       {error && <p className="rounded-xl border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
-      <Button type="submit" disabled={loading} className="h-12 bg-cta text-white shadow-lg shadow-violet-600/20 transition-all duration-200 hover:-translate-y-0.5 hover:opacity-90">
+      <Button type="submit" disabled={loading} className="h-11 bg-cta text-white hover:opacity-90">
         {loading ? "Enviando..." : <>Enviar instruções <Send className="size-4" /></>}
       </Button>
       <Link href="/login" className="mx-auto inline-flex items-center gap-1 text-sm font-medium text-violet-200 transition-colors hover:text-white">
