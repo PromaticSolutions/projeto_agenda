@@ -61,14 +61,13 @@ const STATUS_META: Record<
 /** De quanto em quanto tempo perguntar ao gateway enquanto o QR está aberto. */
 const POLL_INTERVAL_MS = 4000;
 
-export function WhatsAppConnectionPanel({
-  connection,
-  providerConfigured,
-}: {
-  connection: WhatsAppConnection;
-  /** Falso quando EVOLUTION_API_URL/KEY não estão no ambiente. */
-  providerConfigured: boolean;
-}) {
+/**
+ * A tela só chega aqui com o gateway configurado — quem decide isso é
+ * `/app/whatsapp`, que troca a página inteira pelo aviso de área em produção
+ * quando EVOLUTION_API_URL/KEY não existem. Por isso nenhum botão aqui trata o
+ * caso "sem gateway": painel com tudo desabilitado parece defeito.
+ */
+export function WhatsAppConnectionPanel({ connection }: { connection: WhatsAppConnection }) {
   const [status, setStatus] = useState<WhatsAppConnectionStatus>(connection.status);
   const [phone, setPhone] = useState<string | null>(connection.connected_phone);
   const [error, setError] = useState<string | null>(connection.last_error);
@@ -149,21 +148,6 @@ export function WhatsAppConnectionPanel({
 
   return (
     <div className="flex flex-col gap-5">
-      {!providerConfigured && (
-        <section className="panel flex items-start gap-3 border-amber-500/30 bg-amber-500/5 p-4">
-          <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-600" />
-          <div className="space-y-0.5 text-sm">
-            <p className="font-medium text-foreground">Gateway não configurado</p>
-            <p className="text-muted-foreground">
-              Defina <code className="font-mono text-xs">EVOLUTION_API_URL</code> e{" "}
-              <code className="font-mono text-xs">EVOLUTION_API_KEY</code> no ambiente para
-              habilitar a conexão. Os lembretes continuam sendo planejados na fila, mas nada é
-              enviado.
-            </p>
-          </div>
-        </section>
-      )}
-
       <section className={cn("panel flex items-start gap-3 p-4", meta.tone)}>
         <StatusIcon className={cn("mt-0.5 size-5 shrink-0", status === "conectando" && "animate-spin")} />
         <div className="min-w-0 flex-1 space-y-1">
@@ -216,7 +200,7 @@ export function WhatsAppConnectionPanel({
             <Button
               type="button"
               onClick={handleConnect}
-              disabled={pending || !providerConfigured || status === "conectado"}
+              disabled={pending || status === "conectado"}
               className="bg-cta text-white"
             >
               {pending ? <Loader2 className="size-4 animate-spin" /> : <Smartphone className="size-4" />}
@@ -226,7 +210,7 @@ export function WhatsAppConnectionPanel({
               type="button"
               variant="outline"
               onClick={handleRefresh}
-              disabled={pending || !providerConfigured}
+              disabled={pending}
             >
               <RefreshCw className="size-4" /> Atualizar status
             </Button>
@@ -234,7 +218,7 @@ export function WhatsAppConnectionPanel({
               type="button"
               variant="outline"
               onClick={handleDisconnect}
-              disabled={pending || !providerConfigured || status === "desconectado"}
+              disabled={pending || status === "desconectado"}
             >
               <Unplug className="size-4" /> Desconectar
             </Button>

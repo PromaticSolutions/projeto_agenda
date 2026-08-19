@@ -1,7 +1,10 @@
+import Link from "next/link";
+import { BellRing, Construction } from "lucide-react";
 import { getMyStudio } from "@/lib/data/studios";
 import { getWhatsAppConnection } from "@/lib/data/whatsapp";
 import { listRecentMessages } from "@/lib/data/outbox";
 import { WhatsAppConnectionPanel } from "@/components/app/whatsapp-connection-panel";
+import { Button } from "@/components/ui/button";
 import { isWhatsAppProviderConfigured } from "@/lib/whatsapp/provider";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { formatPhoneDisplay, formatFullDateLocal, formatTimeLocal } from "@/lib/format";
@@ -22,6 +25,15 @@ export default async function WhatsAppPage() {
   const studio = await getMyStudio();
   if (!studio) return null;
 
+  // Enquanto o gateway não está no ambiente, não existe nada de real para
+  // fazer nesta tela: o botão de conectar não teria com quem falar. Em vez de
+  // mostrar o painel com tudo desabilitado — que parece defeito —, a tela
+  // inteira assume o estado de área em produção. Assim que EVOLUTION_API_URL e
+  // EVOLUTION_API_KEY existirem, o painel volta sozinho, sem mudar código.
+  if (!isWhatsAppProviderConfigured) {
+    return <UnderConstruction />;
+  }
+
   const connection = await getWhatsAppConnection(studio.id);
   // O histórico lê a fila com service_role; em modo mock a tabela não existe,
   // e a tela simplesmente não mostra a seção.
@@ -36,10 +48,7 @@ export default async function WhatsAppPage() {
         </p>
       </header>
 
-      <WhatsAppConnectionPanel
-        connection={connection}
-        providerConfigured={isWhatsAppProviderConfigured}
-      />
+      <WhatsAppConnectionPanel connection={connection} />
 
       <section className="panel overflow-hidden">
         <header className="flex items-center justify-between gap-4 border-b border-border px-4 py-3">
@@ -58,6 +67,54 @@ export default async function WhatsAppPage() {
             ))}
           </ol>
         )}
+      </section>
+    </div>
+  );
+}
+
+/**
+ * Estado de área em produção.
+ *
+ * Diz o que já funciona e o que ainda não, em vez de só "em breve": o dono que
+ * chega aqui precisa saber se pode contar com o lembrete hoje — e a resposta
+ * honesta é "configure agora, sai quando o número conectar".
+ */
+function UnderConstruction() {
+  return (
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+      <header className="space-y-1 border-b border-border pb-5">
+        <h1 className="text-xl font-semibold text-foreground">WhatsApp</h1>
+        <p className="text-sm text-muted-foreground">
+          Envio automático de mensagens para as suas clientes.
+        </p>
+      </header>
+
+      <section className="panel flex flex-col items-center gap-4 border-dashed p-10 text-center">
+        <span className="flex size-14 items-center justify-center rounded-full bg-amber-500/10 text-amber-600">
+          <Construction className="size-7" aria-hidden />
+        </span>
+
+        <div className="space-y-1.5">
+          <h2 className="text-lg font-semibold text-foreground">Área em produção</h2>
+          <p className="mx-auto max-w-md text-sm text-muted-foreground">
+            A conexão com o WhatsApp está sendo integrada. Enquanto isso, nenhuma mensagem é
+            enviada automaticamente — os agendamentos continuam chegando normalmente pelo seu
+            link público.
+          </p>
+        </div>
+
+        <div className="w-full max-w-md rounded-lg border border-border bg-muted/40 p-4 text-left">
+          <p className="text-[0.6875rem] font-semibold tracking-[0.04em] text-muted-foreground uppercase">
+            Pode adiantar
+          </p>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            Deixe a mensagem e a antecedência do lembrete já configuradas. Assim que o número
+            for conectado, os envios começam a sair sem você precisar mexer em mais nada.
+          </p>
+          <Button variant="outline" size="sm" className="mt-3" render={<Link href="/app/reminders" />}>
+            <BellRing className="size-4" /> Configurar lembretes
+          </Button>
+        </div>
       </section>
     </div>
   );
