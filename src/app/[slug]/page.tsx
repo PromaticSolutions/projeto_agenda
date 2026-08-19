@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { getPublicStudioBySlug } from "@/lib/data/studios";
 import { listPublicServices } from "@/lib/data/services";
 import { BookingFlow } from "@/components/public/booking-flow";
+import { SystemLogo } from "@/components/system-logo";
 import { CalendarCheck2, ShieldCheck, Sparkles } from "lucide-react";
 
 interface StudioPageProps {
@@ -46,8 +47,11 @@ export default async function PublicStudioPage(props: StudioPageProps) {
             className="size-20 rounded-full border-2 border-white/40 object-cover shadow-lg"
           />
         ) : (
-          <span className="flex size-20 items-center justify-center rounded-full bg-white/15 font-heading text-3xl font-semibold shadow-lg ring-4 ring-white/15">
-            {studio.name.slice(0, 1).toUpperCase()}
+          /* Sem logo próprio, entra a marca do Agenda Online — e não mais a
+             inicial do nome. Fundo branco sólido porque a cor do cabeçalho é
+             escolhida pelo dono: sobre um violeta parecido, a peça sumiria. */
+          <span className="flex size-20 items-center justify-center rounded-full bg-white shadow-lg ring-4 ring-white/15">
+            <SystemLogo className="size-14" size={112} />
           </span>
         )}
         <div>

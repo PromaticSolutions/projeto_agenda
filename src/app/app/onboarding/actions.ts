@@ -20,7 +20,6 @@ export async function createStudioAction(
     slug: String(formData.get("slug") ?? ""),
     whatsapp: String(formData.get("whatsapp") ?? ""),
     brand_color: String(formData.get("brand_color") ?? "#7C3AED"),
-    logo_url: String(formData.get("logo_url") ?? ""),
   };
 
   const parsed = studioOnboardingSchema.safeParse(raw);
@@ -38,7 +37,9 @@ export async function createStudioAction(
     slug: parsed.data.slug,
     whatsapp: parsed.data.whatsapp,
     brand_color: parsed.data.brand_color,
-    logo_url: parsed.data.logo_url || null,
+    // Nulo de propósito: nulo significa "usa a marca do Agenda Online".
+    // O estúdio troca por uma própria depois, em Conta > Imagens.
+    logo_url: null,
   });
 
   redirect("/app");

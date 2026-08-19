@@ -21,7 +21,6 @@ export function OnboardingForm() {
   const [slug, setSlug] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
   const [brandColor, setBrandColor] = useState("#7C3AED");
-  const [logoUrl, setLogoUrl] = useState("");
 
   function handleNameChange(value: string) {
     setName(value);
@@ -53,7 +52,6 @@ export function OnboardingForm() {
         name={name}
         slug={slug}
         brandColor={brandColor}
-        logoUrl={logoUrl}
       />
 
       <div className="rounded-3xl bg-card p-6 shadow-xl shadow-plum-900/5 ring-1 ring-plum-900/5 md:order-1">
@@ -85,17 +83,6 @@ export function OnboardingForm() {
                 placeholder="Bella Studio"
                 value={name}
                 onChange={(e) => handleNameChange(e.target.value)}
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="logo_url">URL do logo (opcional)</Label>
-              <Input
-                id="logo_url"
-                name="logo_url"
-                type="url"
-                placeholder="https://..."
-                value={logoUrl}
-                onChange={(e) => setLogoUrl(e.target.value)}
               />
             </div>
           </div>

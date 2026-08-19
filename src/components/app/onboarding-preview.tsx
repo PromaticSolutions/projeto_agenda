@@ -1,30 +1,24 @@
-"use client";
-
-import { useState } from "react";
+import { SystemLogo } from "@/components/system-logo";
 import { cn } from "@/lib/utils";
 
+/**
+ * Miniatura da página pública, ao vivo, enquanto o estúdio é criado.
+ *
+ * O estúdio nasce com a marca do Agenda Online — não há mais campo de logo no
+ * cadastro. Quem quiser a própria troca depois, em Conta > Imagens; até lá é
+ * esta a imagem que a cliente dele vê, e é ela que a prévia precisa mostrar.
+ */
 export function OnboardingPreview({
   name,
   slug,
   brandColor,
-  logoUrl,
   className,
 }: {
   name: string;
   slug: string;
   brandColor: string;
-  logoUrl: string;
   className?: string;
 }) {
-  const [imgFailed, setImgFailed] = useState(false);
-  const [lastLogoUrl, setLastLogoUrl] = useState(logoUrl);
-  if (logoUrl !== lastLogoUrl) {
-    setLastLogoUrl(logoUrl);
-    setImgFailed(false);
-  }
-
-  const showImg = logoUrl.trim().startsWith("http") && !imgFailed;
-
   return (
     <div className={cn("flex flex-col gap-2", className)}>
       <p className="text-[0.7rem] font-semibold tracking-[0.12em] text-muted-foreground uppercase">
@@ -35,19 +29,11 @@ export function OnboardingPreview({
           className="flex flex-col items-center gap-2 px-4 py-8 text-center text-white transition-colors duration-200"
           style={{ backgroundColor: brandColor }}
         >
-          {showImg ? (
-            // eslint-disable-next-line @next/next/no-img-element -- prévia de uma URL externa informada pelo usuário
-            <img
-              src={logoUrl}
-              alt=""
-              onError={() => setImgFailed(true)}
-              className="size-12 rounded-full border-2 border-white/40 object-cover"
-            />
-          ) : (
-            <span className="flex size-12 items-center justify-center rounded-full bg-white/15 font-heading text-lg font-semibold">
-              {(name.trim() || "E").slice(0, 1).toUpperCase()}
-            </span>
-          )}
+          {/* Disco branco atrás da marca: a cor do estúdio é livre, e sem uma
+              base neutra a logo sumiria em quem escolher um violeta próximo. */}
+          <span className="flex size-12 items-center justify-center rounded-full bg-white shadow-sm">
+            <SystemLogo className="size-8" size={64} />
+          </span>
           <p className="font-heading text-sm font-semibold">{name.trim() || "Nome do estúdio"}</p>
         </div>
         <div className="bg-blush-50 px-4 py-3">

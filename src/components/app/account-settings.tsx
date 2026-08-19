@@ -166,7 +166,7 @@ export function AccountSettings({ studio }: { studio: Studio }) {
           <header className="border-b border-border px-4 py-3">
             <h2 className="font-medium text-foreground">Imagens</h2>
             <p className="text-sm text-muted-foreground">
-              Envie do dispositivo ou informe um endereço. JPG, PNG, WebP ou AVIF, até 4 MB.
+              Aparecem na sua página de agendamento. JPG, PNG, WebP ou AVIF, até 4 MB.
             </p>
           </header>
 
@@ -178,6 +178,14 @@ export function AccountSettings({ studio }: { studio: Studio }) {
               aspect="square"
               defaultValue={studio.logo_url}
               hint="Exibido no topo da página pública."
+              systemDefault={{
+                label: "Usar a marca do Agenda Online",
+                description: "Sem logo próprio, é esta a imagem que sua cliente vê.",
+              }}
+              // Só arquivo: no logo a escolha é entre a marca do sistema e uma
+              // imagem sua. Colar endereço de terceiro abria porta para o logo
+              // sumir da página no dia em que aquele site saísse do ar.
+              allowUrl={false}
             />
             <ImageUploadField
               kind="banner"
