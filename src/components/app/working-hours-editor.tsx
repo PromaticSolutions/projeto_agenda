@@ -71,18 +71,75 @@ function CopyWeekdaysButton({ workingHours }: { workingHours: WorkingHour[] }) {
 }
 
 export function WorkingHoursEditor({ workingHours }: { workingHours: WorkingHour[] }) {
-  return <div className="rounded-[2rem] border border-violet-950/6 bg-card shadow-xl shadow-violet-950/5 dark:border-white/8">
-    <div className="flex flex-col gap-4 border-b border-border/70 p-5 sm:flex-row sm:items-center sm:justify-between sm:px-6 dark:border-white/8">
-      <div><p className="text-xs font-bold tracking-[.13em] text-violet-600 uppercase">Semana de trabalho</p><p className="mt-1 text-sm text-muted-foreground">Ative apenas os dias em que você atende. Cada dia pode ter um ou mais períodos.</p></div>
-      <CopyWeekdaysButton workingHours={workingHours} />
+  return (
+    <div className="panel overflow-hidden">
+      <header className="flex flex-col gap-3 border-b border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="font-medium text-foreground">Semana de trabalho</h2>
+          <p className="text-sm text-muted-foreground">
+            Ative os dias em que atende. Cada dia aceita mais de um período.
+          </p>
+        </div>
+        <CopyWeekdaysButton workingHours={workingHours} />
+      </header>
+
+      {/* Um dia por linha: a leitura vertical deixa claro o que está aberto e
+          o que está fechado, coisa que a grade de duas colunas embaralhava. */}
+      <ul className="divide-y divide-border">
+        {WEEKDAY_LABELS.map((label, weekday) => {
+          const shifts = workingHours
+            .filter((hour) => hour.weekday === weekday)
+            .sort((a, b) => a.start_time.localeCompare(b.start_time));
+          const isOpen = shifts.length > 0;
+
+          return (
+            <li key={label} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-start">
+              <div className="flex w-full items-center justify-between gap-3 sm:w-52 sm:shrink-0">
+                <div className="min-w-0">
+                  <p className="font-medium text-foreground">{label}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {isOpen
+                      ? `${shifts.length} ${shifts.length === 1 ? "período" : "períodos"}`
+                      : "Fechado"}
+                  </p>
+                </div>
+                <DaySwitch weekday={weekday} shifts={shifts} />
+              </div>
+
+              <div className="min-w-0 flex-1">
+                {isOpen ? (
+                  <div className="flex flex-col gap-2.5">
+                    <div className="flex flex-wrap gap-1.5">
+                      {shifts.map((shift) => (
+                        <span
+                          key={shift.id}
+                          className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-xs"
+                        >
+                          <Clock3 className="size-3 text-muted-foreground" />
+                          <time className="font-medium">
+                            {shift.start_time.slice(0, 5)} — {shift.end_time.slice(0, 5)}
+                          </time>
+                          <RemoveShiftButton id={shift.id} />
+                        </span>
+                      ))}
+                    </div>
+                    <AddPeriod weekday={weekday} />
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Ative para abrir das {DEFAULT_START} às {DEFAULT_END}.
+                  </p>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+
+      <footer className="flex items-center gap-2 border-t border-border bg-muted/30 px-4 py-2.5 text-xs text-muted-foreground">
+        <Check className="size-3.5" />
+        As mudanças valem no link de agendamento imediatamente.
+      </footer>
     </div>
-    <div className="grid divide-y divide-border/70 dark:divide-white/8 lg:grid-cols-2 lg:divide-x lg:divide-y-0">
-      {WEEKDAY_LABELS.map((label, weekday) => {
-        const shifts = workingHours.filter((hour) => hour.weekday === weekday).sort((a, b) => a.start_time.localeCompare(b.start_time));
-        const isOpen = shifts.length > 0;
-        return <article key={label} className="p-5 sm:px-6"><div className="flex items-center justify-between gap-4"><div className="flex items-center gap-3"><span className={`flex size-9 items-center justify-center rounded-xl text-xs font-bold ${isOpen ? "bg-violet-600 text-white" : "bg-muted text-muted-foreground"}`}>{label.slice(0, 3)}</span><div><h2 className="font-semibold text-plum-900 dark:text-foreground">{label}</h2><p className="text-xs text-muted-foreground">{isOpen ? `${shifts.length} ${shifts.length === 1 ? "período" : "períodos"} disponível${shifts.length === 1 ? "" : "is"}` : "Fechado"}</p></div></div><DaySwitch weekday={weekday} shifts={shifts} /></div>{isOpen && <div className="mt-4 border-t border-border/60 pt-4 dark:border-white/8"><div className="mb-3 flex flex-wrap gap-2">{shifts.map((shift) => <span key={shift.id} className="inline-flex items-center gap-1.5 rounded-full bg-violet-600/10 px-3 py-1.5 text-xs font-semibold text-violet-700 dark:text-violet-300"><Clock3 className="size-3" />{shift.start_time.slice(0, 5)} — {shift.end_time.slice(0, 5)}<RemoveShiftButton id={shift.id} /></span>)}</div><AddPeriod weekday={weekday} /></div>}{!isOpen && <p className="mt-4 text-xs text-muted-foreground">Ative para disponibilizar o horário padrão de 09:00 às 18:00.</p>}</article>;
-      })}
-    </div>
-    <div className="flex items-center gap-2 rounded-b-[2rem] border-t border-border/70 bg-violet-600/[.035] px-5 py-3 text-xs text-muted-foreground sm:px-6 dark:border-white/8"><Check className="size-3.5 text-wa" />As mudanças ficam disponíveis no seu link de agendamento automaticamente.</div>
-  </div>;
+  );
 }

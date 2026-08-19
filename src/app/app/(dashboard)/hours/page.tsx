@@ -16,26 +16,25 @@ export default async function HoursPage() {
   ]);
 
   return (
-    <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-10">
-      <div>
-        <p className="text-xs font-bold tracking-[.14em] text-violet-600 uppercase">Disponibilidade</p>
-        <h1 className="mt-1 font-heading text-3xl font-semibold text-plum-900 dark:text-foreground">Quando você atende?</h1>
-        <p className="mt-2 max-w-2xl text-muted-foreground">Configure sua semana em poucos cliques. Desative os dias fechados e adicione outro período apenas quando precisar, como para separar manhã e tarde.</p>
-        <div className="mt-6"><WorkingHoursEditor workingHours={workingHours} /></div>
-      </div>
-
-      <div>
-        <p className="text-xs font-bold tracking-[.14em] text-violet-600 uppercase">Exceções</p>
-        <h2 className="mt-1 font-heading text-2xl font-semibold text-plum-900 dark:text-foreground">
-          Folgas e bloqueios pontuais
-        </h2>
-        <p className="mt-2 text-muted-foreground">
-          Bloqueie um horário específico (almoço, feriado, folga) mesmo dentro de um turno aberto.
+    <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
+      <header className="space-y-1 border-b border-border pb-5">
+        <h1 className="text-xl font-semibold text-foreground">Horários</h1>
+        <p className="text-sm text-muted-foreground">
+          A grade semanal define quando o link público oferece vagas.
         </p>
-        <div className="mt-4">
-          <BlocksEditor blocks={blocks} />
+      </header>
+
+      <WorkingHoursEditor workingHours={workingHours} />
+
+      <section className="flex flex-col gap-3">
+        <div className="space-y-0.5">
+          <h2 className="font-medium text-foreground">Folgas e bloqueios</h2>
+          <p className="text-sm text-muted-foreground">
+            Fecham um intervalo específico mesmo dentro de um turno aberto.
+          </p>
         </div>
-      </div>
+        <BlocksEditor blocks={blocks} />
+      </section>
     </div>
   );
 }

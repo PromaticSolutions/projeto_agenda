@@ -3,9 +3,11 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/service";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import {
+  mockDeleteClient,
   mockGetClient,
   mockListBookings,
   mockListClients,
+  mockUpdateClient,
   mockUpdateClientNotes,
   mockUpsertClient,
 } from "@/lib/mock/store";
@@ -118,4 +120,82 @@ export async function updateClientNotes(id: string, notes: string | null): Promi
     .single();
   if (error) throw error;
   return data;
+}
+
+export type ClientWriteResult =
+  | { ok: true; client: Client }
+  | { ok: false; error: "duplicate_phone" };
+
+/**
+ * Cadastro manual, feito na tela de Clientes.
+ *
+ * `clients` tem índice único em (studio_id, phone), então dois cadastros com
+ * o mesmo telefone colidem — 23505. Isso é tratado como resultado esperado, e
+ * não exceção: o telefone é justamente como o dono reconhece a cliente, e
+ * duplicar criaria dois históricos para a mesma pessoa.
+ */
+export async function createClient(
+  studioId: string,
+  name: string,
+  phone: string
+): Promise<ClientWriteResult> {
+  if (!isSupabaseConfigured) {
+    const existing = mockListClients(studioId).find((c) => c.phone === phone);
+    if (existing) return { ok: false, error: "duplicate_phone" };
+    return { ok: true, client: mockUpsertClient({ studio_id: studioId, name, phone }) };
+  }
+
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("clients")
+    .insert({ studio_id: studioId, name, phone })
+    .select("*")
+    .single();
+
+  if (error) {
+    if ((error as { code?: string }).code === "23505") return { ok: false, error: "duplicate_phone" };
+    throw error;
+  }
+  return { ok: true, client: data };
+}
+
+export async function updateClient(
+  studioId: string,
+  id: string,
+  name: string,
+  phone: string
+): Promise<ClientWriteResult> {
+  if (!isSupabaseConfigured) {
+    const clash = mockListClients(studioId).find((c) => c.phone === phone && c.id !== id);
+    if (clash) return { ok: false, error: "duplicate_phone" };
+    return { ok: true, client: mockUpdateClient(id, name, phone) };
+  }
+
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("clients")
+    .update({ name, phone, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("studio_id", studioId)
+    .select("*")
+    .single();
+
+  if (error) {
+    if ((error as { code?: string }).code === "23505") return { ok: false, error: "duplicate_phone" };
+    throw error;
+  }
+  return { ok: true, client: data };
+}
+
+/**
+ * Remove o cadastro. Os agendamentos NÃO somem junto: `bookings.client_id` é
+ * `on delete set null` (0004), e o nome/telefone continuam gravados na própria
+ * linha do booking — o histórico da agenda fica íntegro.
+ */
+export async function deleteClient(studioId: string, id: string): Promise<void> {
+  if (!isSupabaseConfigured) return mockDeleteClient(id);
+
+  const supabase = await createServerSupabaseClient();
+  const { error } = await supabase.from("clients").delete().eq("id", id).eq("studio_id", studioId);
+  if (error) throw error;
 }

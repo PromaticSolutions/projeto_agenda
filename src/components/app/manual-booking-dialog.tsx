@@ -23,9 +23,14 @@ import {
   listOwnerSlotsAction,
 } from "@/app/app/(dashboard)/actions";
 import { clientNameSchema, clientPhoneSchema } from "@/lib/validation";
-import { formatDurationMin, formatPriceCents, formatTimeLocal } from "@/lib/format";
+import {
+  formatDurationMin,
+  formatPhoneDisplay,
+  formatPriceCents,
+  formatTimeLocal,
+} from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { Service } from "@/lib/types";
+import type { Client, Service } from "@/lib/types";
 
 interface Slot {
   start: string;
@@ -40,9 +45,13 @@ function isoToStudioTime(iso: string): string {
 export function ManualBookingDialog({
   services,
   defaultDate,
+  clients = [],
 }: {
   services: Service[];
   defaultDate: string;
+  /** Cadastros existentes, para agendar sem redigitar. Opcional: o fluxo
+   *  continua funcionando com a lista vazia, digitando nome e telefone. */
+  clients?: Client[];
 }) {
   const activeServices = services.filter((s) => s.active);
 
@@ -61,6 +70,21 @@ export function ManualBookingDialog({
 
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
+  const [pickedClientId, setPickedClientId] = useState("");
+
+  /**
+   * Escolher uma cliente cadastrada só PREENCHE nome e telefone — os campos
+   * seguem editáveis. Assim o dono corrige um nome na hora sem precisar sair
+   * do agendamento, e o cadastro é reconciliado pelo telefone no servidor
+   * (`upsertClientFromBooking`).
+   */
+  function handlePickClient(id: string) {
+    setPickedClientId(id);
+    const picked = clients.find((c) => c.id === id);
+    if (!picked) return;
+    setClientName(picked.name);
+    setClientPhone(picked.phone.replace(/^55/, ""));
+  }
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -326,6 +350,25 @@ export function ManualBookingDialog({
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+
+            {clients.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="manual_client_pick">Cliente</Label>
+                <select
+                  id="manual_client_pick"
+                  value={pickedClientId}
+                  onChange={(e) => handlePickClient(e.target.value)}
+                  className="h-9 w-full rounded-md border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                >
+                  <option value="">Nova cliente (digitar abaixo)</option>
+                  {clients.map((client) => (
+                    <option key={client.id} value={client.id}>
+                      {client.name} — {formatPhoneDisplay(client.phone)}
+                    </option>
+                  ))}
+                </select>
               </div>
             )}
 

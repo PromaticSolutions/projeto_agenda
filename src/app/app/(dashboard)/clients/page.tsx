@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { Users } from "lucide-react";
 import { getMyStudio } from "@/lib/data/studios";
 import { listMyClientsWithStats } from "@/lib/data/clients";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ClientFormDialog } from "@/components/app/client-form-dialog";
+import { ClientRowActions } from "@/components/app/client-row-actions";
 import { formatDateLocal, formatPhoneDisplay } from "@/lib/format";
 
 export const metadata = { title: "Clientes — Agenda Online" };
@@ -12,6 +12,8 @@ export default async function ClientsPage() {
   if (!studio) return null;
 
   const clients = await listMyClientsWithStats(studio.id);
+  // Quem veio há menos tempo primeiro; quem nunca veio vai para o fim, em
+  // ordem alfabética — é o cadastro novo, ainda sem histórico.
   const sorted = [...clients].sort((a, b) => {
     if (!a.lastVisitAt && !b.lastVisitAt) return a.name.localeCompare(b.name);
     if (!a.lastVisitAt) return 1;
@@ -21,46 +23,66 @@ export default async function ClientsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="font-heading text-2xl font-semibold text-plum-900">Clientes</h1>
-        <p className="text-muted-foreground">
-          Histórico de quem já agendou com você — derivado automaticamente dos agendamentos.
-        </p>
-      </div>
+      <header className="flex flex-wrap items-start justify-between gap-4 border-b border-border pb-5">
+        <div className="space-y-1">
+          <h1 className="text-xl font-semibold text-foreground">Clientes</h1>
+          <p className="text-sm text-muted-foreground">
+            Cadastre quando quiser — quem agenda entra aqui automaticamente.
+          </p>
+        </div>
+        <ClientFormDialog />
+      </header>
 
       {sorted.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-3xl border border-dashed border-plum-900/15 bg-white/35 p-12 text-center">
-          <Users className="size-8 text-muted-foreground" />
-          <p className="text-muted-foreground">Nenhum cliente ainda. Assim que o primeiro agendamento entrar, ele aparece aqui.</p>
+        <div className="panel flex flex-col items-center gap-1 border-dashed p-10 text-center">
+          <p className="font-medium text-foreground">Nenhuma cliente ainda</p>
+          <p className="text-sm text-muted-foreground">
+            Cadastre pelo botão acima, ou espere o primeiro agendamento entrar.
+          </p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl bg-card shadow-sm ring-1 ring-plum-900/5">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>Telefone</TableHead>
-                <TableHead>Agendamentos</TableHead>
-                <TableHead>Última visita</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sorted.map((client) => (
-                <TableRow key={client.id}>
-                  <TableCell>
-                    <Link href={`/app/clients/${client.id}`} className="font-medium text-plum-900 hover:text-violet-600 dark:text-foreground">
-                      {client.name}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{formatPhoneDisplay(client.phone)}</TableCell>
-                  <TableCell>{client.totalBookings}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {client.lastVisitAt ? formatDateLocal(new Date(client.lastVisitAt)) : "—"}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        <div className="panel overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/40 text-left">
+                  <th className="section-label px-4 py-2.5 text-muted-foreground">Nome</th>
+                  <th className="section-label px-4 py-2.5 text-muted-foreground">Telefone</th>
+                  <th className="section-label px-4 py-2.5 text-right text-muted-foreground">
+                    Agendamentos
+                  </th>
+                  <th className="section-label px-4 py-2.5 text-muted-foreground">Última visita</th>
+                  <th className="section-label px-4 py-2.5 text-right text-muted-foreground">
+                    Ações
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {sorted.map((client) => (
+                  <tr key={client.id} className="border-b border-border last:border-0">
+                    <td className="px-4 py-3">
+                      <Link
+                        href={`/app/clients/${client.id}`}
+                        className="font-medium text-foreground underline-offset-4 hover:underline"
+                      >
+                        {client.name}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {formatPhoneDisplay(client.phone)}
+                    </td>
+                    <td className="px-4 py-3 text-right">{client.totalBookings}</td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {client.lastVisitAt ? formatDateLocal(new Date(client.lastVisitAt)) : "—"}
+                    </td>
+                    <td className="px-4 py-3">
+                      <ClientRowActions client={client} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

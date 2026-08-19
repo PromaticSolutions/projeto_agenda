@@ -592,3 +592,20 @@ export function mockGetWhatsAppConnection(studioId: string): WhatsAppConnection 
     }
   );
 }
+
+export function mockUpdateClient(id: string, name: string, phone: string): Client {
+  const idx = clients.findIndex((c) => c.id === id);
+  if (idx === -1) throw new Error("Cliente não encontrado");
+  clients[idx] = { ...clients[idx], name, phone, updated_at: new Date().toISOString() };
+  return clients[idx];
+}
+
+/** Espelha `on delete set null`: o booking fica, só perde o vínculo. */
+export function mockDeleteClient(id: string): void {
+  const idx = clients.findIndex((c) => c.id === id);
+  if (idx === -1) return;
+  clients.splice(idx, 1);
+  for (let i = 0; i < bookings.length; i++) {
+    if (bookings[i].client_id === id) bookings[i] = { ...bookings[i], client_id: null };
+  }
+}
