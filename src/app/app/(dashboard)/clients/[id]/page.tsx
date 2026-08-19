@@ -34,18 +34,18 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
         <ArrowLeft className="size-4" /> Voltar para clientes
       </Link>
 
-      <div>
-        <h1 className="font-heading text-2xl font-semibold text-plum-900">{client.name}</h1>
-        <p className="text-muted-foreground">{formatPhoneDisplay(client.phone)}</p>
-      </div>
+      <header className="space-y-1 border-b border-border pb-5">
+        <h1 className="text-xl font-semibold text-foreground">{client.name}</h1>
+        <p className="text-sm text-muted-foreground">{formatPhoneDisplay(client.phone)}</p>
+      </header>
 
-      <section className="rounded-2xl bg-card p-5 shadow-sm ring-1 ring-plum-900/5">
-        <p className="mb-3 text-xs font-bold tracking-[.13em] text-violet-600 uppercase">Notas</p>
+      <section className="panel p-4">
+        <p className="section-label mb-3 text-muted-foreground">Notas</p>
         <ClientNotesForm clientId={client.id} notes={client.notes} />
       </section>
 
-      <section className="rounded-2xl bg-card p-5 shadow-sm ring-1 ring-plum-900/5">
-        <p className="mb-3 text-xs font-bold tracking-[.13em] text-violet-600 uppercase">
+      <section className="panel p-4">
+        <p className="section-label mb-3 text-muted-foreground">
           Histórico de agendamentos ({bookings.length})
         </p>
         {bookings.length === 0 ? (
