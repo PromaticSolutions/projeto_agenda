@@ -18,6 +18,8 @@ export interface ServiceInput {
   duration_min: number;
   color: string;
   active: boolean;
+  /** Observações internas, opcional. Não aparece na página pública. */
+  notes?: string | null;
 }
 
 /** Lista completa (ativos + inativos) para a tela de CRUD do dono. */
@@ -29,6 +31,7 @@ export async function listMyServices(studioId: string): Promise<Service[]> {
     .from("services")
     .select("*")
     .eq("studio_id", studioId)
+    .is("archived_at", null)
     .order("name");
   if (error) throw error;
   return data;
@@ -57,12 +60,36 @@ export async function updateService(id: string, patch: Partial<ServiceInput>): P
   return data;
 }
 
-export async function deleteService(id: string): Promise<void> {
+/** Como o serviço saiu da lista: apagado de fato ou preservado como histórico. */
+export type DeleteServiceMode = "deleted" | "archived";
+
+/**
+ * Exclusão em dois regimes.
+ *
+ * `bookings.service_id` é `on delete restrict` (0001_init.sql) de propósito:
+ * apagar um serviço não pode apagar o histórico financeiro nem deixar
+ * agendamento órfão. Então um DELETE direto estoura 23503 para qualquer
+ * serviço que já tenha sido agendado — que era exatamente o bug da tela.
+ *
+ * - serviço sem nenhum booking -> DELETE real, a linha some;
+ * - serviço com bookings       -> arquivamento, sai de todas as listas mas o
+ *                                 histórico continua íntegro.
+ */
+export async function deleteService(id: string): Promise<DeleteServiceMode> {
   if (!isSupabaseConfigured) return mockDeleteService(id);
 
   const supabase = await createServerSupabaseClient();
   const { error } = await supabase.from("services").delete().eq("id", id);
-  if (error) throw error;
+  if (!error) return "deleted";
+
+  if ((error as { code?: string }).code !== "23503") throw error;
+
+  const { error: archiveError } = await supabase
+    .from("services")
+    .update({ archived_at: new Date().toISOString(), active: false })
+    .eq("id", id);
+  if (archiveError) throw archiveError;
+  return "archived";
 }
 
 /** Só serviços ativos — página pública /[slug]. */
@@ -75,6 +102,7 @@ export async function listPublicServices(studioId: string): Promise<Service[]> {
     .select("*")
     .eq("studio_id", studioId)
     .eq("active", true)
+    .is("archived_at", null)
     .order("name");
   if (error) throw error;
   return data;

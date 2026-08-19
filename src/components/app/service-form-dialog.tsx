@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import {
   createServiceAction,
   updateServiceAction,
@@ -66,6 +67,7 @@ export function ServiceFormDialog({ service }: { service?: Service }) {
           <DialogTitle>{isEdit ? "Editar serviço" : "Novo serviço"}</DialogTitle>
           <DialogDescription>
             Nome, preço, duração e cor aparecem para o cliente na página pública.
+            As observações ficam só para você.
           </DialogDescription>
         </DialogHeader>
         <form action={formAction} className="flex flex-col gap-4">
@@ -139,6 +141,24 @@ export function ServiceFormDialog({ service }: { service?: Service }) {
               Serviço ativo (visível na página pública)
             </Label>
             <Switch id="active" name="active" defaultChecked={service?.active ?? true} />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <div className="flex items-baseline justify-between gap-2">
+              <Label htmlFor="notes">Observações</Label>
+              <span className="text-xs text-muted-foreground">Opcional</span>
+            </div>
+            <Textarea
+              id="notes"
+              name="notes"
+              rows={3}
+              maxLength={2000}
+              defaultValue={service?.notes ?? ""}
+              placeholder="Preparo, contraindicações, material necessário..."
+            />
+            <p className="text-xs text-muted-foreground">
+              Uso interno. Não aparece na página pública.
+            </p>
           </div>
 
           {state && !state.ok && <p className="text-sm text-destructive">{state.error}</p>}

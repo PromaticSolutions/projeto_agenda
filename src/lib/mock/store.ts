@@ -1,5 +1,15 @@
 import "server-only";
-import type { Block, Booking, BookingStatus, Client, Service, Studio, WorkingHour } from "@/lib/types";
+import type {
+  Block,
+  Booking,
+  BookingStatus,
+  Client,
+  ReminderSettings,
+  Service,
+  Studio,
+  WhatsAppConnection,
+  WorkingHour,
+} from "@/lib/types";
 import { localDateTimeToUtc } from "@/lib/availability";
 
 /**
@@ -42,6 +52,8 @@ interface MockDb {
   blocks: Block[];
   bookings: Booking[];
   clients: Client[];
+  reminderSettings: ReminderSettings[];
+  whatsappConnections: WhatsAppConnection[];
 }
 
 declare global {
@@ -205,11 +217,31 @@ function buildSeedDb(): MockDb {
     },
   ];
 
-  return { studios, services, workingHours, blocks, bookings, clients };
+  // Lembretes e WhatsApp nascem vazios: sem linha = configuração padrão,
+  // igual ao banco real, onde a linha só existe depois do primeiro save.
+  return {
+    studios,
+    services,
+    workingHours,
+    blocks,
+    bookings,
+    clients,
+    reminderSettings: [],
+    whatsappConnections: [],
+  };
 }
 
 const db = (globalThis.__agendaMockDb ??= buildSeedDb());
-const { studios, services, workingHours, blocks, bookings, clients } = db;
+const {
+  studios,
+  services,
+  workingHours,
+  blocks,
+  bookings,
+  clients,
+  reminderSettings,
+  whatsappConnections,
+} = db;
 
 // ---------------------------------------------------------------------------
 // studios
@@ -274,6 +306,8 @@ export function mockUpdateStudio(id: string, patch: Partial<Studio>): Studio {
 export function mockListServices(studioId: string, opts?: { activeOnly?: boolean }): Service[] {
   return services
     .filter((s) => s.studio_id === studioId)
+    // Arquivado nunca aparece em listagem — só sobrevive para o histórico.
+    .filter((s) => s.archived_at === null)
     .filter((s) => (opts?.activeOnly ? s.active : true))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -305,9 +339,25 @@ export function mockUpdateService(id: string, patch: Partial<Service>): Service 
   return services[idx];
 }
 
-export function mockDeleteService(id: string): void {
+/**
+ * Espelha os dois regimes do servidor (ver `deleteService`): serviço nunca
+ * agendado some de vez; serviço com histórico é arquivado.
+ */
+export function mockDeleteService(id: string): "deleted" | "archived" {
   const idx = services.findIndex((s) => s.id === id);
-  if (idx !== -1) services.splice(idx, 1);
+  if (idx === -1) return "deleted";
+
+  if (bookings.some((b) => b.service_id === id)) {
+    services[idx] = {
+      ...services[idx],
+      archived_at: new Date().toISOString(),
+      active: false,
+    };
+    return "archived";
+  }
+
+  services.splice(idx, 1);
+  return "deleted";
 }
 
 // ---------------------------------------------------------------------------
@@ -486,4 +536,59 @@ export function mockUpdateClientNotes(id: string, notes: string | null): Client 
   if (idx === -1) throw new Error("Cliente não encontrado");
   clients[idx] = { ...clients[idx], notes, updated_at: new Date().toISOString() };
   return clients[idx];
+}
+
+// ---------------------------------------------------------------------------
+// reminder_settings (item 7) — 1 linha por estúdio.
+// ---------------------------------------------------------------------------
+const REMINDER_DEFAULTS = {
+  enabled: false,
+  lead_time_minutes: 1440,
+  message_template:
+    "Olá {cliente}! Passando para confirmar seu horário de {servico} em {data} às {hora}. Até logo! — {salao}",
+  include_link: false,
+  link_url: null,
+};
+
+export function mockGetReminderSettings(studioId: string): ReminderSettings {
+  return (
+    reminderSettings.find((r) => r.studio_id === studioId) ?? {
+      studio_id: studioId,
+      ...REMINDER_DEFAULTS,
+      updated_at: new Date().toISOString(),
+    }
+  );
+}
+
+export function mockUpsertReminderSettings(
+  studioId: string,
+  input: Omit<ReminderSettings, "studio_id" | "updated_at">
+): ReminderSettings {
+  const row: ReminderSettings = {
+    studio_id: studioId,
+    ...input,
+    link_url: input.include_link ? input.link_url : null,
+    updated_at: new Date().toISOString(),
+  };
+  const idx = reminderSettings.findIndex((r) => r.studio_id === studioId);
+  if (idx === -1) reminderSettings.push(row);
+  else reminderSettings[idx] = row;
+  return row;
+}
+
+// ---------------------------------------------------------------------------
+// whatsapp_connections (item 8) — só leitura: a Evolution API ainda não existe.
+// ---------------------------------------------------------------------------
+export function mockGetWhatsAppConnection(studioId: string): WhatsAppConnection {
+  return (
+    whatsappConnections.find((w) => w.studio_id === studioId) ?? {
+      studio_id: studioId,
+      status: "desconectado",
+      instance_name: null,
+      connected_phone: null,
+      last_error: null,
+      last_connected_at: null,
+      updated_at: new Date().toISOString(),
+    }
+  );
 }

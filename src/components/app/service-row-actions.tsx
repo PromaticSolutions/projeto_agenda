@@ -16,15 +16,33 @@ export function ServiceRowActions({ service }: { service: Service }) {
   function handleToggle(checked: boolean) {
     setActive(checked);
     startTransition(async () => {
-      await toggleServiceActiveAction(service.id, checked);
+      const result = await toggleServiceActiveAction(service.id, checked);
+      if (!result.ok) {
+        setActive(!checked); // desfaz o otimismo se o servidor recusou
+        toast.error(result.error);
+      }
     });
   }
 
   function handleDelete() {
-    if (!confirm(`Excluir "${service.name}"? Essa ação não pode ser desfeita.`)) return;
+    if (!confirm(`Excluir "${service.name}"?`)) return;
     startTransition(async () => {
-      await deleteServiceAction(service.id);
-      toast.success("Serviço excluído");
+      const result = await deleteServiceAction(service.id);
+
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+
+      // Serviço já agendado não pode ser apagado (FK on delete restrict), então
+      // é arquivado. Dizer só "excluído" esconderia isso do dono.
+      if (result.mode === "archived") {
+        toast.success("Serviço arquivado", {
+          description: "Ele tem agendamentos no histórico, então saiu das listas mas foi preservado.",
+        });
+      } else {
+        toast.success("Serviço excluído");
+      }
     });
   }
 
@@ -32,7 +50,7 @@ export function ServiceRowActions({ service }: { service: Service }) {
     <div className="flex items-center gap-2">
       <Switch checked={active} onCheckedChange={handleToggle} disabled={pending} aria-label="Ativo" />
       <ServiceFormDialog service={service} />
-      <Button variant="ghost" size="icon-sm" onClick={handleDelete} disabled={pending}>
+      <Button variant="ghost" size="icon-sm" onClick={handleDelete} disabled={pending} aria-label="Excluir serviço">
         <Trash2 className="size-4 text-destructive" />
       </Button>
     </div>

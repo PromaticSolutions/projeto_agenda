@@ -17,6 +17,13 @@ export interface StudioInput {
   whatsapp: string;
   brand_color: string;
   logo_url?: string | null;
+  /** Colunas da 0006 — identidade visual e dados do responsável. */
+  banner_url?: string | null;
+  owner_name?: string | null;
+  /** 11 dígitos, sem máscara: é o formato que a check constraint aceita. */
+  owner_cpf?: string | null;
+  owner_birth_date?: string | null;
+  acquired_at?: string | null;
 }
 
 /** Estúdio do dono autenticado (contexto /app). Null se ainda não fez onboarding. */

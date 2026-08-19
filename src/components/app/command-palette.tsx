@@ -3,7 +3,17 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
-import { CalendarDays, CircleUserRound, Clock, Scissors, Search, Users } from "lucide-react";
+import {
+  BellRing,
+  CalendarDays,
+  CircleUserRound,
+  Clock,
+  MessageCircle,
+  Scissors,
+  Search,
+  Settings,
+  Users,
+} from "lucide-react";
 
 interface NavItem {
   label: string;
@@ -16,7 +26,10 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Clientes", href: "/app/clients", icon: Users },
   { label: "Serviços", href: "/app/services", icon: Scissors },
   { label: "Horários", href: "/app/hours", icon: Clock },
+  { label: "Lembretes", href: "/app/reminders", icon: BellRing },
+  { label: "WhatsApp", href: "/app/whatsapp", icon: MessageCircle },
   { label: "Conta", href: "/app/account", icon: CircleUserRound },
+  { label: "Configurações", href: "/app/settings", icon: Settings },
 ];
 
 export function CommandPalette() {
