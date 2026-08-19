@@ -1,13 +1,15 @@
 import { AuthParticles } from "@/components/auth/auth-particles";
 import { AuthShowcasePanel } from "@/components/auth/brand-mark";
+import { GlassKnotBackdrop } from "@/components/auth/glass-knot";
 
 /**
- * Moldura comum das telas de autenticação: superfície escura, campo de
- * partículas ao fundo e, em telas largas, o painel de apresentação à esquerda.
+ * Moldura comum das telas de autenticação: superfície escura, a marca em
+ * vidro girando ao fundo, campo de partículas por cima dela e, em telas
+ * largas, o painel de apresentação à esquerda.
  *
- * As partículas ficam numa ÚNICA camada no nível do shell, e não uma por
- * coluna: assim elas atravessam a tela inteira, sem emenda visível na divisa
- * entre o painel e o formulário.
+ * O fundo 3D e as partículas ficam numa ÚNICA camada no nível do shell, e não
+ * uma por coluna: assim atravessam a tela inteira, sem emenda visível na
+ * divisa entre o painel e o formulário.
  */
 export function AuthShell({
   children,
@@ -19,6 +21,9 @@ export function AuthShell({
 }) {
   return (
     <div className="relative flex flex-1 overflow-hidden bg-plum-900 text-blush-50">
+      {/* Ordem importa: o nó pinta o próprio plum de fundo (é opaco, para o
+          vidro ter o que refratar), então precisa vir ANTES das partículas. */}
+      <GlassKnotBackdrop />
       <AuthParticles count={70} />
 
       <div className="relative z-10 flex flex-1 lg:grid lg:grid-cols-2">

@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { CalendarDays, Check } from "lucide-react";
+import { Check } from "lucide-react";
+import { GlassKnotMark } from "@/components/auth/glass-knot";
 import { cn } from "@/lib/utils";
 
 const SHOWCASE_BENEFITS = [
@@ -19,9 +20,7 @@ export function AuthShowcasePanel({ className }: { className?: string }) {
       )}
     >
       <div className="flex items-center gap-2.5">
-        <span className="flex size-9 items-center justify-center rounded-md bg-cta text-white">
-          <CalendarDays className="size-5" />
-        </span>
+        <GlassKnotMark />
         <span className="text-[1.25rem] font-semibold">Agenda Online</span>
       </div>
 
@@ -51,9 +50,7 @@ export function AuthShowcasePanel({ className }: { className?: string }) {
 export function BrandMark() {
   return (
     <Link href="/" className="flex items-center gap-2.5">
-      <span className="flex size-9 items-center justify-center rounded-md bg-cta text-white">
-        <CalendarDays className="size-5" />
-      </span>
+      <GlassKnotMark />
       {/* Sem cor própria: herda do contexto. As telas de auth são escuras
           (AuthShell define claro) e o onboarding é claro — fixar a cor aqui
           apagaria a marca em um dos dois. */}
