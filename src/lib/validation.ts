@@ -135,7 +135,7 @@ export function validateImageUpload(
 const optionalUrlSchema = z.union([z.literal(""), httpUrlSchema]).optional();
 
 /** Criação do estúdio. Sem `logo_url`: o estúdio nasce com a marca do
- *  Agenda Online e só troca depois, na Conta. */
+ *  Timely e só troca depois, na Conta. */
 export const studioOnboardingSchema = z.object({
   name: z.string().trim().min(2, "Informe o nome do estúdio").max(80),
   slug: slugSchema,
@@ -145,7 +145,7 @@ export const studioOnboardingSchema = z.object({
 
 /** Aba "Identidade" da Conta: o cadastro + as imagens que só existem aqui.
  *  `logo_url` vazio é um estado válido e significativo — é o que diz "use a
- *  marca do Agenda Online na minha página". */
+ *  marca do Timely na minha página". */
 export const studioIdentitySchema = studioOnboardingSchema.extend({
   logo_url: optionalUrlSchema,
   banner_url: optionalUrlSchema,

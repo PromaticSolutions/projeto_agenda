@@ -47,7 +47,7 @@ export default async function PublicStudioPage(props: StudioPageProps) {
             className="size-20 rounded-full border-2 border-white/40 object-cover shadow-lg"
           />
         ) : (
-          /* Sem logo próprio, entra a marca do Agenda Online — e não mais a
+          /* Sem logo próprio, entra a marca do Timely — e não mais a
              inicial do nome. Fundo branco sólido porque a cor do cabeçalho é
              escolhida pelo dono: sobre um violeta parecido, a peça sumiria. */
           <span className="flex size-20 items-center justify-center rounded-full bg-white shadow-lg ring-4 ring-white/15">
@@ -76,7 +76,7 @@ export default async function PublicStudioPage(props: StudioPageProps) {
 
       <footer className="relative px-4 py-7 text-center text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-950/8 bg-white/60 px-3 py-1.5 shadow-sm">
-          <Sparkles className="size-3 text-violet-600" /> Agendamento por <span className="font-semibold text-plum-900">Agenda Online</span>
+          <Sparkles className="size-3 text-violet-600" /> Agendamento por <span className="font-semibold text-plum-900">Timely</span>
         </span>
       </footer>
     </div>

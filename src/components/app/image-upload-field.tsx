@@ -19,7 +19,7 @@ interface ImageUploadFieldProps {
   defaultValue?: string | null;
   /** Proporção da moldura de prévia — logo é quadrado, banner é panorâmico. */
   aspect?: "square" | "wide";
-  /** Oferece "usar a marca do Agenda Online" como alternativa ao arquivo
+  /** Oferece "usar a marca do Timely" como alternativa ao arquivo
    *  próprio. Ligado, o vazio deixa de ser ausência e passa a ser escolha. */
   systemDefault?: { label: string; description: string };
   /** Colar endereço de imagem. O banner ainda aceita; o logo não, porque a

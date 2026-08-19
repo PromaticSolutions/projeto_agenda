@@ -5,7 +5,7 @@ import { ClientFormDialog } from "@/components/app/client-form-dialog";
 import { ClientRowActions } from "@/components/app/client-row-actions";
 import { formatDateLocal, formatPhoneDisplay } from "@/lib/format";
 
-export const metadata = { title: "Clientes — Agenda Online" };
+export const metadata = { title: "Clientes — Timely" };
 
 export default async function ClientsPage() {
   const studio = await getMyStudio();

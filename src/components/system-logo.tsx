@@ -2,7 +2,7 @@ import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 /**
- * A marca do Agenda Online em imagem estática, para uso fora das telas de
+ * A marca do Timely em imagem estática, para uso fora das telas de
  * autenticação.
  *
  * É o mesmo nó de vidro de `components/auth/glass-knot.tsx`, mas renderizado
@@ -26,7 +26,7 @@ export function SystemLogo({
   return (
     <Image
       src="/brand/logo.png"
-      alt="Agenda Online"
+      alt="Timely"
       width={size}
       height={size}
       className={cn("block object-contain", className)}

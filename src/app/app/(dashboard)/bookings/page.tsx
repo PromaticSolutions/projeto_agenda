@@ -25,7 +25,7 @@ import { nextLocalDate, utcToLocalDate } from "@/lib/availability";
 import { cn } from "@/lib/utils";
 import type { Booking, Service } from "@/lib/types";
 
-export const metadata = { title: "Agendamentos — Agenda Online" };
+export const metadata = { title: "Agendamentos — Timely" };
 
 /**
  * Módulo de agendamentos: a agenda inteira, em oposição ao "Painel do dia".

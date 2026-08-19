@@ -37,7 +37,7 @@ export async function createStudioAction(
     slug: parsed.data.slug,
     whatsapp: parsed.data.whatsapp,
     brand_color: parsed.data.brand_color,
-    // Nulo de propósito: nulo significa "usa a marca do Agenda Online".
+    // Nulo de propósito: nulo significa "usa a marca do Timely".
     // O estúdio troca por uma própria depois, em Conta > Imagens.
     logo_url: null,
   });

@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 /**
  * Miniatura da página pública, ao vivo, enquanto o estúdio é criado.
  *
- * O estúdio nasce com a marca do Agenda Online — não há mais campo de logo no
+ * O estúdio nasce com a marca do Timely — não há mais campo de logo no
  * cadastro. Quem quiser a própria troca depois, em Conta > Imagens; até lá é
  * esta a imagem que a cliente dele vê, e é ela que a prévia precisa mostrar.
  */

@@ -2,7 +2,7 @@ import { getMyStudio } from "@/lib/data/studios";
 import { getMyEmail } from "@/lib/data/account";
 import { StudioProfileForm } from "@/components/app/studio-profile-form";
 
-export const metadata = { title: "Configurações — Agenda Online" };
+export const metadata = { title: "Configurações — Timely" };
 
 export default async function SettingsPage() {
   const studio = await getMyStudio();

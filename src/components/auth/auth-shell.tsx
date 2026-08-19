@@ -36,6 +36,22 @@ export function AuthShell({
   );
 }
 
+/**
+ * Assinatura discreta abaixo do cartão.
+ *
+ * Existe sobretudo no celular, onde a coluna de apresentação não aparece e o
+ * formulário ficaria flutuando sem nada que diga de quem é o sistema. Em tela
+ * larga ela repete, em miniatura, o que o rodapé da coluna já diz — repetição
+ * barata, e o alinhamento vertical do cartão fica melhor com ela do que sem.
+ */
+export function AuthFooter() {
+  return (
+    <p className="text-xs text-blush-50/45">
+      Timely <span aria-hidden>·</span> Promatic Solutions
+    </p>
+  );
+}
+
 /** Superfície do formulário: translúcida de propósito, para as partículas
  *  continuarem visíveis por trás sem prejudicar a leitura do conteúdo. */
 export const AUTH_CARD_CLASS =

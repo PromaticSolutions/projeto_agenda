@@ -179,7 +179,7 @@ export function AccountSettings({ studio }: { studio: Studio }) {
               defaultValue={studio.logo_url}
               hint="Exibido no topo da página pública."
               systemDefault={{
-                label: "Usar a marca do Agenda Online",
+                label: "Usar a marca do Timely",
                 description: "Sem logo próprio, é esta a imagem que sua cliente vê.",
               }}
               // Só arquivo: no logo a escolha é entre a marca do sistema e uma

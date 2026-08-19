@@ -1,4 +1,4 @@
-# Agenda Online — Promatic Solutions
+# Timely — Promatic Solutions
 
 Sistema de agendamento online multi-tenant: cada estúdio tem sua página
 pública (`/[slug]`) para clientes marcarem horário sem login, e um painel

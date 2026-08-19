@@ -3,7 +3,7 @@ import { BrandMark } from "@/components/auth/brand-mark";
 import { AuthShell, AUTH_CARD_CLASS } from "@/components/auth/auth-shell";
 import { PasswordRecoveryForm } from "@/components/auth/password-recovery-form";
 
-export const metadata = { title: "Recuperar senha — Agenda Online" };
+export const metadata = { title: "Recuperar senha — Timely" };
 
 export default function ForgotPasswordPage() {
   return (

@@ -8,7 +8,7 @@ import { formatPhoneDisplay, formatFullDateLocal, formatTimeLocal } from "@/lib/
 import { cn } from "@/lib/utils";
 import type { MessageOutbox, MessageOutboxStatus } from "@/lib/types";
 
-export const metadata = { title: "WhatsApp — Agenda Online" };
+export const metadata = { title: "WhatsApp — Timely" };
 
 const OUTBOX_STATUS_META: Record<MessageOutboxStatus, { label: string; tone: string }> = {
   pendente: { label: "Na fila", tone: "bg-muted text-muted-foreground" },

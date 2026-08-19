@@ -30,7 +30,7 @@ const ibmPlexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Agenda Online — Promatic Solutions",
+  title: "Timely — Promatic Solutions",
   description: "Sistema de agendamento online para negócios de horário marcado.",
 };
 

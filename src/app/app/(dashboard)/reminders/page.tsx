@@ -4,7 +4,7 @@ import { getReminderSettings } from "@/lib/data/reminders";
 import { getWhatsAppConnection } from "@/lib/data/whatsapp";
 import { ReminderSettingsForm } from "@/components/app/reminder-settings-form";
 
-export const metadata = { title: "Lembretes — Agenda Online" };
+export const metadata = { title: "Lembretes — Timely" };
 
 export default async function RemindersPage() {
   const studio = await getMyStudio();

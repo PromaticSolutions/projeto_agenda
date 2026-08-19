@@ -1,7 +1,7 @@
 import { getMyStudio } from "@/lib/data/studios";
 import { AccountSettings } from "@/components/app/account-settings";
 
-export const metadata = { title: "Conta — Agenda Online" };
+export const metadata = { title: "Conta — Timely" };
 
 export default async function AccountPage() {
   const studio = await getMyStudio();

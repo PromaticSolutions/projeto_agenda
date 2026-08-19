@@ -17,7 +17,7 @@ import { formatDateLocal, formatTimeLocal, getStudioPublicUrl } from "@/lib/form
 import { nextLocalDate, prevLocalDate, utcToLocalDate } from "@/lib/availability";
 import { cn } from "@/lib/utils";
 
-export const metadata = { title: "Painel do dia — Agenda Online" };
+export const metadata = { title: "Painel do dia — Timely" };
 
 /**
  * Índice da primeira reserva ainda no futuro — é antes dela que entra a régua
