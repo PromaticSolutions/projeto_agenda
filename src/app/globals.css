@@ -136,7 +136,12 @@
   --shadow-lift: 0 14px 28px -14px rgb(0 0 0 / 0.65);
   --chart-1: #9b74f0;
   --chart-2: #e05fa4;
-  --chart-3: #6ba3d8;
+  /* Azul mais saturado que o #6ba3d8 anterior: naquele passo o token
+     reprovava no piso de croma e no par adjacente do validador de
+     daltonismo (scripts/validate_palette.js da skill de dataviz) contra o
+     fundo escuro. Com este, os três primeiros slots passam em todos os
+     testes nos dois temas — é a paleta usada nos gráficos do /superadmin. */
+  --chart-3: #4f97e8;
   --chart-4: #d4a94a;
   --chart-5: #b8b8c4;
   --sidebar: #1a1a1f;

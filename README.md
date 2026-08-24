@@ -33,16 +33,16 @@ SUPABASE_SERVICE_ROLE_KEY=...       # secreta! nunca comitar, nunca prefixar com
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ```
 
-**Depois de preencher as chaves, rode as migrações, em ordem** —
-[`0001_init.sql`](supabase/migrations/0001_init.sql),
-[`0002_grants.sql`](supabase/migrations/0002_grants.sql),
-[`0003_platform_admins.sql`](supabase/migrations/0003_platform_admins.sql) e
-[`0004_clients.sql`](supabase/migrations/0004_clients.sql) — no SQL Editor
-do seu projeto (Dashboard → SQL Editor → New query, cole o arquivo inteiro
-e rode), ou via qualquer conexão direta ao Postgres. Isso cria as tabelas,
-a constraint anti-colisão de horário, as policies de RLS, os grants de
-tabela e (0004) a tabela de clientes + o backfill a partir dos bookings
-já existentes.
+**Depois de preencher as chaves, rode TODAS as migrações de
+[`supabase/migrations/`](supabase/migrations/) em ordem numérica** (0001,
+0002, … 0011) no SQL Editor do seu projeto (Dashboard → SQL Editor → New
+query, cole o arquivo inteiro e rode), ou via qualquer conexão direta ao
+Postgres. Elas criam as tabelas, a constraint anti-colisão de horário, as
+policies de RLS, os grants de tabela, o CRM de clientes, a fila de
+mensagens e a cobrança da plataforma.
+
+Cada tela avisa quando falta a migração dela em vez de estourar erro — se
+o painel disser "rode a migração 00XX", é literalmente isso.
 
 > Já aplicadas no projeto `mcgecpnpxilrhavtbsfn` referenciado em
 > `.env.local` (2026-07-23): as 5 tabelas, RLS, a exclusion constraint
@@ -73,10 +73,61 @@ um provedor de e-mail, desative em Authentication → Providers → Email →
 - `src/lib/availability.ts` — algoritmo de horários livres (com testes).
 - `src/lib/data/*` — camada de dados; alterna Supabase real ↔ mock conforme `.env.local`.
 - `src/lib/mock/store.ts` — dados fictícios usados quando o Supabase não está configurado.
+- `src/app/superadmin` — painel da plataforma (visão geral, clientes, faturamento).
+- `src/lib/billing.ts` — vocabulário e aritmética da cobrança (com testes).
+- `src/lib/data/billing.ts` / `src/lib/data/platformMetrics.ts` — leituras do superadmin (dinheiro e uso).
 - `supabase/migrations/0001_init.sql` — schema + RLS + constraint anti-colisão.
+- `supabase/migrations/0011_billing.sql` — planos, assinaturas, faturas e pagamentos.
 
 Decisões e riscos documentados em [DECISIONS.md](DECISIONS.md) e
 [RISKS.md](RISKS.md). Status do projeto em [REPORT.md](REPORT.md).
+
+## Painel da plataforma (`/superadmin`)
+
+Só entra quem está em `platform_admins` (migração 0003) — dono de estúdio
+comum vê "acesso restrito", não um loop de login. Todas as leituras usam a
+`service_role` key e atravessam RLS de propósito; a autorização acontece
+uma vez, no layout.
+
+Três telas:
+
+- **Visão geral** — receita recorrente, uso da base e um bloco "precisa de
+  atenção" (faturas em atraso, testes vencendo, estúdios que pararam de
+  agendar, mensagens que falharam).
+- **Clientes** (`/superadmin/studios`) — uma linha por estúdio com uso e
+  cobrança juntos, com filtro e ordenação na URL; clique abre a **ficha**
+  (`/superadmin/studios/[id]`): cadastro, assinatura, faturas, agenda,
+  serviços, clientes recorrentes, ocupação e automação.
+- **Faturamento** (`/superadmin/billing`) — MRR, receita realizada por mês,
+  método de pagamento, inadimplência por faixa de atraso e a lista de
+  faturas com filtro.
+
+### O que cada número significa
+
+Duas contas diferentes convivem no painel, e a tela não mistura as duas:
+
+| Número | É | Não é |
+| --- | --- | --- |
+| **MRR** | soma das assinaturas `ativa` + `inadimplente`, plano anual dividido por 12 | não inclui `trial` — teste não é receita |
+| **Receita realizada** | faturas com status `paga`, pela data de pagamento | não é o contratado |
+| **Projeção anual** | MRR × 12 | não é receita fechada (a tela diz isso) |
+| **Volume atendido** | preço dos atendimentos finalizados **nos estúdios** | não é dinheiro da plataforma |
+| **Ocupação** | minutos agendados ÷ minutos de expediente | estimativa: ignora folga e bloqueio pontual |
+
+### Cobrança e o gateway (Pix / cartão)
+
+A migração [`0011_billing.sql`](supabase/migrations/0011_billing.sql) cria
+`plans`, `subscriptions`, `invoices`, `payments` e `billing_events` — e é
+**agnóstica de gateway**: cada linha guarda `gateway` (texto) mais o ID
+externo, então plugar Mercado Pago, Asaas, Stripe ou Pagar.me depois não
+exige nova migração. Nada de segredo no banco: chave de API e secret de
+webhook ficam em variável de ambiente. Cartão nunca é armazenado — só marca
+e 4 últimos dígitos, o que o gateway devolve.
+
+Enquanto não houver integração, o painel mostra assinatura e faturamento a
+partir do que existe no banco (a 0011 coloca os estúdios já cadastrados em
+teste de 14 dias) e nenhum número é inventado: sem pagamento registrado, a
+receita aparece como zero, não como estimativa.
 
 ## Lembretes no WhatsApp
 

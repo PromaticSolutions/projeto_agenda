@@ -357,3 +357,77 @@ ser commitado. **Sempre conferir o conteúdo de arquivos `.env*` antes de
   número do salão — o único que o cadastro conhece —, o que funciona mas é
   esquisito. A alternativa é guardar um número pessoal do dono só para
   notificação, e isso é campo novo no cadastro.
+
+## Superadmin detalhado + cobrança da plataforma (migração 0011)
+
+- **"Faturamento" é o que o estúdio paga à Timely, não o que a cliente paga
+  ao estúdio.** As duas coisas existem no produto e confundi-las
+  contaminaria todo o painel, então elas vivem em lugares diferentes:
+  `services.price_cents` (dinheiro do estúdio, some em "volume atendido") e
+  as tabelas da 0011 (dinheiro da plataforma, some em MRR/receita). Cada KPI
+  de volume atendido carrega a ressalva na própria tela.
+- **Schema de cobrança agnóstico de gateway**: o provedor de Pix/cartão
+  ainda não foi escolhido, então nenhuma coluna usa vocabulário de um
+  gateway específico — cada linha tem `gateway` (texto) + ID externo, e
+  webhook cru cai em `billing_events` com índice único `(gateway,
+  external_event_id)` para idempotência. Trocar ou plugar provedor não exige
+  migração nova. Nenhum segredo no banco; de cartão, só marca e 4 últimos
+  dígitos (guardar PAN/CVV colocaria o projeto no escopo de PCI-DSS).
+- **Assinatura cancelada continua na tabela**, e um índice único PARCIAL
+  (`where status in ('trial','ativa','inadimplente','pausada')`) garante uma
+  vigente por estúdio. Apagar a linha no cancelamento tornaria churn e
+  histórico de receita impossíveis de calcular depois.
+- **`invoices.total_cents` é coluna gerada pelo banco** (`amount - desconto`):
+  se nenhum app escreve, nenhum app pode divergir do outro. Testado: `update`
+  direto na coluna é recusado pelo Postgres.
+- **Backfill coloca os estúdios existentes em trial, e só isso.** Sem ele o
+  painel abriria com base vazia; com fatura ou pagamento semeado, abriria
+  mentindo. Trial não é receita, então é o único estado seguro de semear — e
+  o comando para desfazer está na própria migração.
+- **`trial` fora do MRR, `inadimplente` dentro (mas destacado).** Somar teste
+  em receita recorrente é a forma mais comum de um painel de SaaS enganar o
+  próprio dono; a assinatura inadimplente, por outro lado, é contrato que
+  existe e pode ser recuperado — aparece no MRR e, separadamente, como "MRR
+  em risco".
+- **Taxa de conversão de trial NÃO foi implementada**, apesar de ser um KPI
+  óbvio: não há tabela de histórico de status, então qualquer número aqui
+  seria chute com cara de medição. No lugar entrou "testes vencendo em 7
+  dias", que é dado real e além de tudo acionável. Se a conversão for
+  necessária, o caminho honesto é uma tabela `subscription_events`.
+- **Bug real encontrado medindo contra o projeto Supabase**: `select("*", {
+  count: "exact", head: true })` numa tabela que NÃO existe responde **204,
+  `error` nulo, `count` nulo** — o PostgREST não manda corpo em resposta a
+  HEAD. A checagem "a migração 0011 já rodou?" feita por contagem dizia
+  "sim" para um banco sem as tabelas, e o painel de faturamento inteiro
+  estourava logo depois. Corrigido usando `select("id").limit(1)`, que no
+  mesmo caso devolve 404 + `PGRST205`. **Vale para qualquer checagem de
+  existência de tabela neste projeto: não use `head: true`.**
+- **"Estúdio ativo" e "em risco" saem da lista, não de contagens globais.**
+  A primeira versão derivava por subtração (`total - ativos - novos`), o que
+  contava duas vezes o estúdio novo que já agenda: número plausível e errado.
+  Agora os dois critérios moram em `listStudiosWithActivity`, que olha
+  agendamento por estúdio.
+- **Ocupação é estimativa conservadora e a tela diz isso**: soma o expediente
+  de `working_hours` por dia da semana na janela de 30 dias e ignora
+  bloqueios pontuais (folga, feriado). Ignorar bloqueio infla o
+  denominador, então o número nunca superestima a agenda cheia.
+- **`--chart-3` do tema escuro foi trocado (#6ba3d8 → #4f97e8)**: no passo
+  anterior o token reprovava no piso de croma e no par adjacente do
+  validador de daltonismo da skill de dataviz contra o fundo escuro. Os
+  gráficos do superadmin usam `--chart-1/2/3` (Pix, cartão, boleto), agora
+  aprovados nos dois temas. Os tokens `--chart-4/5` continuam reprovando e
+  por isso NÃO são usados como cor categórica em gráfico nenhum.
+- **Todo gráfico tem tabela gêmea** (`ChartCard` com `<details>` "Ver dados
+  em tabela"): gráfico é a única parte do painel em que o valor mora numa
+  posição e não num texto, então sem a tabela quem usa leitor de tela, toque
+  ou impressão perde o dado.
+- **Migração validada em Postgres local antes de entregar**: subi um cluster
+  temporário, criei os stubs do que o Supabase fornece (`auth.users`,
+  `auth.uid()`, roles `anon`/`authenticated`/`service_role`) e rodei
+  0001→0011 em ordem, mais 12 casos de constraint (duas assinaturas
+  vigentes, cancelada sem data, desconto maior que o valor, fatura paga sem
+  `paid_at`, Pix com dado de cartão, Pix parcelado, evento de gateway
+  repetido, `card_last4` inválido...). Também comparei coluna por coluna o
+  schema real com os tipos escritos à mão em `src/lib/supabase/types.ts` —
+  as 15 tabelas conferem. Só a 0007 falha localmente, porque depende do
+  schema `storage` do Supabase.
