@@ -554,3 +554,39 @@ depois.
 Nenhuma das duas aceita estúdio ou instância no corpo. O nome da instância é
 derivado do ID do estúdio da sessão, e há teste que tenta forçar outro
 inquilino pelo payload e verifica que não passa.
+
+### O histórico de migrations estava vazio (2026-09-04)
+
+Ao aplicar a 0012 o Supabase respondeu `type "message_outbox_kind" does not
+exist`. A causa não era a 0012: **o banco remoto estava na 0009**. As 0010
+(fila de mensagens) e 0011 (faturamento) nunca tinham sido aplicadas, e é a
+0010 que cria esse tipo.
+
+O porquê ficou claro em `supabase migration list`: a coluna `remote` estava
+vazia nas doze migrations. As 0001–0009 foram aplicadas **à mão no SQL
+Editor**, então `supabase_migrations.schema_migrations` nunca registrou nada —
+e sem registro ninguém percebeu que duas migrations ficaram para trás.
+
+`supabase db push` NÃO era o caminho: com o histórico vazio ele começaria na
+0001, que tem `create table studios` e `create type booking_status` sem
+guarda, além de `add column` sem `if not exists` e um `insert into clients`
+desprotegido na 0004. A correção foi `migration repair --status applied
+0001..0009` (escreve só o histórico, não executa DDL) e depois `db push`, que
+aplicou exatamente 0010, 0011 e 0012.
+
+Lição operacional: aplicar migration pelo SQL Editor deixa o CLI cego. Use
+`db push`, ou registre com `migration repair` na sequência.
+
+### Índice composto, não parcial, por causa do enum
+
+A 0012 nasceu com um índice parcial `where kind = 'manual'` e isso estava
+errado: o PostgreSQL recusa USAR um valor de enum acrescentado na mesma
+transação ("unsafe use of new value of enum type"), e tanto o SQL Editor
+quanto o `db push` rodam cada migração em transação. O `alter type` e um
+índice que menciona o valor novo não cabem no mesmo arquivo.
+
+Trocado por `(studio_id, kind, created_at desc)`, que não menciona o valor: a
+consulta do limitador é igualdade, igualdade, faixa — a ordem exata das
+colunas —, resolve com a mesma eficiência, serve qualquer outro recorte por
+`kind`, e cabe em uma migração só. Dividir em 0012 + 0013 resolveria também,
+mas duas migrations para um índice é pior que um índice melhor.

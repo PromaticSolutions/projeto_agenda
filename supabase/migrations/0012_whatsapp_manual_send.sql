@@ -1,6 +1,7 @@
 -- Agenda Online — Promatic Solutions
 -- Migração 0012: envio manual de WhatsApp (seções 20–24 do plano de integração).
--- Rode depois de 0001..0011.
+-- Rode depois de 0001..0011 — em especial DEPOIS DA 0010, que é quem cria o
+-- tipo `message_outbox_kind` e a tabela `message_outbox` alterados aqui.
 --
 -- POR QUE O ENVIO MANUAL ENTRA NA MESMA FILA:
 -- a alternativa era mandar direto pelo gateway e não guardar nada. Isso
@@ -14,8 +15,6 @@
 -- (`enviado` ou `falhou`) já gravado. O disparador nunca reivindica essas
 -- linhas porque elas não nascem `pendente`.
 
--- `alter type ... add value` roda em transação a partir do PG 12 desde que o
--- valor novo não seja USADO na mesma transação — esta migração só o declara.
 -- `if not exists` deixa a migração re-executável, como as demais do diretório.
 alter type message_outbox_kind add value if not exists 'manual';
 
@@ -28,11 +27,23 @@ alter type message_outbox_kind add value if not exists 'manual';
 -- um limitador em memória, esta contagem funciona igual em qualquer número de
 -- instâncias serverless, que é o cenário real na Vercel.
 --
--- O índice de 0010 é (studio_id, created_at desc) sem recorte de `kind`;
--- este é parcial e cobre exatamente a pergunta do limitador.
-create index if not exists message_outbox_manual_rate_idx
-  on message_outbox (studio_id, created_at desc)
-  where kind = 'manual';
+-- A consulta que ele sustenta é
+--   where studio_id = ? and kind = 'manual' and created_at >= ?
+-- ou seja igualdade, igualdade, faixa — exatamente a ordem das colunas abaixo.
+--
+-- POR QUE COMPOSTO E NÃO PARCIAL (`where kind = 'manual'`):
+-- um índice parcial precisaria escrever o literal 'manual' no DDL, e o
+-- PostgreSQL recusa USAR um valor de enum acrescentado na MESMA transação —
+-- "unsafe use of new value of enum type". Como o SQL Editor do Supabase e o
+-- `supabase db push` rodam cada migração em transação, o `alter type` acima e
+-- um índice parcial não cabem no mesmo arquivo: a migração falharia inteira.
+--
+-- O índice composto não menciona o valor novo, resolve a mesma consulta com a
+-- mesma eficiência, e ainda serve qualquer outro recorte por `kind` (o índice
+-- da 0010 é (studio_id, created_at desc), sem `kind`). Uma migração, sem
+-- armadilha de transação.
+create index if not exists message_outbox_studio_kind_created_idx
+  on message_outbox (studio_id, kind, created_at desc);
 
-comment on index message_outbox_manual_rate_idx is
-  'Sustenta o teto de envios manuais por janela de tempo (rate limit de /api/whatsapp/send).';
+comment on index message_outbox_studio_kind_created_idx is
+  'Sustenta o teto de envios manuais por janela de tempo (rate limit de /api/whatsapp/send) e qualquer leitura da fila recortada por kind.';
