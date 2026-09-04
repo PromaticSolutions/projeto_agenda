@@ -137,10 +137,18 @@ como rota HTTP, e um **gateway** (Evolution API) que fala com o WhatsApp.
 ```
 cron (a cada 5 min)  →  /api/cron/reminders  →  planeja + envia
                                                   ↓
-                                     message_outbox (fila, 0010)
+/app/whatsapp (envio manual) ────────→  message_outbox (fila, 0010)
                                                   ↓
                                         Evolution API → WhatsApp
+                                                  ↓
+                     /api/webhooks/evolution ← estado da conexão
 ```
+
+Nada no navegador fala com a Evolution: a chave é global da instalação (quem a
+tem controla todas as instâncias) e vive só no servidor. A tela usa Server
+Actions, e `POST /api/whatsapp/send` existe para que o frontend não precise
+conhecer o gateway — trocar de gateway amanhã é escrever outro arquivo em
+`src/lib/whatsapp/`.
 
 Sem `EVOLUTION_API_URL`/`EVOLUTION_API_KEY` o app **não quebra**: a fila
 continua sendo planejada e dá para acompanhá-la em `/app/whatsapp`, mas nada é
@@ -148,10 +156,14 @@ enviado. Isso é de propósito — permite conferir o planejamento antes da VPS
 existir. O que nunca acontece é uma mensagem ser marcada como enviada sem ter
 saído.
 
-### 1. Rode a migração 0010
+### 1. Rode as migrações 0010 e 0012
 
 [`0010_message_outbox.sql`](supabase/migrations/0010_message_outbox.sql) cria a
 fila e a função `claim_pending_messages`. Sem ela o disparador devolve 500.
+
+[`0012_whatsapp_manual_send.sql`](supabase/migrations/0012_whatsapp_manual_send.sql)
+acrescenta o tipo `manual` à fila (o envio feito à mão em `/app/whatsapp`
+entra no mesmo histórico) e o índice que sustenta o teto de envio.
 
 ### 2. Suba a Evolution na VPS
 
@@ -165,35 +177,68 @@ docker compose up -d
 Depois ponha um proxy com HTTPS na frente (a porta fica no loopback de
 propósito — a chave de API viaja em cada requisição).
 
-### 3. Confira os endpoints antes de confiar
+### 3. Confira o gateway com o smoke test
 
 O adaptador em [`src/lib/whatsapp/evolution.ts`](src/lib/whatsapp/evolution.ts)
-foi escrito contra a linha 2.x. A v1 usava outro formato no envio, e o projeto
-muda endpoint entre versões menores. Cinco chamadas resolvem a dúvida:
+foi escrito contra o código-fonte da tag **2.3.7**. A Evolution muda contrato
+entre versões menores, então há um smoke test que pergunta ao SEU gateway se
+ele se comporta como o adaptador espera:
 
 ```bash
-export EVO=https://evolution.seudominio.com.br
-export KEY=sua-chave
+node --env-file=.env.local scripts/whatsapp-smoke.mjs
+```
 
-curl -s -H "apikey: $KEY" "$EVO/instance/fetchInstances"
+Ele cria uma instância descartável (`smoke_*`), percorre o ciclo de vida
+inteiro e a remove no fim. Cada verificação corresponde a uma característica
+real da 2.3.7 — por exemplo, que `connectionState` **não** devolve o número
+pareado (por isso `status()` consulta `fetchInstances`), e que enviar com a
+sessão fechada **trava** em vez de devolver erro (por isso o app confere o
+estado antes de enviar).
 
-curl -s -X POST -H "apikey: $KEY" -H "Content-Type: application/json" \
-  -d '{"instanceName":"teste","qrcode":true,"integration":"WHATSAPP-BAILEYS"}' \
-  "$EVO/instance/create"
+Para exercitar o próprio adaptador contra o gateway real, e não só os
+endpoints:
 
-# devolve o QR em base64 — leia no aparelho
-curl -s -H "apikey: $KEY" "$EVO/instance/connect/teste"
-
-# depois de ler, tem que responder state: "open"
-curl -s -H "apikey: $KEY" "$EVO/instance/connectionState/teste"
-
-curl -s -X POST -H "apikey: $KEY" -H "Content-Type: application/json" \
-  -d '{"number":"5511999999999","text":"teste"}' \
-  "$EVO/message/sendText/teste"
+```bash
+EVOLUTION_LIVE=1 node --env-file=.env.local \
+  ./node_modules/.bin/vitest run src/lib/whatsapp/evolution.live.test.ts
 ```
 
 Se algum formato divergir, o ajuste é só em `evolution.ts` — nem o disparador
 nem a tela precisam mudar.
+
+### 3.1. O que só dá para testar com um celular
+
+O smoke test não lê QR code. Com um aparelho na mão, o roteiro é:
+
+1. `/app/whatsapp` → **Conectar número** → leia o QR no WhatsApp
+   (Aparelhos conectados → Conectar aparelho).
+2. A tela deve virar **Conectado** sozinha em segundos, com o número ao lado.
+3. Em **Enviar mensagem**, mande um texto para o seu próprio número.
+4. A mensagem deve aparecer em **Últimas mensagens** como *Enviado*.
+5. **Desconectar** → a tela volta para Desconectado e o envio fica bloqueado.
+6. **Excluir** → pede confirmação; depois, **Reconectar número** gera QR novo.
+
+### 3.2. Webhook (opcional, mas é o que deixa a tela instantânea)
+
+`POST /api/webhooks/evolution` recebe `connection.update`, `qrcode.updated`,
+`logout.instance` e `remove.instance`, e é o único jeito de o sistema saber que
+a sessão morreu do lado do WhatsApp (o dono desvinculou o aparelho no celular)
+antes de um envio falhar.
+
+Ele é registrado automaticamente em cada instância quando o estúdio conecta —
+não precisa configurar nada na Evolution. Exige duas coisas:
+
+- `EVOLUTION_WEBHOOK_SECRET` (`openssl rand -hex 32`). Sem ele a rota devolve
+  404 e nenhum webhook é registrado: um receptor aberto deixaria qualquer um na
+  internet marcar o WhatsApp de um estúdio como conectado.
+- uma URL **pública**. Quem chama é a VPS, então `localhost` não serve — em
+  desenvolvimento o webhook fica desligado (a tela avisa) e o estado é
+  atualizado por consulta. Para testar local, aponte `EVOLUTION_WEBHOOK_URL`
+  para um túnel.
+
+A consulta (polling na tela, `syncWhatsAppConnection` no disparador) continua
+existindo de propósito: uma entrega de webhook perdida durante um deploy
+deixaria o banco mentindo. Webhook acelera; consulta é o piso.
 
 ### 4. Agende o disparador
 

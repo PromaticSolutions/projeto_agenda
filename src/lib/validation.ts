@@ -306,6 +306,26 @@ export const REMINDER_LEAD_TIME_OPTIONS = [
   { value: 10080, label: "1 semana antes" },
 ] as const;
 
+/**
+ * Envio manual de WhatsApp (seções 20–24 do plano de integração).
+ *
+ * Reaproveita `clientPhoneSchema`: o número digitado aqui é normalizado para
+ * o MESMO formato do resto do sistema (55DDNNNNNNNNN), que é o que a check
+ * constraint de `message_outbox.to_phone` aceita e o que o gateway espera.
+ * Um segundo formato de telefone só nesta tela seria um jeito de descobrir a
+ * divergência quando a mensagem não sair.
+ */
+export const manualWhatsAppMessageSchema = z.object({
+  phone: clientPhoneSchema,
+  message: z
+    .string()
+    .trim()
+    .min(1, "Escreva a mensagem que será enviada")
+    // O WhatsApp aceita mais que isso, mas texto muito longo costuma ser
+    // colagem acidental — e o corpo é gravado no histórico de toda mensagem.
+    .max(4096, "A mensagem passou de 4096 caracteres"),
+});
+
 export const reminderSettingsSchema = z
   .object({
     enabled: z.boolean(),

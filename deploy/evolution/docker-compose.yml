@@ -18,7 +18,7 @@
 
 services:
   evolution:
-    image: atendai/evolution-api:v2.1.1
+    image: atendai/evolution-api:v2.3.7
     restart: always
     ports:
       # Só o loopback: quem publica para fora é o proxy com HTTPS.
@@ -49,8 +49,12 @@ services:
       CACHE_REDIS_PREFIX_KEY: evolution
       CACHE_LOCAL_ENABLED: "false"
 
-      # O app consulta o estado quando precisa (ver DECISIONS.md), então não há
-      # webhook configurado aqui.
+      # O webhook NÃO é configurado aqui de propósito: cada instância recebe
+      # o dela por `POST /webhook/set/{instancia}` quando o estúdio conecta
+      # (ver src/lib/whatsapp/evolution.ts). Um webhook GLOBAL neste arquivo
+      # apontaria todas as instâncias para a mesma URL sem o segredo por
+      # instância, e passaria a valer também para instalações do app que
+      # dividem este mesmo gateway.
       LOG_LEVEL: ERROR
     depends_on:
       - postgres

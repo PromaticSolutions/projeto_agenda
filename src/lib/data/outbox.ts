@@ -194,3 +194,90 @@ export async function listRecentMessages(
   if (error) throw error;
   return data ?? [];
 }
+
+// ---------------------------------------------------------------------------
+// Envio manual (0012)
+// ---------------------------------------------------------------------------
+
+/**
+ * Teto de envios manuais por estúdio. A seção 30 do plano pede proteção contra
+ * abuso; o número é generoso para uso legítimo (avisar as clientes do dia) e
+ * baixo o bastante para que um script preso em laço não queime a sessão do
+ * WhatsApp do salão — banimento por disparo em massa é o risco real aqui, e
+ * ele cai sobre o NÚMERO do dono, não sobre a nossa infraestrutura.
+ */
+export const MANUAL_SEND_LIMIT = 20;
+export const MANUAL_SEND_WINDOW_MINUTES = 10;
+
+/**
+ * Quantos envios manuais este estúdio fez na janela.
+ *
+ * A contagem sai da própria fila em vez de um contador em memória de
+ * propósito: na Vercel cada requisição pode cair em uma instância diferente, e
+ * um limitador em memória contaria do zero em cada uma — ou seja, não
+ * limitaria nada justamente quando houvesse volume.
+ */
+export async function countRecentManualSends(
+  studioId: string,
+  now = new Date()
+): Promise<number> {
+  const since = new Date(now.getTime() - MANUAL_SEND_WINDOW_MINUTES * 60_000).toISOString();
+  const supabase = createServiceRoleSupabaseClient();
+  const { count, error } = await supabase
+    .from("message_outbox")
+    .select("id", { count: "exact", head: true })
+    .eq("studio_id", studioId)
+    .eq("kind", "manual")
+    .gte("created_at", since);
+  if (error) throw error;
+  return count ?? 0;
+}
+
+export interface ManualMessageRecord {
+  studioId: string;
+  toPhone: string;
+  body: string;
+  /** Resultado já conhecido: a mensagem manual é tentada antes de ser gravada. */
+  outcome: "enviado" | "falhou";
+  providerMessageId?: string | null;
+  error?: string | null;
+  now?: Date;
+}
+
+/**
+ * Grava no histórico a mensagem manual JÁ tentada.
+ *
+ * Não passa por `pendente`: se nascesse pendente e o processo morresse entre a
+ * gravação e o envio, o disparador reivindicaria a linha depois e a cliente
+ * receberia a mesma mensagem duas vezes. `booking_id` fica nulo, e o índice
+ * único de 0010 é parcial (`where booking_id is not null`), então mensagens
+ * manuais não colidem entre si nem com lembretes.
+ */
+export async function recordManualMessage(input: ManualMessageRecord): Promise<MessageOutbox> {
+  const now = input.now ?? new Date();
+  const iso = now.toISOString();
+  const supabase = createServiceRoleSupabaseClient();
+
+  const { data, error } = await supabase
+    .from("message_outbox")
+    .insert({
+      studio_id: input.studioId,
+      booking_id: null,
+      kind: "manual" as MessageOutboxKind,
+      to_phone: input.toPhone,
+      body: input.body,
+      // Manual não espera a hora: o instante do pedido é o instante do envio.
+      scheduled_for: iso,
+      status: input.outcome,
+      attempts: 1,
+      provider_message_id: input.providerMessageId ?? null,
+      sent_at: input.outcome === "enviado" ? iso : null,
+      last_error: input.error ? input.error.slice(0, 500) : null,
+      created_at: iso,
+      updated_at: iso,
+    })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data;
+}

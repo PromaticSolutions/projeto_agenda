@@ -431,3 +431,126 @@ ser commitado. **Sempre conferir o conteúdo de arquivos `.env*` antes de
   schema real com os tipos escritos à mão em `src/lib/supabase/types.ts` —
   as 15 tabelas conferem. Só a 0007 falha localmente, porque depende do
   schema `storage` do Supabase.
+
+## Integração WhatsApp com a Evolution API 2.3.7 (2026-09-04)
+
+Contexto: o plano em `plano_evo` pedia a integração completa contra a Evolution
+2.3.7 rodando na VPS. A base já existia (adaptador, fila, disparador, telas); o
+que faltava era webhook, envio manual, exclusão e — descobriu-se — correções de
+contrato.
+
+### Uma conexão por estúdio, e não N conexões nomeadas
+
+O plano descreve vários WhatsApps nomeados por cliente ("Comercial",
+"Suporte") com seletor no envio. Ficou **uma conexão por estúdio**, decisão do
+dono do produto: `whatsapp_connections.studio_id` segue sendo a chave
+primária, o disparador não mudou e não houve migração de cardinalidade.
+
+Consequência aceita: não existe listagem de conexões, "+ Adicionar WhatsApp"
+nem dropdown de seleção no envio — com uma conexão, quem a resolve é a sessão.
+Mudar isso depois é migração de `whatsapp_connections` para `id` próprio +
+`name` + `instance_name` único, mais `connection_id` em `reminder_settings`.
+
+### Webhook E consulta, não webhook OU consulta
+
+O webhook (`/api/webhooks/evolution`) atualiza o estado da conexão sem ninguém
+clicar em nada, e é o único jeito de o sistema saber que a sessão morreu do
+lado do WhatsApp (dono desvinculou o aparelho no celular) antes do próximo
+envio falhar.
+
+A consulta (polling na tela + `syncWhatsAppConnection` no disparador) **não foi
+removida**: o webhook depende de a VPS alcançar a URL pública do app, o que não
+acontece em desenvolvimento (localhost) nem durante um deploy. Uma entrega
+perdida nessa janela deixaria o banco mentindo indefinidamente. Consulta é o
+piso que sempre funciona; webhook é o que torna a tela instantânea.
+
+`resolveWebhookTarget()` recusa localhost e recusa ausência de segredo — e a
+tela diz, em vez de prometer atualização automática que não vai acontecer.
+
+`MESSAGES_UPSERT` não é assinado: o produto só envia, e trazer conversa de
+cliente para dentro da base seria dado pessoal de terceiro sem ninguém ter
+pedido. O receptor entende o evento e responde 200 se ele chegar.
+
+### O corpo do webhook contém a chave global do gateway
+
+`webhook.controller.ts` inclui `apikey` (a chave GLOBAL da instalação) em toda
+entrega. Por isso nada em `/api/webhooks/evolution` loga o corpo do evento — um
+`console.log(body)` ali despejaria nos logs da plataforma a chave que controla
+todas as instâncias. A autenticação usa header próprio
+(`x-timely-webhook-secret`) com comparação de tempo constante, não a `apikey` do
+corpo.
+
+### Divergências da 2.3.7 encontradas conferindo o código-fonte da tag
+
+O adaptador anterior seguia a "linha 2.x" por suposição. Quatro coisas estavam
+erradas, todas confirmadas depois contra a instância real:
+
+1. `GET /instance/connectionState/{nome}` devolve **só**
+   `{ instance: { instanceName, state } }`. Não há `owner` nem `number` — o
+   código lia esses campos, então **o número pareado nunca era preenchido**.
+   Agora vem de `fetchInstances` (`ownerJid`), com a chamada extra feita só
+   quando a sessão está aberta, ou do `wuid` do webhook.
+2. `DELETE /instance/logout/{nome}` devolve **400** ("is not connected") com a
+   sessão já fechada, não 404. Desconectar duas vezes é normal na tela.
+3. `refused` (QR estourou o limite de tentativas) não é "desconectado": a
+   sessão não volta sozinha, e chamar isso de desconectado faria a tela
+   sugerir esperar quando o certo é gerar código novo.
+4. `deploy/evolution/docker-compose.yml` fixava `v2.1.1` enquanto a VPS roda
+   `2.3.7`.
+
+### Enviar sem sessão TRAVA o gateway, não devolve erro
+
+Medido no smoke test: `POST /message/sendText` com a sessão fechada não
+responde — a requisição estoura o timeout. É por isso que
+`sendManualWhatsAppMessage` e o disparador conferem o estado **antes** de
+chamar o envio, em vez de "tentar e tratar o erro": tentar custaria 15s por
+mensagem e, num lote de 25, estouraria o orçamento de tempo da rota de cron.
+
+### `delete` é aceite, não conclusão
+
+`DELETE /instance/delete/{nome}` emite `remove.instance` e responde
+`SUCCESS` na hora; a remoção acontece no listener. Com a sessão já fechada, a
+instância não está mais no mapa vivo, o listener não tem o que remover e a
+linha fica pendurada no banco da Evolution.
+
+Não afeta o produto: a sessão fica encerrada, o estado que a tela mostra é o da
+nossa tabela (que a action zera), e reconectar depois funciona porque
+`ensureInstance` trata o 403 "already in use" como sucesso e o `connect`
+seguinte gera QR novo — caminho verificado na instância real.
+
+### Envio manual entra na mesma fila, já resolvido
+
+A mensagem manual é gravada em `message_outbox` com `kind = 'manual'` e o
+resultado (`enviado`/`falhou`) **já definido** — nunca passa por `pendente`.
+Se nascesse pendente e o processo morresse entre a gravação e o envio, o
+disparador reivindicaria a linha depois e a cliente receberia a mensagem duas
+vezes.
+
+Guardar em vez de "mandar e esquecer" é o que faz "Últimas mensagens" não
+mentir por omissão: sem isso, a mensagem que o dono mandou na mão há dois
+minutos não apareceria em lugar nenhum, e é justamente esse histórico que
+responde quando a cliente diz que não recebeu.
+
+### Teto de envio contado no banco, não em memória
+
+`/api/whatsapp/send` limita por contagem em `message_outbox` (20 por 10
+minutos, por estúdio). Um limitador em memória contaria do zero em cada
+instância serverless da Vercel — ou seja, não limitaria nada justamente quando
+houvesse volume. O risco real que ele cobre não é a nossa infraestrutura: é o
+**número do salão** ser bloqueado por disparo em sequência.
+
+No webhook o limitador é em memória de propósito: ali quem autentica é o
+segredo, a rota é idempotente, e o freio existe só para o caso de a Evolution
+entrar em laço de reconexão.
+
+### Duas portas, uma implementação
+
+A tela usa Server Action (padrão do projeto para painel autenticado) e existe
+`POST /api/whatsapp/send` (que o plano nomeia, e que mantém o frontend sem
+conhecer a Evolution). As duas chamam `sendManualWhatsAppMessage` — validar em
+dois lugares é como uma das portas acaba sem a checagem de propriedade meses
+depois.
+
+Nenhuma das duas aceita estúdio ou instância no corpo. O nome da instância é
+derivado do ID do estúdio da sessão, e há teste que tenta forçar outro
+inquilino pelo payload e verifica que não passa.

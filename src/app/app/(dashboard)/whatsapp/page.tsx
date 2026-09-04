@@ -4,8 +4,9 @@ import { getMyStudio } from "@/lib/data/studios";
 import { getWhatsAppConnection } from "@/lib/data/whatsapp";
 import { listRecentMessages } from "@/lib/data/outbox";
 import { WhatsAppConnectionPanel } from "@/components/app/whatsapp-connection-panel";
+import { WhatsAppSendForm } from "@/components/app/whatsapp-send-form";
 import { Button } from "@/components/ui/button";
-import { isWhatsAppProviderConfigured } from "@/lib/whatsapp/provider";
+import { isWhatsAppProviderConfigured, resolveWebhookTarget } from "@/lib/whatsapp/provider";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { formatPhoneDisplay, formatFullDateLocal, formatTimeLocal } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -39,16 +40,26 @@ export default async function WhatsAppPage() {
   // e a tela simplesmente não mostra a seção.
   const messages = isSupabaseConfigured ? await listRecentMessages(studio.id, 15) : [];
 
+  // O webhook só é registrado quando a Evolution consegue alcançar o app. Em
+  // desenvolvimento (localhost) ela não consegue, e a tela diz isso em vez de
+  // prometer atualização automática que não vai acontecer.
+  const webhookActive = resolveWebhookTarget() !== null;
+
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
       <header className="space-y-1 border-b border-border pb-5">
-        <h1 className="text-xl font-semibold text-foreground">Conectar WhatsApp</h1>
+        <h1 className="text-xl font-semibold text-foreground">WhatsApp</h1>
         <p className="text-sm text-muted-foreground">
-          Número conectado ao estúdio para o envio dos lembretes.
+          Número conectado ao estúdio para os lembretes e para o envio manual.
         </p>
       </header>
 
-      <WhatsAppConnectionPanel connection={connection} />
+      <WhatsAppConnectionPanel connection={connection} webhookActive={webhookActive} />
+
+      <WhatsAppSendForm
+        status={connection.status}
+        connectedPhone={connection.connected_phone}
+      />
 
       <section className="panel overflow-hidden">
         <header className="flex items-center justify-between gap-4 border-b border-border px-4 py-3">

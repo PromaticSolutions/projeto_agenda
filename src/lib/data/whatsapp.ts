@@ -81,3 +81,28 @@ export async function listWhatsAppConnectionsByStudioIds(
   if (error) throw error;
   return data ?? [];
 }
+
+/**
+ * Acha a conexão pelo nome da instância no gateway.
+ *
+ * É o caminho de volta que o webhook precisa: a Evolution avisa "a instância
+ * promatic_<uuid> conectou" e o receptor tem que descobrir de quem ela é.
+ *
+ * A consulta vai ao banco em vez de extrair o UUID do nome por string. O nome
+ * É derivado do ID do estúdio hoje, mas confiar nisso faria o webhook aceitar
+ * qualquer nome bem formado e escrever na linha correspondente — inclusive de
+ * um evento forjado. Aqui, uma instância que não está no nosso banco
+ * simplesmente não tem linha para atualizar.
+ */
+export async function findWhatsAppConnectionByInstanceName(
+  instanceName: string
+): Promise<WhatsAppConnection | null> {
+  const supabase = createServiceRoleSupabaseClient();
+  const { data, error } = await supabase
+    .from("whatsapp_connections")
+    .select("*")
+    .eq("instance_name", instanceName)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}

@@ -17,7 +17,11 @@ export type BookingStatus =
   | "cancelado";
 
 /** enums da fila de mensagens — 0010_message_outbox.sql */
-export type MessageOutboxKind = "lembrete" | "novo_agendamento";
+export type MessageOutboxKind =
+  | "lembrete"
+  | "novo_agendamento"
+  /** 0012 — mensagem disparada à mão pelo dono em /app/whatsapp. */
+  | "manual";
 
 export type MessageOutboxStatus =
   | "pendente"

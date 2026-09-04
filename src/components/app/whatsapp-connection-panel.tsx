@@ -1,12 +1,33 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Loader2, QrCode, RefreshCw, Smartphone, TriangleAlert, Unplug, Wifi } from "lucide-react";
+import { useRouter } from "next/navigation";
+import {
+  Loader2,
+  QrCode,
+  RefreshCw,
+  Smartphone,
+  Trash2,
+  TriangleAlert,
+  Unplug,
+  Wifi,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
   connectWhatsAppAction,
+  deleteWhatsAppConnectionAction,
   disconnectWhatsAppAction,
   refreshWhatsAppStatusAction,
 } from "@/app/app/(dashboard)/whatsapp/actions";
@@ -18,14 +39,20 @@ import type { WhatsAppConnectionStatus } from "@/lib/supabase/types";
 /**
  * Tela de conexão do WhatsApp, ligada à Evolution API.
  *
- * O componente não conhece a Evolution: ele chama três Server Actions e
- * desenha o que elas devolvem. A chave do gateway nunca chega ao navegador —
- * é por isso que o pareamento passa por action em vez de `fetch` daqui.
+ * O componente não conhece a Evolution: chama Server Actions e desenha o que
+ * elas devolvem. A chave do gateway nunca chega ao navegador — é por isso que
+ * o pareamento passa por action em vez de `fetch` daqui.
  *
  * Enquanto o QR está na tela, o componente pergunta o estado ao gateway de
- * poucos em poucos segundos. É consulta, não webhook: quem lê o código quer
- * ver a tela mudar em segundos, e um webhook perdido num deploy deixaria o
- * painel mentindo até alguém reconectar na mão.
+ * poucos em poucos segundos. Isso continua existindo mesmo agora que há
+ * webhook: o webhook depende de a VPS alcançar a URL pública do app, o que não
+ * acontece em desenvolvimento nem durante um deploy. Consulta é o piso que
+ * sempre funciona; webhook é o que torna a mudança instantânea em produção.
+ *
+ * `router.refresh()` nos pontos de mudança de estado não é enfeite: o
+ * formulário de envio e o histórico são renderizados no servidor, ao lado
+ * deste painel. Sem o refresh, conectar aqui deixaria o formulário de envio
+ * desabilitado até alguém recarregar a página na mão.
  */
 
 const STATUS_META: Record<
@@ -67,13 +94,22 @@ const POLL_INTERVAL_MS = 4000;
  * quando EVOLUTION_API_URL/KEY não existem. Por isso nenhum botão aqui trata o
  * caso "sem gateway": painel com tudo desabilitado parece defeito.
  */
-export function WhatsAppConnectionPanel({ connection }: { connection: WhatsAppConnection }) {
+export function WhatsAppConnectionPanel({
+  connection,
+  webhookActive,
+}: {
+  connection: WhatsAppConnection;
+  /** Falso em dev/localhost: a VPS não alcança a URL do app. */
+  webhookActive: boolean;
+}) {
+  const router = useRouter();
   const [status, setStatus] = useState<WhatsAppConnectionStatus>(connection.status);
   const [phone, setPhone] = useState<string | null>(connection.connected_phone);
   const [error, setError] = useState<string | null>(connection.last_error);
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   // Só faz sentido perguntar enquanto há um pareamento em curso.
   const polling = qrCode !== null && status === "conectando";
@@ -90,11 +126,12 @@ export function WhatsAppConnectionPanel({ connection }: { connection: WhatsAppCo
         setQrCode(null);
         setPairingCode(null);
         toast.success("WhatsApp conectado");
+        router.refresh();
       }
     }, POLL_INTERVAL_MS);
 
     return () => clearInterval(id);
-  }, [polling]);
+  }, [polling, router]);
 
   function handleConnect() {
     startTransition(async () => {
@@ -106,11 +143,24 @@ export function WhatsAppConnectionPanel({ connection }: { connection: WhatsAppCo
         return;
       }
       setError(null);
+
+      // A 2.3.7 responde sem QR quando a sessão já está aberta — mostrar
+      // "leia o código" nesse caso faria o dono esperar por um código que
+      // nunca vem.
+      if (result.alreadyConnected) {
+        setStatus("conectado");
+        setQrCode(null);
+        setPairingCode(null);
+        toast.success("Este número já está conectado.");
+        router.refresh();
+        return;
+      }
+
       setStatus("conectando");
       setQrCode(result.qrCodeBase64);
       setPairingCode(result.pairingCode);
       if (!result.qrCodeBase64 && !result.pairingCode) {
-        toast.info("O gateway não devolveu QR code. Atualize o status em alguns segundos.");
+        toast.info("O código ainda está sendo gerado. Toque em “Gerar novo código” em instantes.");
       }
     });
   }
@@ -125,6 +175,7 @@ export function WhatsAppConnectionPanel({ connection }: { connection: WhatsAppCo
       setStatus(result.status);
       setPhone(result.phone);
       if (result.status === "conectado") setQrCode(null);
+      router.refresh();
     });
   }
 
@@ -140,16 +191,38 @@ export function WhatsAppConnectionPanel({ connection }: { connection: WhatsAppCo
       setQrCode(null);
       setPairingCode(null);
       toast.success("Número desconectado");
+      router.refresh();
+    });
+  }
+
+  function handleDelete() {
+    startTransition(async () => {
+      const result = await deleteWhatsAppConnectionAction();
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      setStatus("desconectado");
+      setPhone(null);
+      setQrCode(null);
+      setPairingCode(null);
+      setError(null);
+      setDeleteOpen(false);
+      toast.success("Conexão excluída");
+      router.refresh();
     });
   }
 
   const meta = STATUS_META[status];
   const StatusIcon = meta.Icon;
+  const neverConnected = !connection.instance_name && status === "desconectado";
 
   return (
     <div className="flex flex-col gap-5">
       <section className={cn("panel flex items-start gap-3 p-4", meta.tone)}>
-        <StatusIcon className={cn("mt-0.5 size-5 shrink-0", status === "conectando" && "animate-spin")} />
+        <StatusIcon
+          className={cn("mt-0.5 size-5 shrink-0", status === "conectando" && "animate-spin")}
+        />
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="font-medium text-foreground">{meta.label}</h2>
@@ -161,6 +234,15 @@ export function WhatsAppConnectionPanel({ connection }: { connection: WhatsAppCo
           </div>
           <p className="text-sm text-muted-foreground">{meta.description}</p>
           {status === "erro" && error && <p className="text-sm text-destructive">{error}</p>}
+          {connection.last_connected_at && status !== "conectado" && (
+            <p className="text-xs text-muted-foreground">
+              Última conexão:{" "}
+              {new Date(connection.last_connected_at).toLocaleString("pt-BR", {
+                dateStyle: "short",
+                timeStyle: "short",
+              })}
+            </p>
+          )}
         </div>
       </section>
 
@@ -203,15 +285,18 @@ export function WhatsAppConnectionPanel({ connection }: { connection: WhatsAppCo
               disabled={pending || status === "conectado"}
               className="bg-cta text-white"
             >
-              {pending ? <Loader2 className="size-4 animate-spin" /> : <Smartphone className="size-4" />}
-              {status === "conectando" ? "Gerar novo código" : "Conectar número"}
+              {pending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Smartphone className="size-4" />
+              )}
+              {status === "conectando"
+                ? "Gerar novo código"
+                : status === "desconectado" && connection.instance_name
+                  ? "Reconectar número"
+                  : "Conectar número"}
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleRefresh}
-              disabled={pending}
-            >
+            <Button type="button" variant="outline" onClick={handleRefresh} disabled={pending}>
               <RefreshCw className="size-4" /> Atualizar status
             </Button>
             <Button
@@ -222,11 +307,53 @@ export function WhatsAppConnectionPanel({ connection }: { connection: WhatsAppCo
             >
               <Unplug className="size-4" /> Desconectar
             </Button>
+
+            {/* Excluir só aparece quando existe algo para excluir: um botão
+                destrutivo permanentemente inerte só ensina o dono a ignorá-lo. */}
+            {!neverConnected && (
+              <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+                <DialogTrigger
+                  render={<Button type="button" variant="outline" disabled={pending} />}
+                >
+                  <Trash2 className="size-4" /> Excluir
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Excluir esta conexão?</DialogTitle>
+                    <DialogDescription>
+                      A conexão sai do sistema e a sessão é apagada no servidor. Os lembretes
+                      automáticos param de sair até você conectar um número novamente — e
+                      reconectar exigirá ler o QR code de novo.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <DialogFooter>
+                    <DialogClose render={<Button type="button" variant="outline" />}>
+                      Cancelar
+                    </DialogClose>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      onClick={handleDelete}
+                      disabled={pending}
+                    >
+                      {pending && <Loader2 className="size-4 animate-spin" />}
+                      Excluir
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            )}
           </div>
 
           {polling && (
             <p className="text-xs text-muted-foreground">
               Verificando a conexão a cada {POLL_INTERVAL_MS / 1000} segundos...
+            </p>
+          )}
+          {!webhookActive && (
+            <p className="max-w-sm text-center text-xs text-muted-foreground">
+              Aviso automático de status desligado neste ambiente: o servidor de WhatsApp não
+              alcança este endereço. O estado é atualizado ao abrir a tela e pelo botão acima.
             </p>
           )}
         </div>
