@@ -10,20 +10,38 @@
 # Web viva na memória.
 #
 #   docker compose up -d
-#   docker compose logs -f evolution
+#   docker compose logs -f evolution caddy
 #
-# Depois: aponte um domínio para a máquina e ponha um proxy com HTTPS na
-# frente (Caddy resolve em duas linhas). A porta 8080 NÃO deve ficar exposta
-# na internet sem TLS — a chave de API viaja em cada requisição.
+# O HTTPS JÁ ESTÁ AQUI: o serviço `caddy` termina o TLS e é o único que
+# publica porta no host. A Evolution não publica nenhuma — ver o comentário
+# no serviço dela. Antes do primeiro `up`, aponte um registro A do domínio
+# para o IP desta máquina e preencha EVOLUTION_DOMAIN/ACME_EMAIL no .env,
+# senão o Caddy não consegue emitir o certificado.
 
 services:
   evolution:
     image: atendai/evolution-api:v2.3.7
     restart: always
-    ports:
-      # Só o loopback: quem publica para fora é o proxy com HTTPS.
-      - "127.0.0.1:8080:8080"
+    # SEM `ports:` de propósito — e isso é o que de fato fecha o acesso direto.
+    #
+    # Não é firewall: publicar uma porta no Docker escreve regra na cadeia
+    # DOCKER do iptables, que é avaliada ANTES das regras do ufw. Ou seja,
+    # `ufw deny 8080` com a porta publicada NÃO bloqueia nada — a máquina
+    # continua atendendo em http://IP:8080 e a chave segue viajando em claro.
+    # A única forma confiável de fechar é não publicar.
+    #
+    # A Evolution continua alcançável pelo nome de serviço `evolution:8080`
+    # dentro da rede do compose, que é por onde o Caddy fala com ela. Para
+    # depurar da própria máquina, sem reabrir nada:
+    #   docker compose exec evolution wget -qO- localhost:8080
+    expose:
+      - "8080"
     environment:
+      # Precisa ser a URL PÚBLICA HTTPS (a mesma de EVOLUTION_DOMAIN): a
+      # Evolution usa este valor para montar URLs que ela reporta, inclusive
+      # o campo `server_url` que chega em todo webhook. Deixar o IP aqui
+      # depois de subir o proxy faria os eventos apontarem para o endereço
+      # que acabamos de fechar.
       SERVER_URL: ${SERVER_URL}
 
       # Chave GLOBAL da instalação: é o valor de EVOLUTION_API_KEY no .env do
@@ -63,7 +81,20 @@ services:
       - evolution_instances:/evolution/instances
 
   postgres:
-    image: postgres:16-alpine
+    # ATENÇÃO À VERSÃO — não troque sem migrar os dados.
+    #
+    # O Postgres RECUSA subir sobre um volume inicializado por outra versão
+    # maior ("database files are incompatible with server"). A VPS de vocês
+    # roda a linha 15 (ver plano_evo), então este arquivo fixa 15: aplicar um
+    # `up -d` com a 16 sobre o volume existente derrubaria a Evolution que
+    # hoje está funcionando, e o erro só aparece no log do container.
+    #
+    # Confirme antes de subir:
+    #   docker compose exec postgres postgres --version
+    #
+    # Para subir de versão de verdade é pg_dump na antiga + restore na nova,
+    # não troca de tag.
+    image: postgres:15-alpine
     restart: always
     environment:
       POSTGRES_USER: evolution
@@ -78,7 +109,37 @@ services:
     volumes:
       - redis_data:/data
 
+  # ---------------------------------------------------------------------------
+  # Proxy com HTTPS — o único serviço que fala com a internet
+  # ---------------------------------------------------------------------------
+  caddy:
+    image: caddy:2.10-alpine
+    restart: always
+    ports:
+      # A 80 não é enfeite: é o desafio HTTP-01 do ACME e o redirecionamento
+      # de quem chegar em http://. Fechá-la impede a RENOVAÇÃO do certificado,
+      # e o site quebra 60 dias depois — quando ninguém lembra do que mexeu.
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # `caddy_data` guarda as chaves e os certificados emitidos. SEM este
+      # volume, cada `docker compose up` pede certificado novo e a conta bate
+      # no limite da Let's Encrypt (5 certificados iguais por semana) — aí o
+      # gateway fica sem TLS por dias.
+      - caddy_data:/data
+      - caddy_config:/config
+      - caddy_logs:/var/log/caddy
+    environment:
+      EVOLUTION_DOMAIN: ${EVOLUTION_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+    depends_on:
+      - evolution
+
 volumes:
   evolution_instances:
   postgres_data:
   redis_data:
+  caddy_data:
+  caddy_config:
+  caddy_logs:

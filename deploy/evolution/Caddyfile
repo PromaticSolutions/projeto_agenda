@@ -1,0 +1,73 @@
+# Caddy na frente da Evolution API — termina o TLS e nada mais.
+#
+# POR QUE ISTO NÃO É OPCIONAL: a chave da Evolution é GLOBAL da instalação
+# (quem a tem controla todas as instâncias) e viaja no header `apikey` em
+# TODA requisição — cada checagem de estado, cada lembrete enviado. Em HTTP
+# puro isso atravessa a internet em texto claro, e quem estiver no caminho
+# fica com a chave. Não é risco teórico: o app na Vercel fala com esta
+# máquina pela internet aberta, várias vezes por minuto.
+#
+# O Caddy pede e renova o certificado sozinho (ACME/Let's Encrypt). Para isso
+# precisa, ANTES do primeiro `up`:
+#   1. um registro A do domínio apontando para o IP desta máquina;
+#   2. as portas 80 e 443 abertas — a 80 é usada no desafio HTTP-01 e para
+#      redirecionar quem chegar em http:// (o Caddy faz isso por padrão).
+
+{
+	# Endereço para os avisos de expiração da Let's Encrypt. Sem ele o Caddy
+	# ainda emite o certificado, mas você não é avisado se a renovação parar.
+	email {$ACME_EMAIL}
+}
+
+{$EVOLUTION_DOMAIN} {
+	# ---------------------------------------------------------------------
+	# O Manager NÃO fica exposto
+	# ---------------------------------------------------------------------
+	# A Evolution serve o painel de administração em /manager. O requisito é
+	# explícito: o cliente não acessa o Evolution Manager — quem fala com o
+	# gateway é o backend do sistema. Publicá-lo num domínio na internet
+	# entrega a porta de entrada do gateway a quem descobrir o endereço, e
+	# ele só protege com a mesma chave global que já não pode circular.
+	#
+	# 404 em vez de 403: não confirma para quem sondou que existe um Manager
+	# ali atrás. Se algum dia precisar do painel, use um túnel SSH
+	# (`ssh -L 8080:localhost:8080`) em vez de reabrir isto.
+	@manager path /manager /manager/*
+	respond @manager 404
+
+	# HSTS. O objetivo do proxy é que a chave nunca ande em claro; sem isto,
+	# a PRIMEIRA requisição de um cliente novo ainda pode sair em http://
+	# antes do redirecionamento. Um ano, incluindo subdomínios.
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+	# Não anunciar o servidor por trás — economia barata de sinal para quem
+	# está varrendo a internet por versões vulneráveis.
+	header -Server
+
+	# `reverse_proxy` do Caddy 2 já faz upgrade de WebSocket sem configuração
+	# extra, o que a Evolution usa na integração de websocket.
+	#
+	# O alvo é o nome do serviço na rede do compose (`evolution:8080`), não
+	# localhost: a Evolution deixa de publicar porta no host, então o único
+	# caminho até ela passa por aqui. Ver o comentário no docker-compose.yml.
+	#
+	# Sem timeout de resposta de propósito: `/instance/connect` espera alguns
+	# segundos para devolver o QR, e o envio com a sessão caída pode ficar
+	# pendurado (comportamento medido da 2.3.7). Cortar aqui transformaria
+	# esses casos em erro de proxy, escondendo a causa real do app — que já
+	# tem timeout próprio de 15s no adaptador.
+	reverse_proxy evolution:8080
+
+	encode zstd gzip
+
+	# Log de acesso em JSON, com rotação. Serve para responder "a Vercel
+	# chegou aqui?" quando um lembrete não sai — sem isso a investigação vira
+	# adivinhação entre dois servidores.
+	log {
+		output file /var/log/caddy/evolution.log {
+			roll_size 10MiB
+			roll_keep 5
+		}
+		format json
+	}
+}
