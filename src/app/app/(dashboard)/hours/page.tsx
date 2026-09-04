@@ -4,7 +4,7 @@ import { listMyBlocks } from "@/lib/data/blocks";
 import { WorkingHoursEditor } from "@/components/app/working-hours-editor";
 import { BlocksEditor } from "@/components/app/blocks-editor";
 
-export const metadata = { title: "Horários — Agenda Online" };
+export const metadata = { title: "Horários — Timely" };
 
 export default async function HoursPage() {
   const studio = await getMyStudio();

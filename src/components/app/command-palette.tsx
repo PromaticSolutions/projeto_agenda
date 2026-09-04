@@ -6,6 +6,7 @@ import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import {
   BellRing,
   CalendarDays,
+  CalendarRange,
   CircleUserRound,
   Clock,
   MessageCircle,
@@ -23,6 +24,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: "Painel do dia", href: "/app", icon: CalendarDays },
+  { label: "Agendamentos", href: "/app/bookings", icon: CalendarRange },
   { label: "Clientes", href: "/app/clients", icon: Users },
   { label: "Serviços", href: "/app/services", icon: Scissors },
   { label: "Horários", href: "/app/hours", icon: Clock },

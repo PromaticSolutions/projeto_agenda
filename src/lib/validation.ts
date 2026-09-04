@@ -134,16 +134,20 @@ export function validateImageUpload(
 
 const optionalUrlSchema = z.union([z.literal(""), httpUrlSchema]).optional();
 
+/** Criação do estúdio. Sem `logo_url`: o estúdio nasce com a marca do
+ *  Timely e só troca depois, na Conta. */
 export const studioOnboardingSchema = z.object({
   name: z.string().trim().min(2, "Informe o nome do estúdio").max(80),
   slug: slugSchema,
   whatsapp: whatsappSchema,
   brand_color: hexColorSchema,
-  logo_url: optionalUrlSchema,
 });
 
-/** Aba "Identidade" da Conta: onboarding + banner. */
+/** Aba "Identidade" da Conta: o cadastro + as imagens que só existem aqui.
+ *  `logo_url` vazio é um estado válido e significativo — é o que diz "use a
+ *  marca do Timely na minha página". */
 export const studioIdentitySchema = studioOnboardingSchema.extend({
+  logo_url: optionalUrlSchema,
   banner_url: optionalUrlSchema,
 });
 
@@ -301,6 +305,26 @@ export const REMINDER_LEAD_TIME_OPTIONS = [
   { value: 2880, label: "2 dias antes" },
   { value: 10080, label: "1 semana antes" },
 ] as const;
+
+/**
+ * Envio manual de WhatsApp (seções 20–24 do plano de integração).
+ *
+ * Reaproveita `clientPhoneSchema`: o número digitado aqui é normalizado para
+ * o MESMO formato do resto do sistema (55DDNNNNNNNNN), que é o que a check
+ * constraint de `message_outbox.to_phone` aceita e o que o gateway espera.
+ * Um segundo formato de telefone só nesta tela seria um jeito de descobrir a
+ * divergência quando a mensagem não sair.
+ */
+export const manualWhatsAppMessageSchema = z.object({
+  phone: clientPhoneSchema,
+  message: z
+    .string()
+    .trim()
+    .min(1, "Escreva a mensagem que será enviada")
+    // O WhatsApp aceita mais que isso, mas texto muito longo costuma ser
+    // colagem acidental — e o corpo é gravado no histórico de toda mensagem.
+    .max(4096, "A mensagem passou de 4096 caracteres"),
+});
 
 export const reminderSettingsSchema = z
   .object({

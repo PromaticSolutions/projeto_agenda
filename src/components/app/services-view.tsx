@@ -95,7 +95,7 @@ function GridView({ services }: { services: Service[] }) {
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {services.map((service) => (
-        <article key={service.id} className="panel flex flex-col overflow-hidden">
+        <article key={service.id} className="panel card-lift flex flex-col overflow-hidden">
           <div className="h-1" style={{ backgroundColor: service.color }} />
           <div className="flex flex-1 flex-col gap-3 p-4">
             <div className="flex items-start justify-between gap-2">

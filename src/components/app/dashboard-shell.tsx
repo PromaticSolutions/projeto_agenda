@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   BellRing,
   CalendarDays,
+  CalendarRange,
   CircleUserRound,
   Clock,
   MessageCircle,
@@ -12,6 +13,7 @@ import {
   Settings,
   Users,
 } from "lucide-react";
+import { SystemLogo } from "@/components/system-logo";
 import { cn } from "@/lib/utils";
 import { SignOutButton } from "@/components/app/sign-out-button";
 import { CopyLinkButton } from "@/components/app/copy-link-button";
@@ -29,6 +31,7 @@ const NAV_GROUPS = [
     label: "Operação",
     items: [
       { href: "/app", label: "Painel do dia", icon: CalendarDays },
+      { href: "/app/bookings", label: "Agendamentos", icon: CalendarRange },
       { href: "/app/clients", label: "Clientes", icon: Users },
       { href: "/app/services", label: "Serviços", icon: Scissors },
       { href: "/app/hours", label: "Horários", icon: Clock },
@@ -69,12 +72,12 @@ export function DashboardShell({
     <div className="flex min-h-screen w-full flex-col bg-background md:flex-row">
       <aside className="flex shrink-0 flex-col gap-6 border-b border-border bg-card px-4 py-4 md:w-64 md:border-b-0 md:border-r md:px-4 md:py-5">
         <div className="flex items-center gap-2.5">
-          <span
-            className="flex size-9 shrink-0 items-center justify-center rounded-md text-sm font-semibold text-white"
-            style={{ backgroundColor: studio.brand_color }}
-          >
-            {studio.name.slice(0, 1).toUpperCase()}
-          </span>
+          {/* Marca do produto, igual para todo estúdio. Antes era a inicial do
+              nome sobre a cor da marca do dono — o que fazia o painel parecer
+              um app diferente a cada cliente. A identidade de cada estúdio
+              continua onde ela importa: na página pública e no nome aqui do
+              lado. */}
+          <SystemLogo className="size-9" size={80} />
           <div className="min-w-0">
             <p className="truncate font-medium text-foreground">{studio.name}</p>
             <p className="truncate text-xs text-muted-foreground">/{studio.slug}</p>

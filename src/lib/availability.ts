@@ -39,16 +39,26 @@ export function weekdayOfDate(dateStr: string): number {
   return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
 }
 
+/**
+ * Soma (ou subtrai) dias de calendário a uma data "YYYY-MM-DD".
+ *
+ * Passa por `Date.UTC` de propósito: a aritmética acontece em UTC puro, onde
+ * todo dia tem 24h, então nenhum horário de verão do fuso do estúdio pode
+ * fazer o resultado pular ou repetir um dia.
+ */
+export function addLocalDays(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+}
+
 /** Próxima data de calendário (string "YYYY-MM-DD"), sem depender de timezone. */
 export function nextLocalDate(dateStr: string): string {
-  const [y, m, d] = dateStr.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
+  return addLocalDays(dateStr, 1);
 }
 
 /** Data de calendário anterior (string "YYYY-MM-DD"), sem depender de timezone. */
 export function prevLocalDate(dateStr: string): string {
-  const [y, m, d] = dateStr.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d - 1)).toISOString().slice(0, 10);
+  return addLocalDays(dateStr, -1);
 }
 
 /** Intervalo [00:00, 24:00) de uma data local do estúdio, em instantes UTC — usado para consultar bookings/blocks do dia. */

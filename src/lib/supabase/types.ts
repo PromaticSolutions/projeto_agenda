@@ -16,12 +16,60 @@ export type BookingStatus =
   | "finalizado"
   | "cancelado";
 
+/** enums da fila de mensagens — 0010_message_outbox.sql */
+export type MessageOutboxKind =
+  | "lembrete"
+  | "novo_agendamento"
+  /** 0012 — mensagem disparada à mão pelo dono em /app/whatsapp. */
+  | "manual";
+
+export type MessageOutboxStatus =
+  | "pendente"
+  | "enviando"
+  | "enviado"
+  | "falhou"
+  | "cancelado";
+
 /** enum `whatsapp_connection_status` — 0009_whatsapp_connections.sql */
 export type WhatsAppConnectionStatus =
   | "desconectado"
   | "conectando"
   | "conectado"
   | "erro";
+
+/** enums de cobrança — 0011_billing.sql */
+export type PlanInterval = "mensal" | "anual";
+
+export type SubscriptionStatus =
+  | "trial"
+  | "ativa"
+  | "inadimplente"
+  | "pausada"
+  | "cancelada";
+
+export type InvoiceStatus =
+  | "aberta"
+  | "paga"
+  | "vencida"
+  | "cancelada"
+  | "reembolsada";
+
+export type PaymentMethod = "pix" | "cartao_credito" | "boleto";
+
+export type PaymentStatus =
+  | "pendente"
+  | "aprovado"
+  | "recusado"
+  | "estornado"
+  | "expirado";
+
+/** Gateways previstos. `manual` = baixa dada à mão pelo admin (TED, cortesia). */
+export type BillingGateway =
+  | "mercadopago"
+  | "asaas"
+  | "stripe"
+  | "pagarme"
+  | "manual";
 
 export interface Database {
   public: {
@@ -227,6 +275,251 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["whatsapp_connections"]["Insert"]>;
         Relationships: [];
       };
+      /** 0010_message_outbox.sql — fila de envio de WhatsApp. */
+      message_outbox: {
+        Row: {
+          id: string;
+          studio_id: string;
+          booking_id: string | null;
+          kind: MessageOutboxKind;
+          to_phone: string;
+          body: string;
+          scheduled_for: string;
+          status: MessageOutboxStatus;
+          attempts: number;
+          last_error: string | null;
+          provider_message_id: string | null;
+          sent_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          studio_id: string;
+          booking_id?: string | null;
+          kind: MessageOutboxKind;
+          to_phone: string;
+          body: string;
+          scheduled_for: string;
+          status?: MessageOutboxStatus;
+          attempts?: number;
+          last_error?: string | null;
+          provider_message_id?: string | null;
+          sent_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["message_outbox"]["Insert"]>;
+        Relationships: [];
+      };
+      /** 0011_billing.sql — catálogo comercial da plataforma. */
+      plans: {
+        Row: {
+          id: string;
+          code: string;
+          name: string;
+          tagline: string | null;
+          price_cents: number;
+          billing_interval: PlanInterval;
+          trial_days: number;
+          /** Nulo = ilimitado. */
+          max_bookings_per_month: number | null;
+          max_services: number | null;
+          includes_whatsapp: boolean;
+          active: boolean;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          code: string;
+          name: string;
+          tagline?: string | null;
+          price_cents: number;
+          billing_interval?: PlanInterval;
+          trial_days?: number;
+          max_bookings_per_month?: number | null;
+          max_services?: number | null;
+          includes_whatsapp?: boolean;
+          active?: boolean;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["plans"]["Insert"]>;
+        Relationships: [];
+      };
+      /** 0011_billing.sql — contrato estúdio ↔ plataforma. */
+      subscriptions: {
+        Row: {
+          id: string;
+          studio_id: string;
+          plan_id: string;
+          status: SubscriptionStatus;
+          /** Valor travado na contratação, em centavos. */
+          amount_cents: number;
+          started_at: string;
+          trial_ends_at: string | null;
+          current_period_start: string;
+          current_period_end: string;
+          cancel_at_period_end: boolean;
+          canceled_at: string | null;
+          cancel_reason: string | null;
+          gateway: BillingGateway | null;
+          gateway_customer_id: string | null;
+          gateway_subscription_id: string | null;
+          default_payment_method: PaymentMethod | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          studio_id: string;
+          plan_id: string;
+          status?: SubscriptionStatus;
+          amount_cents: number;
+          started_at?: string;
+          trial_ends_at?: string | null;
+          current_period_start?: string;
+          current_period_end?: string;
+          cancel_at_period_end?: boolean;
+          canceled_at?: string | null;
+          cancel_reason?: string | null;
+          gateway?: BillingGateway | null;
+          gateway_customer_id?: string | null;
+          gateway_subscription_id?: string | null;
+          default_payment_method?: PaymentMethod | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["subscriptions"]["Insert"]>;
+        Relationships: [];
+      };
+      /** 0011_billing.sql — o que foi cobrado do estúdio. */
+      invoices: {
+        Row: {
+          id: string;
+          studio_id: string;
+          subscription_id: string | null;
+          /** Sequência humana ("#1043"), gerada pelo banco. */
+          seq: number;
+          amount_cents: number;
+          discount_cents: number;
+          /** Coluna gerada (amount - discount) — só leitura. */
+          total_cents: number;
+          status: InvoiceStatus;
+          description: string | null;
+          period_start: string | null;
+          period_end: string | null;
+          due_date: string;
+          issued_at: string;
+          paid_at: string | null;
+          canceled_at: string | null;
+          gateway: string | null;
+          gateway_invoice_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          studio_id: string;
+          subscription_id?: string | null;
+          amount_cents: number;
+          discount_cents?: number;
+          status?: InvoiceStatus;
+          description?: string | null;
+          period_start?: string | null;
+          period_end?: string | null;
+          due_date: string;
+          issued_at?: string;
+          paid_at?: string | null;
+          canceled_at?: string | null;
+          gateway?: string | null;
+          gateway_invoice_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["invoices"]["Insert"]>;
+        Relationships: [];
+      };
+      /** 0011_billing.sql — tentativas de pagar uma fatura. */
+      payments: {
+        Row: {
+          id: string;
+          invoice_id: string;
+          studio_id: string;
+          amount_cents: number;
+          fee_cents: number;
+          refunded_cents: number;
+          method: PaymentMethod;
+          status: PaymentStatus;
+          installments: number;
+          card_brand: string | null;
+          /** Só os 4 últimos — ver cabeçalho da 0011. */
+          card_last4: string | null;
+          pix_expires_at: string | null;
+          paid_at: string | null;
+          failure_code: string | null;
+          failure_reason: string | null;
+          gateway: string | null;
+          gateway_payment_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          invoice_id: string;
+          studio_id: string;
+          amount_cents: number;
+          fee_cents?: number;
+          refunded_cents?: number;
+          method: PaymentMethod;
+          status?: PaymentStatus;
+          installments?: number;
+          card_brand?: string | null;
+          card_last4?: string | null;
+          pix_expires_at?: string | null;
+          paid_at?: string | null;
+          failure_code?: string | null;
+          failure_reason?: string | null;
+          gateway?: string | null;
+          gateway_payment_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["payments"]["Insert"]>;
+        Relationships: [];
+      };
+      /** 0011_billing.sql — log cru de webhook do gateway. */
+      billing_events: {
+        Row: {
+          id: string;
+          gateway: string;
+          event_type: string;
+          external_event_id: string | null;
+          studio_id: string | null;
+          invoice_id: string | null;
+          payment_id: string | null;
+          payload: Record<string, unknown>;
+          processed_at: string | null;
+          process_error: string | null;
+          received_at: string;
+        };
+        Insert: {
+          id?: string;
+          gateway: string;
+          event_type: string;
+          external_event_id?: string | null;
+          studio_id?: string | null;
+          invoice_id?: string | null;
+          payment_id?: string | null;
+          payload?: Record<string, unknown>;
+          processed_at?: string | null;
+          process_error?: string | null;
+          received_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["billing_events"]["Insert"]>;
+        Relationships: [];
+      };
       platform_admins: {
         Row: {
           user_id: string;
@@ -241,6 +534,12 @@ export interface Database {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      /** 0010_message_outbox.sql — reivindicação atômica do lote a enviar. */
+      claim_pending_messages: {
+        Args: { p_limit: number };
+        Returns: Database["public"]["Tables"]["message_outbox"]["Row"][];
+      };
+    };
   };
 }

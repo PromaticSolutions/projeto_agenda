@@ -41,6 +41,24 @@ export async function listBookingsForMonth(
   return listBookingsInRangeOwner(studioId, rangeStart.toISOString(), rangeEnd.toISOString());
 }
 
+/**
+ * Agendamentos do estúdio entre duas datas locais, INCLUSIVE nas duas pontas
+ * — a fonte do módulo /app/bookings.
+ *
+ * Recebe datas de calendário ("YYYY-MM-DD") em vez de instantes porque o
+ * filtro da tela é por dia; a conversão para o intervalo UTC correspondente
+ * fica aqui, num lugar só, como em `listBookingsForDay`.
+ */
+export async function listBookingsForRange(
+  studioId: string,
+  fromDate: string,
+  toDate: string
+): Promise<Booking[]> {
+  const start = localDayRangeUtc(fromDate).start;
+  const end = localDayRangeUtc(toDate).end;
+  return listBookingsInRangeOwner(studioId, start.toISOString(), end.toISOString());
+}
+
 async function listBookingsInRangeOwner(
   studioId: string,
   fromIso: string,
@@ -456,4 +474,28 @@ export async function listOwnerAvailableSlots(
       .map((b) => ({ start: new Date(b.start_at), end: new Date(b.end_at) })),
     now: new Date(),
   }).map((slot) => ({ start: slot.start.toISOString(), end: slot.end.toISOString() }));
+}
+
+/**
+ * Agendamentos de VÁRIOS estúdios num intervalo — a leitura do planejador de
+ * lembretes. Uma consulta só, em vez de uma por estúdio: os intervalos de
+ * antecedência diferem entre salões, então o disparador busca a janela mais
+ * larga de todas e recorta cada estúdio em memória.
+ */
+export async function listBookingsForStudiosInRange(
+  studioIds: string[],
+  fromIso: string,
+  toIso: string
+): Promise<Booking[]> {
+  if (studioIds.length === 0) return [];
+  const supabase = createServiceRoleSupabaseClient();
+  const { data, error } = await supabase
+    .from("bookings")
+    .select("*")
+    .in("studio_id", studioIds)
+    .gte("start_at", fromIso)
+    .lte("start_at", toIso)
+    .order("start_at");
+  if (error) throw error;
+  return data ?? [];
 }

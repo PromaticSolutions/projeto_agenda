@@ -3,7 +3,7 @@ import { OnboardingForm } from "@/components/app/onboarding-form";
 import { BrandMark } from "@/components/auth/brand-mark";
 import { getMyStudio } from "@/lib/data/studios";
 
-export const metadata = { title: "Criar estúdio — Agenda Online" };
+export const metadata = { title: "Criar estúdio — Timely" };
 
 export default async function OnboardingPage() {
   const studio = await getMyStudio();

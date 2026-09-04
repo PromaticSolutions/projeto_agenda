@@ -250,3 +250,343 @@ ser commitado. **Sempre conferir o conteúdo de arquivos `.env*` antes de
   `src/lib/data/bookings.test.ts` exercita as funções de dados reais em Node
   puro (modo mock, sem `.env.local`). O marcador `server-only` lança fora do
   runtime de Server Component — o alias o neutraliza só nos testes.
+
+## Módulo de agendamentos (/app/bookings)
+
+- **Por que uma tela nova em vez de expandir o painel.** O "Painel do dia"
+  responde *o que acontece hoje* — um dia por vez, régua do agora, contadores.
+  A pergunta *onde está o atendimento da fulana* é outra: atravessa dias,
+  filtra por status e serviço e quer densidade ajustável. Enfiar as duas no
+  mesmo lugar transformaria o painel num formulário de busca com um dia
+  dentro. As duas telas compartilham os componentes (`BookingStatusSelect`,
+  `BookingFormDialog`, `ManualBookingDialog`), não o layout.
+- **Os filtros moram na URL, não em `useState`.** `periodo`, `status`,
+  `servico`, `q` e `view` são `searchParams`: o botão voltar funciona, o dono
+  pode favoritar "cancelados dos últimos 30 dias", e a página continua um
+  Server Component que busca os dados uma vez — nada de refazer a consulta no
+  cliente. A `BookingsToolbar` só escreve na URL; quem lê é a página.
+- **Vocabulário dos filtros centralizado em `src/lib/bookings-filter.ts`.**
+  Barra e página importam as MESMAS constantes e os mesmos `parse*`. Se cada
+  lado tivesse a sua lista, um dia a barra ofereceria uma opção que a página
+  não sabe ler e o filtro cairia calado no padrão. Todo `parse*` é total:
+  valor desconhecido na URL vira o padrão, nunca `undefined`.
+- **Período por presets, não por intervalo livre.** Quatro opções (hoje, 7
+  dias, 30 dias, últimos 30 dias) cobrem o uso real de um estúdio e mantêm a
+  consulta limitada. O intervalo é inclusivo nas duas pontas, e "últimos 30
+  dias" inclui o próprio dia de propósito: um atendimento das 9h já é passado
+  às 15h, e escondê-lo faria procurar em dois lugares.
+- **Filtro de status/serviço/busca é em memória, sobre o intervalo já
+  carregado.** Uma ida ao banco por filtro seria mais consultas para o mesmo
+  conjunto de linhas. Como o filtro roda em JS, a busca por nome dobra acento
+  e caixa ("monica" acha "Mônica") — coisa que o `ilike` do `searchBookings`,
+  no painel, não faz.
+- **O movimento do hover é 100% CSS.** `BookingCard` continua Server
+  Component; só os dois controles internos descem como JavaScript. **Nada
+  aparece ou some no hover** — quem usa toque ou teclado vê a mesma
+  interface, `focus-within` repete o destaque no Tab, e `motion-reduce` deixa
+  só a cor.
+- **O deslocamento virou o utilitário `card-lift`** (globals.css), aplicado
+  aos cards de agendamento, aos cards de serviço e aos tiles do painel. Duas
+  razões para não repetir a corrente de classes em cada tela: o movimento
+  precisa ser idêntico em todo lugar (repetido à mão, cada tela acabaria com
+  uma distância e uma duração ligeiramente diferentes), e a sombra depende do
+  tema — daí o token `--shadow-lift`, que no escuro precisa de bem mais
+  opacidade para não sumir contra o fundo. Sobe 4px, não 2px: 2px era um
+  movimento que o olho registrava sem perceber.
+- **Linha de tabela não sobe.** Em `/app/clients` (e na visualização em lista
+  dos agendamentos) a reação ao cursor é de cor, não de deslocamento:
+  `transform` em `<tr>` é tratado de forma inconsistente entre navegadores, e
+  uma linha subindo dentro de uma lista dividida quebra o alinhamento das
+  divisórias vizinhas.
+
+## Envio de lembretes no WhatsApp (fila + disparador + Evolution)
+
+- **Fila, e não "o cron varre `bookings` e manda".** Varrer e enviar direto não
+  tem memória: duas execuções do disparador (retry da plataforma, dois cron
+  apontando para a mesma rota, deploy no meio) mandam o mesmo lembrete duas
+  vezes. Mensagem repetida no WhatsApp da cliente é o erro que faz o salão
+  desligar o recurso. A tabela `message_outbox` (0010) dá idempotência por
+  índice único `(booking_id, kind)`, retentativa com contagem, e histórico
+  auditável — dá para responder "esse lembrete saiu?".
+- **A reivindicação é uma função SQL, não `select` + `update` no app.** Entre
+  ler e marcar existe janela de corrida; `for update skip locked` fecha essa
+  janela dentro do banco e ainda deixa duas execuções simultâneas pegarem
+  lotes diferentes em vez de esperar uma pela outra. Como o PostgREST não
+  expõe isso, virou `claim_pending_messages`, com `revoke` de `anon` e
+  `authenticated` — `security definer` em tabela multi-tenant sem revoke é
+  como um estúdio acabaria reivindicando mensagem de outro.
+- **Guardamos o texto final, não o template + os dados.** Se o dono editar a
+  mensagem amanhã, o que já estava na fila não muda de conteúdo no meio do
+  caminho, e o histórico mostra o que a cliente de fato recebeu. O preço é o
+  horizonte curto de enfileiramento (60 min), para uma edição de template
+  ainda alcançar o lembrete de amanhã.
+- **Planejar e enviar são etapas separadas na mesma execução.** Sem gateway
+  configurado, o planejamento continua rodando e a fila é visível em
+  `/app/whatsapp` — o que tornou o disparador verificável antes de existir
+  VPS. `getWhatsAppProvider()` devolve `null` nesse caso, e não um dublê que
+  finge enviar: um dublê marcaria mensagens como "enviado" sem ninguém
+  receber, e o histórico passaria a mentir.
+- **Três regras que existem por causa de casos reais**, todas em
+  `src/lib/reminders.ts` e `src/lib/data/outbox.ts`:
+  agendamento que já começou não gera lembrete (senão ligar o recurso hoje
+  dispararia mensagem para a agenda da semana passada); mensagem vencida há
+  mais de 2h é cancelada em vez de enviada (o estúdio que passou dias
+  desconectado e reconecta numa terça de manhã); e lembrete cujo horário ideal
+  já passou sai agora em vez de ser descartado (melhor um aviso em cima da
+  hora do que nenhum).
+- **Consulta de estado, não webhook.** A tela de conexão e o disparador
+  perguntam o estado à Evolution no momento em que ele importa
+  (`syncWhatsAppConnection`). Webhook exigiria endpoint público recebendo
+  callback e ainda deixaria o painel mentindo quando uma entrega se perdesse
+  num deploy. O custo é uma requisição por estúdio por execução — e ela evita
+  o pior cenário: o banco dizendo "conectado" com a sessão caída, e todas as
+  mensagens gastando as quatro tentativas até virarem falha.
+- **A rota do disparador é agnóstica de agendador, e falha fechada.** Aceita
+  `GET` e `POST` com segredo em header, então serve tanto ao Cron da Vercel
+  quanto a um `curl` no crontab da VPS — o que importa aqui porque o Cron da
+  Vercel no plano gratuito roda 1x/dia, inviabilizando "1 hora antes". Sem
+  `CRON_SECRET` no ambiente ela devolve 404: uma rota de disparo aberta na
+  internet deixaria qualquer um enviando mensagem em nome dos estúdios.
+- **Interface de gateway com cinco operações, sem nada de caixa de entrada.**
+  O escopo decidido é só envio; prever recebimento na interface seria projetar
+  para um produto que ninguém pediu. Trocar a Evolution por um gateway
+  hospedado é escrever outro arquivo em `src/lib/whatsapp/` e mudar uma linha.
+- **O que ficou de fora, e por quê**: o aviso ao DONO quando entra agendamento
+  novo (hoje ainda é o link `wa.me` que a cliente toca). Falta uma decisão de
+  produto que não é minha: a mensagem sairia do número do salão para o próprio
+  número do salão — o único que o cadastro conhece —, o que funciona mas é
+  esquisito. A alternativa é guardar um número pessoal do dono só para
+  notificação, e isso é campo novo no cadastro.
+
+## Superadmin detalhado + cobrança da plataforma (migração 0011)
+
+- **"Faturamento" é o que o estúdio paga à Timely, não o que a cliente paga
+  ao estúdio.** As duas coisas existem no produto e confundi-las
+  contaminaria todo o painel, então elas vivem em lugares diferentes:
+  `services.price_cents` (dinheiro do estúdio, some em "volume atendido") e
+  as tabelas da 0011 (dinheiro da plataforma, some em MRR/receita). Cada KPI
+  de volume atendido carrega a ressalva na própria tela.
+- **Schema de cobrança agnóstico de gateway**: o provedor de Pix/cartão
+  ainda não foi escolhido, então nenhuma coluna usa vocabulário de um
+  gateway específico — cada linha tem `gateway` (texto) + ID externo, e
+  webhook cru cai em `billing_events` com índice único `(gateway,
+  external_event_id)` para idempotência. Trocar ou plugar provedor não exige
+  migração nova. Nenhum segredo no banco; de cartão, só marca e 4 últimos
+  dígitos (guardar PAN/CVV colocaria o projeto no escopo de PCI-DSS).
+- **Assinatura cancelada continua na tabela**, e um índice único PARCIAL
+  (`where status in ('trial','ativa','inadimplente','pausada')`) garante uma
+  vigente por estúdio. Apagar a linha no cancelamento tornaria churn e
+  histórico de receita impossíveis de calcular depois.
+- **`invoices.total_cents` é coluna gerada pelo banco** (`amount - desconto`):
+  se nenhum app escreve, nenhum app pode divergir do outro. Testado: `update`
+  direto na coluna é recusado pelo Postgres.
+- **Backfill coloca os estúdios existentes em trial, e só isso.** Sem ele o
+  painel abriria com base vazia; com fatura ou pagamento semeado, abriria
+  mentindo. Trial não é receita, então é o único estado seguro de semear — e
+  o comando para desfazer está na própria migração.
+- **`trial` fora do MRR, `inadimplente` dentro (mas destacado).** Somar teste
+  em receita recorrente é a forma mais comum de um painel de SaaS enganar o
+  próprio dono; a assinatura inadimplente, por outro lado, é contrato que
+  existe e pode ser recuperado — aparece no MRR e, separadamente, como "MRR
+  em risco".
+- **Taxa de conversão de trial NÃO foi implementada**, apesar de ser um KPI
+  óbvio: não há tabela de histórico de status, então qualquer número aqui
+  seria chute com cara de medição. No lugar entrou "testes vencendo em 7
+  dias", que é dado real e além de tudo acionável. Se a conversão for
+  necessária, o caminho honesto é uma tabela `subscription_events`.
+- **Bug real encontrado medindo contra o projeto Supabase**: `select("*", {
+  count: "exact", head: true })` numa tabela que NÃO existe responde **204,
+  `error` nulo, `count` nulo** — o PostgREST não manda corpo em resposta a
+  HEAD. A checagem "a migração 0011 já rodou?" feita por contagem dizia
+  "sim" para um banco sem as tabelas, e o painel de faturamento inteiro
+  estourava logo depois. Corrigido usando `select("id").limit(1)`, que no
+  mesmo caso devolve 404 + `PGRST205`. **Vale para qualquer checagem de
+  existência de tabela neste projeto: não use `head: true`.**
+- **"Estúdio ativo" e "em risco" saem da lista, não de contagens globais.**
+  A primeira versão derivava por subtração (`total - ativos - novos`), o que
+  contava duas vezes o estúdio novo que já agenda: número plausível e errado.
+  Agora os dois critérios moram em `listStudiosWithActivity`, que olha
+  agendamento por estúdio.
+- **Ocupação é estimativa conservadora e a tela diz isso**: soma o expediente
+  de `working_hours` por dia da semana na janela de 30 dias e ignora
+  bloqueios pontuais (folga, feriado). Ignorar bloqueio infla o
+  denominador, então o número nunca superestima a agenda cheia.
+- **`--chart-3` do tema escuro foi trocado (#6ba3d8 → #4f97e8)**: no passo
+  anterior o token reprovava no piso de croma e no par adjacente do
+  validador de daltonismo da skill de dataviz contra o fundo escuro. Os
+  gráficos do superadmin usam `--chart-1/2/3` (Pix, cartão, boleto), agora
+  aprovados nos dois temas. Os tokens `--chart-4/5` continuam reprovando e
+  por isso NÃO são usados como cor categórica em gráfico nenhum.
+- **Todo gráfico tem tabela gêmea** (`ChartCard` com `<details>` "Ver dados
+  em tabela"): gráfico é a única parte do painel em que o valor mora numa
+  posição e não num texto, então sem a tabela quem usa leitor de tela, toque
+  ou impressão perde o dado.
+- **Migração validada em Postgres local antes de entregar**: subi um cluster
+  temporário, criei os stubs do que o Supabase fornece (`auth.users`,
+  `auth.uid()`, roles `anon`/`authenticated`/`service_role`) e rodei
+  0001→0011 em ordem, mais 12 casos de constraint (duas assinaturas
+  vigentes, cancelada sem data, desconto maior que o valor, fatura paga sem
+  `paid_at`, Pix com dado de cartão, Pix parcelado, evento de gateway
+  repetido, `card_last4` inválido...). Também comparei coluna por coluna o
+  schema real com os tipos escritos à mão em `src/lib/supabase/types.ts` —
+  as 15 tabelas conferem. Só a 0007 falha localmente, porque depende do
+  schema `storage` do Supabase.
+
+## Integração WhatsApp com a Evolution API 2.3.7 (2026-09-04)
+
+Contexto: o plano em `plano_evo` pedia a integração completa contra a Evolution
+2.3.7 rodando na VPS. A base já existia (adaptador, fila, disparador, telas); o
+que faltava era webhook, envio manual, exclusão e — descobriu-se — correções de
+contrato.
+
+### Uma conexão por estúdio, e não N conexões nomeadas
+
+O plano descreve vários WhatsApps nomeados por cliente ("Comercial",
+"Suporte") com seletor no envio. Ficou **uma conexão por estúdio**, decisão do
+dono do produto: `whatsapp_connections.studio_id` segue sendo a chave
+primária, o disparador não mudou e não houve migração de cardinalidade.
+
+Consequência aceita: não existe listagem de conexões, "+ Adicionar WhatsApp"
+nem dropdown de seleção no envio — com uma conexão, quem a resolve é a sessão.
+Mudar isso depois é migração de `whatsapp_connections` para `id` próprio +
+`name` + `instance_name` único, mais `connection_id` em `reminder_settings`.
+
+### Webhook E consulta, não webhook OU consulta
+
+O webhook (`/api/webhooks/evolution`) atualiza o estado da conexão sem ninguém
+clicar em nada, e é o único jeito de o sistema saber que a sessão morreu do
+lado do WhatsApp (dono desvinculou o aparelho no celular) antes do próximo
+envio falhar.
+
+A consulta (polling na tela + `syncWhatsAppConnection` no disparador) **não foi
+removida**: o webhook depende de a VPS alcançar a URL pública do app, o que não
+acontece em desenvolvimento (localhost) nem durante um deploy. Uma entrega
+perdida nessa janela deixaria o banco mentindo indefinidamente. Consulta é o
+piso que sempre funciona; webhook é o que torna a tela instantânea.
+
+`resolveWebhookTarget()` recusa localhost e recusa ausência de segredo — e a
+tela diz, em vez de prometer atualização automática que não vai acontecer.
+
+`MESSAGES_UPSERT` não é assinado: o produto só envia, e trazer conversa de
+cliente para dentro da base seria dado pessoal de terceiro sem ninguém ter
+pedido. O receptor entende o evento e responde 200 se ele chegar.
+
+### O corpo do webhook contém a chave global do gateway
+
+`webhook.controller.ts` inclui `apikey` (a chave GLOBAL da instalação) em toda
+entrega. Por isso nada em `/api/webhooks/evolution` loga o corpo do evento — um
+`console.log(body)` ali despejaria nos logs da plataforma a chave que controla
+todas as instâncias. A autenticação usa header próprio
+(`x-timely-webhook-secret`) com comparação de tempo constante, não a `apikey` do
+corpo.
+
+### Divergências da 2.3.7 encontradas conferindo o código-fonte da tag
+
+O adaptador anterior seguia a "linha 2.x" por suposição. Quatro coisas estavam
+erradas, todas confirmadas depois contra a instância real:
+
+1. `GET /instance/connectionState/{nome}` devolve **só**
+   `{ instance: { instanceName, state } }`. Não há `owner` nem `number` — o
+   código lia esses campos, então **o número pareado nunca era preenchido**.
+   Agora vem de `fetchInstances` (`ownerJid`), com a chamada extra feita só
+   quando a sessão está aberta, ou do `wuid` do webhook.
+2. `DELETE /instance/logout/{nome}` devolve **400** ("is not connected") com a
+   sessão já fechada, não 404. Desconectar duas vezes é normal na tela.
+3. `refused` (QR estourou o limite de tentativas) não é "desconectado": a
+   sessão não volta sozinha, e chamar isso de desconectado faria a tela
+   sugerir esperar quando o certo é gerar código novo.
+4. `deploy/evolution/docker-compose.yml` fixava `v2.1.1` enquanto a VPS roda
+   `2.3.7`.
+
+### Enviar sem sessão TRAVA o gateway, não devolve erro
+
+Medido no smoke test: `POST /message/sendText` com a sessão fechada não
+responde — a requisição estoura o timeout. É por isso que
+`sendManualWhatsAppMessage` e o disparador conferem o estado **antes** de
+chamar o envio, em vez de "tentar e tratar o erro": tentar custaria 15s por
+mensagem e, num lote de 25, estouraria o orçamento de tempo da rota de cron.
+
+### `delete` é aceite, não conclusão
+
+`DELETE /instance/delete/{nome}` emite `remove.instance` e responde
+`SUCCESS` na hora; a remoção acontece no listener. Com a sessão já fechada, a
+instância não está mais no mapa vivo, o listener não tem o que remover e a
+linha fica pendurada no banco da Evolution.
+
+Não afeta o produto: a sessão fica encerrada, o estado que a tela mostra é o da
+nossa tabela (que a action zera), e reconectar depois funciona porque
+`ensureInstance` trata o 403 "already in use" como sucesso e o `connect`
+seguinte gera QR novo — caminho verificado na instância real.
+
+### Envio manual entra na mesma fila, já resolvido
+
+A mensagem manual é gravada em `message_outbox` com `kind = 'manual'` e o
+resultado (`enviado`/`falhou`) **já definido** — nunca passa por `pendente`.
+Se nascesse pendente e o processo morresse entre a gravação e o envio, o
+disparador reivindicaria a linha depois e a cliente receberia a mensagem duas
+vezes.
+
+Guardar em vez de "mandar e esquecer" é o que faz "Últimas mensagens" não
+mentir por omissão: sem isso, a mensagem que o dono mandou na mão há dois
+minutos não apareceria em lugar nenhum, e é justamente esse histórico que
+responde quando a cliente diz que não recebeu.
+
+### Teto de envio contado no banco, não em memória
+
+`/api/whatsapp/send` limita por contagem em `message_outbox` (20 por 10
+minutos, por estúdio). Um limitador em memória contaria do zero em cada
+instância serverless da Vercel — ou seja, não limitaria nada justamente quando
+houvesse volume. O risco real que ele cobre não é a nossa infraestrutura: é o
+**número do salão** ser bloqueado por disparo em sequência.
+
+No webhook o limitador é em memória de propósito: ali quem autentica é o
+segredo, a rota é idempotente, e o freio existe só para o caso de a Evolution
+entrar em laço de reconexão.
+
+### Duas portas, uma implementação
+
+A tela usa Server Action (padrão do projeto para painel autenticado) e existe
+`POST /api/whatsapp/send` (que o plano nomeia, e que mantém o frontend sem
+conhecer a Evolution). As duas chamam `sendManualWhatsAppMessage` — validar em
+dois lugares é como uma das portas acaba sem a checagem de propriedade meses
+depois.
+
+Nenhuma das duas aceita estúdio ou instância no corpo. O nome da instância é
+derivado do ID do estúdio da sessão, e há teste que tenta forçar outro
+inquilino pelo payload e verifica que não passa.
+
+### O histórico de migrations estava vazio (2026-09-04)
+
+Ao aplicar a 0012 o Supabase respondeu `type "message_outbox_kind" does not
+exist`. A causa não era a 0012: **o banco remoto estava na 0009**. As 0010
+(fila de mensagens) e 0011 (faturamento) nunca tinham sido aplicadas, e é a
+0010 que cria esse tipo.
+
+O porquê ficou claro em `supabase migration list`: a coluna `remote` estava
+vazia nas doze migrations. As 0001–0009 foram aplicadas **à mão no SQL
+Editor**, então `supabase_migrations.schema_migrations` nunca registrou nada —
+e sem registro ninguém percebeu que duas migrations ficaram para trás.
+
+`supabase db push` NÃO era o caminho: com o histórico vazio ele começaria na
+0001, que tem `create table studios` e `create type booking_status` sem
+guarda, além de `add column` sem `if not exists` e um `insert into clients`
+desprotegido na 0004. A correção foi `migration repair --status applied
+0001..0009` (escreve só o histórico, não executa DDL) e depois `db push`, que
+aplicou exatamente 0010, 0011 e 0012.
+
+Lição operacional: aplicar migration pelo SQL Editor deixa o CLI cego. Use
+`db push`, ou registre com `migration repair` na sequência.
+
+### Índice composto, não parcial, por causa do enum
+
+A 0012 nasceu com um índice parcial `where kind = 'manual'` e isso estava
+errado: o PostgreSQL recusa USAR um valor de enum acrescentado na mesma
+transação ("unsafe use of new value of enum type"), e tanto o SQL Editor
+quanto o `db push` rodam cada migração em transação. O `alter type` e um
+índice que menciona o valor novo não cabem no mesmo arquivo.
+
+Trocado por `(studio_id, kind, created_at desc)`, que não menciona o valor: a
+consulta do limitador é igualdade, igualdade, faixa — a ordem exata das
+colunas —, resolve com a mesma eficiência, serve qualquer outro recorte por
+`kind`, e cabe em uma migração só. Dividir em 0012 + 0013 resolveria também,
+mas duas migrations para um índice é pior que um índice melhor.

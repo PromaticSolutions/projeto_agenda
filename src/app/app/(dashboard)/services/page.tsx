@@ -3,7 +3,7 @@ import { listMyServices } from "@/lib/data/services";
 import { ServiceFormDialog } from "@/components/app/service-form-dialog";
 import { ServicesView } from "@/components/app/services-view";
 
-export const metadata = { title: "Serviços — Agenda Online" };
+export const metadata = { title: "Serviços — Timely" };
 
 export default async function ServicesPage() {
   const studio = await getMyStudio();

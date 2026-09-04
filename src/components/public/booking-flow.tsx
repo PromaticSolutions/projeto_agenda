@@ -12,7 +12,7 @@ import { PhoneInput } from "@/components/ui/phone-input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { formatDateLocal, formatDurationMin, formatPriceCents, formatTimeLocal } from "@/lib/format";
-import { buildWhatsAppUrl } from "@/lib/whatsapp";
+import { buildWhatsAppUrl } from "@/lib/whatsapp/link";
 import { clientNameSchema, clientPhoneSchema } from "@/lib/validation";
 import type { Service, Studio } from "@/lib/types";
 

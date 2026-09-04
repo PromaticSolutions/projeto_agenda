@@ -1,5 +1,36 @@
-import { CalendarDays } from "lucide-react";
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Building2, LayoutDashboard, Receipt, ShieldCheck } from "lucide-react";
+import { SystemLogo } from "@/components/system-logo";
 import { SignOutButton } from "@/components/app/sign-out-button";
+import { ThemeToggle } from "@/components/app/theme-toggle";
+import { cn } from "@/lib/utils";
+
+/**
+ * Casca do painel da plataforma.
+ *
+ * Passou de header único para navegação lateral porque o superadmin deixou de
+ * ser uma tela: são três assuntos diferentes — o resumo da plataforma, a ficha
+ * de cada cliente e o dinheiro. Empilhar os três numa página só obrigaria a
+ * rolar para trocar de pergunta.
+ *
+ * A estrutura repete a do painel do estúdio (`DashboardShell`) de propósito:
+ * quem administra a plataforma também usa o /app, e duas gramáticas de
+ * navegação no mesmo produto custam mais do que a economia de um componente
+ * compartilhado. O que muda é a faixa de identificação — este painel vê dado
+ * de TODOS os estúdios, e isso tem que estar visível na tela.
+ */
+const NAV_ITEMS = [
+  { href: "/superadmin", label: "Visão geral", icon: LayoutDashboard },
+  { href: "/superadmin/studios", label: "Clientes", icon: Building2 },
+  { href: "/superadmin/billing", label: "Faturamento", icon: Receipt },
+] as const;
+
+function isActive(pathname: string, href: string): boolean {
+  return pathname === href || (href !== "/superadmin" && pathname.startsWith(`${href}/`));
+}
 
 export function SuperAdminShell({
   adminEmail,
@@ -8,26 +39,67 @@ export function SuperAdminShell({
   adminEmail: string | null;
   children: React.ReactNode;
 }) {
+  const pathname = usePathname();
+
   return (
-    <div className="min-h-screen bg-[#f7f5fc]">
-      <header className="border-b border-black/10 bg-plum-900 px-4 py-3 text-white md:px-8">
-        <div className="mx-auto flex max-w-7xl items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <span className="flex size-8 items-center justify-center rounded-lg bg-cta">
-              <CalendarDays className="size-4" />
-            </span>
-            <div>
-              <p className="font-heading text-sm leading-none font-semibold">Promatic Admin</p>
-              <p className="mt-0.5 text-[11px] text-white/45">Visão geral da plataforma</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            {adminEmail && <span className="hidden text-xs text-white/50 sm:inline">{adminEmail}</span>}
-            <SignOutButton className="text-white/70 hover:bg-white/10 hover:text-white" />
+    <div className="flex min-h-screen w-full flex-col bg-background md:flex-row">
+      <aside className="flex shrink-0 flex-col gap-6 border-b border-border bg-card px-4 py-4 md:w-60 md:border-b-0 md:border-r md:py-5">
+        <div className="flex items-center gap-2.5">
+          <SystemLogo className="size-9" size={80} />
+          <div className="min-w-0">
+            <p className="truncate font-medium text-foreground">Timely Admin</p>
+            <p className="truncate text-xs text-muted-foreground">Painel da plataforma</p>
           </div>
         </div>
-      </header>
-      <main className="mx-auto max-w-7xl px-4 py-8 md:px-8">{children}</main>
+
+        <nav className="flex flex-row gap-1 overflow-x-auto md:flex-col md:gap-0.5 md:overflow-visible">
+          {NAV_ITEMS.map((item) => {
+            const active = isActive(pathname, item.href);
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "flex items-center gap-2.5 whitespace-nowrap rounded-md px-2.5 py-2 text-sm transition-colors",
+                  active
+                    ? "bg-primary font-medium text-primary-foreground"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+              >
+                <Icon className="size-4 shrink-0" />
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* Lembrete permanente de escopo: quem está aqui lê dado de cliente. */}
+        <div className="mt-auto hidden flex-col gap-1.5 rounded-md border border-border p-3 md:flex">
+          <p className="flex items-center gap-1.5 text-xs font-medium text-foreground">
+            <ShieldCheck className="size-3.5 text-primary" />
+            Acesso de plataforma
+          </p>
+          <p className="text-xs leading-snug text-muted-foreground">
+            Estes números atravessam todos os estúdios. Trate como dado de cliente.
+          </p>
+        </div>
+      </aside>
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="flex items-center justify-between gap-3 border-b border-border bg-card px-4 py-2.5 md:px-8">
+          <p className="truncate text-sm text-muted-foreground">
+            {adminEmail ?? "Administrador da plataforma"}
+          </p>
+          <div className="flex items-center gap-1">
+            <ThemeToggle />
+            <SignOutButton />
+          </div>
+        </header>
+
+        <main className="flex-1 px-4 py-6 md:px-8 md:py-8">{children}</main>
+      </div>
     </div>
   );
 }

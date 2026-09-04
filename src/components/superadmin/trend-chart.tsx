@@ -126,11 +126,11 @@ export function TrendChart({ data, color }: { data: DailyPoint[]; color: string 
 
       {hovered && (
         <div
-          className="pointer-events-none absolute top-0 z-10 -translate-x-1/2 rounded-lg bg-plum-900 px-2.5 py-1.5 text-xs whitespace-nowrap text-white shadow-lg"
+          className="pointer-events-none absolute top-0 z-10 -translate-x-1/2 rounded-md bg-foreground px-2 py-1 text-xs whitespace-nowrap text-background shadow-md"
           style={{ left: `${(hovered.x / WIDTH) * 100}%` }}
         >
           <p className="font-semibold">{hovered.count}</p>
-          <p className="text-white/60">{formatShortDate(hovered.date)}</p>
+          <p className="opacity-70">{formatShortDate(hovered.date)}</p>
         </div>
       )}
     </div>

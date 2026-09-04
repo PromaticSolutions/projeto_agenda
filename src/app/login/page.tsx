@@ -4,10 +4,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { LoginForm } from "@/components/auth/login-form";
 import { DemoModeNotice } from "@/components/auth/demo-mode-notice";
 import { BrandMark } from "@/components/auth/brand-mark";
-import { AuthShell, AUTH_CARD_CLASS } from "@/components/auth/auth-shell";
+import { AuthShell, AuthFooter, AUTH_CARD_CLASS } from "@/components/auth/auth-shell";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 
-export const metadata = { title: "Entrar — Agenda Online" };
+export const metadata = { title: "Entrar — Timely" };
 
 export default function LoginPage() {
   return (
@@ -30,17 +30,24 @@ export default function LoginPage() {
           <Suspense>
             <LoginForm />
           </Suspense>
-          <p className="mt-4 text-center text-sm text-blush-50/70">
-            Ainda não tem conta?{" "}
-            <Link
-              href="/signup"
-              className="font-medium text-blush-50 underline underline-offset-4 hover:text-white"
-            >
-              Criar estúdio
-            </Link>
-          </p>
+          {/* Separado por uma régua em vez de solto embaixo do botão: o
+              caminho de quem NÃO tem conta é outro assunto, e a divisa deixa
+              isso legível sem precisar de mais um título. */}
+          <div className="mt-6 border-t border-white/10 pt-4 text-center">
+            <p className="text-sm text-blush-50/70">
+              Ainda não tem conta?{" "}
+              <Link
+                href="/signup"
+                className="font-medium text-blush-50 underline underline-offset-4 hover:text-white"
+              >
+                Criar estúdio
+              </Link>
+            </p>
+          </div>
         </CardContent>
       </Card>
+
+      <AuthFooter />
     </AuthShell>
   );
 }

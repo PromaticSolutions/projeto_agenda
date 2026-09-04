@@ -1,5 +1,6 @@
 import "server-only";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createServiceRoleSupabaseClient } from "@/lib/supabase/service";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { mockGetReminderSettings, mockUpsertReminderSettings } from "@/lib/mock/store";
 import type { ReminderSettings } from "@/lib/types";
@@ -66,4 +67,21 @@ export async function upsertReminderSettings(
     .single();
   if (error) throw error;
   return data;
+}
+
+/**
+ * Todas as configurações com lembrete LIGADO, de todos os estúdios.
+ *
+ * Só o disparador chama: roda sem sessão de usuário, então usa a service_role
+ * e atravessa a RLS de propósito — é a única leitura do sistema que precisa
+ * enxergar todos os inquilinos de uma vez.
+ */
+export async function listEnabledReminderSettings(): Promise<ReminderSettings[]> {
+  const supabase = createServiceRoleSupabaseClient();
+  const { data, error } = await supabase
+    .from("reminder_settings")
+    .select("*")
+    .eq("enabled", true);
+  if (error) throw error;
+  return data ?? [];
 }

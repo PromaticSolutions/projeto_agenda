@@ -3,7 +3,7 @@ import { BrandMark } from "@/components/auth/brand-mark";
 import { AuthShell, AUTH_CARD_CLASS } from "@/components/auth/auth-shell";
 import { ResetPasswordForm } from "@/components/auth/reset-password-form";
 
-export const metadata = { title: "Nova senha — Agenda Online" };
+export const metadata = { title: "Nova senha — Timely" };
 
 export default function ResetPasswordPage() {
   return (

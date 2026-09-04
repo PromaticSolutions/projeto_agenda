@@ -3,10 +3,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { SignupForm } from "@/components/auth/signup-form";
 import { DemoModeNotice } from "@/components/auth/demo-mode-notice";
 import { BrandMark } from "@/components/auth/brand-mark";
-import { AuthShell, AUTH_CARD_CLASS } from "@/components/auth/auth-shell";
+import { AuthShell, AuthFooter, AUTH_CARD_CLASS } from "@/components/auth/auth-shell";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 
-export const metadata = { title: "Criar conta — Agenda Online" };
+export const metadata = { title: "Criar conta — Timely" };
 
 export default function SignupPage() {
   return (
@@ -27,17 +27,21 @@ export default function SignupPage() {
         </CardHeader>
         <CardContent className="px-6 pb-6">
           <SignupForm />
-          <p className="mt-4 text-center text-sm text-blush-50/70">
-            Já tem conta?{" "}
-            <Link
-              href="/login"
-              className="font-medium text-blush-50 underline underline-offset-4 hover:text-white"
-            >
-              Entrar
-            </Link>
-          </p>
+          <div className="mt-6 border-t border-white/10 pt-4 text-center">
+            <p className="text-sm text-blush-50/70">
+              Já tem conta?{" "}
+              <Link
+                href="/login"
+                className="font-medium text-blush-50 underline underline-offset-4 hover:text-white"
+              >
+                Entrar
+              </Link>
+            </p>
+          </div>
         </CardContent>
       </Card>
+
+      <AuthFooter />
     </AuthShell>
   );
 }

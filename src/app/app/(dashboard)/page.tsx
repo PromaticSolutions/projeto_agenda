@@ -17,7 +17,7 @@ import { formatDateLocal, formatTimeLocal, getStudioPublicUrl } from "@/lib/form
 import { nextLocalDate, prevLocalDate, utcToLocalDate } from "@/lib/availability";
 import { cn } from "@/lib/utils";
 
-export const metadata = { title: "Painel do dia — Agenda Online" };
+export const metadata = { title: "Painel do dia — Timely" };
 
 /**
  * Índice da primeira reserva ainda no futuro — é antes dela que entra a régua
@@ -244,7 +244,7 @@ function BookingRows({
 
 function StatTile({ label, value, accent }: { label: string; value: number; accent: string }) {
   return (
-    <div className="panel overflow-hidden">
+    <div className="panel card-lift overflow-hidden">
       <div className={cn("h-1", accent)} />
       <div className="p-3">
         <output className="block text-2xl font-semibold text-foreground">{value}</output>

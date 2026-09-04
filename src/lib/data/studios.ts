@@ -98,3 +98,12 @@ export async function isSlugAvailable(slug: string, excludeStudioId?: string): P
   if (!existing) return true;
   return existing.id === excludeStudioId;
 }
+
+/** Estúdios por ID, para o disparador montar o nome do salão na mensagem. */
+export async function listStudiosByIds(ids: string[]): Promise<Studio[]> {
+  if (ids.length === 0) return [];
+  const supabase = createServiceRoleSupabaseClient();
+  const { data, error } = await supabase.from("studios").select("*").in("id", ids);
+  if (error) throw error;
+  return data ?? [];
+}
