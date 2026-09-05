@@ -10,6 +10,8 @@ export type ReminderSettings = Database["public"]["Tables"]["reminder_settings"]
 export type WhatsAppConnection = Database["public"]["Tables"]["whatsapp_connections"]["Row"];
 export type PlatformAdmin = Database["public"]["Tables"]["platform_admins"]["Row"];
 export type MessageOutbox = Database["public"]["Tables"]["message_outbox"]["Row"];
+/** Pesquisa de mercado da landing — 0013_market_research_leads.sql. */
+export type MarketResearchLead = Database["public"]["Tables"]["market_research_leads"]["Row"];
 /** Cobrança da plataforma — 0011_billing.sql. */
 export type Plan = Database["public"]["Tables"]["plans"]["Row"];
 export type Subscription = Database["public"]["Tables"]["subscriptions"]["Row"];
@@ -18,6 +20,7 @@ export type Payment = Database["public"]["Tables"]["payments"]["Row"];
 export type BillingEvent = Database["public"]["Tables"]["billing_events"]["Row"];
 export type { BookingStatus, WhatsAppConnectionStatus } from "@/lib/supabase/types";
 export type { MessageOutboxKind, MessageOutboxStatus } from "@/lib/supabase/types";
+export type { LeadInterest } from "@/lib/supabase/types";
 export type {
   BillingGateway,
   InvoiceStatus,

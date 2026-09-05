@@ -21,7 +21,9 @@ export type MessageOutboxKind =
   | "lembrete"
   | "novo_agendamento"
   /** 0012 — mensagem disparada à mão pelo dono em /app/whatsapp. */
-  | "manual";
+  | "manual"
+  /** 0013 — aviso de lead da pesquisa da landing, para o dono da plataforma. */
+  | "lead";
 
 export type MessageOutboxStatus =
   | "pendente"
@@ -29,6 +31,9 @@ export type MessageOutboxStatus =
   | "enviado"
   | "falhou"
   | "cancelado";
+
+/** enum `lead_interest` — 0013_market_research_leads.sql */
+export type LeadInterest = "sim" | "talvez" | "saber_mais" | "nao";
 
 /** enum `whatsapp_connection_status` — 0009_whatsapp_connections.sql */
 export type WhatsAppConnectionStatus =
@@ -310,6 +315,56 @@ export interface Database {
           updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["message_outbox"]["Insert"]>;
+        Relationships: [];
+      };
+      /** 0013_market_research_leads.sql — pesquisa de mercado da landing. */
+      market_research_leads: {
+        Row: {
+          id: string;
+          name: string;
+          phone: string;
+          instagram: string | null;
+          business_name: string | null;
+          email: string | null;
+          profession: string;
+          /** 0014 — opcionais: coletados depois do envio, sem travar o funil. */
+          team_size: string | null;
+          agenda_tools: string[];
+          pain_points: string[];
+          weekly_volume: string | null;
+          whatsapp_reliance: string | null;
+          improvement_wish: string | null;
+          interest: LeadInterest | null;
+          hours_lost_band: string | null;
+          contact_allowed: boolean;
+          privacy_accepted_at: string | null;
+          source: string;
+          utm: Record<string, string> | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          phone: string;
+          instagram?: string | null;
+          business_name?: string | null;
+          email?: string | null;
+          profession: string;
+          team_size?: string | null;
+          agenda_tools?: string[];
+          pain_points?: string[];
+          weekly_volume?: string | null;
+          whatsapp_reliance?: string | null;
+          improvement_wish?: string | null;
+          interest?: LeadInterest | null;
+          hours_lost_band?: string | null;
+          contact_allowed?: boolean;
+          privacy_accepted_at?: string | null;
+          source?: string;
+          utm?: Record<string, string> | null;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["market_research_leads"]["Insert"]>;
         Relationships: [];
       };
       /** 0011_billing.sql — catálogo comercial da plataforma. */
