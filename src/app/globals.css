@@ -326,3 +326,23 @@
     will-change: auto;
   }
 }
+
+/* Flutuação dos selos do hero da landing. `transform` só — o compositor
+   resolve na GPU sem recalcular layout, que é o que permite manter isso
+   rodando numa página que precisa ser rápida no celular.
+
+   Sem `prefers-reduced-motion` nenhum elemento se move: movimento perpétuo é
+   exatamente o que a preferência pede para desligar. */
+@keyframes float-soft {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -7px, 0); }
+}
+
+@utility float-soft {
+  animation: float-soft 5s ease-in-out infinite;
+  will-change: transform;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}

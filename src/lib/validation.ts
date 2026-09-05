@@ -348,3 +348,164 @@ export const reminderSettingsSchema = z
     message: "Informe o link que será enviado, ou desligue a opção de incluir link",
     path: ["link_url"],
   });
+// ---------------------------------------------------------------------------
+// Pesquisa de mercado da landing (0013)
+// ---------------------------------------------------------------------------
+/**
+ * As opções ficam AQUI, não no componente, e o formulário as importa.
+ *
+ * O motivo é concreto: o `value` gravado no banco e o `label` mostrado na tela
+ * precisam andar juntos. Declarados em dois lugares, um ajuste de texto na
+ * interface passaria a gravar valor que o Zod recusa — e a pessoa perderia o
+ * formulário inteiro no envio, depois de nove etapas.
+ */
+
+export const LEAD_PROFESSIONS = [
+  { value: "salao", label: "Salão" },
+  { value: "cabeleireiro", label: "Cabeleireiro(a)" },
+  { value: "barbeiro", label: "Barbeiro(a)" },
+  { value: "manicure", label: "Manicure" },
+  { value: "nail_designer", label: "Nail designer" },
+  { value: "lash_designer", label: "Lash designer" },
+  { value: "estetica", label: "Estética" },
+  { value: "maquiagem", label: "Maquiagem" },
+  { value: "outro", label: "Outro" },
+] as const;
+
+export const LEAD_TEAM_SIZES = [
+  { value: "sozinho", label: "Sozinho(a)" },
+  { value: "2_3", label: "2 a 3 profissionais" },
+  { value: "4_10", label: "4 a 10 profissionais" },
+  { value: "10_mais", label: "Mais de 10" },
+] as const;
+
+export const LEAD_AGENDA_TOOLS = [
+  { value: "whatsapp", label: "WhatsApp" },
+  { value: "instagram", label: "Instagram" },
+  { value: "papel", label: "Papel ou caderno" },
+  { value: "planilha", label: "Planilha" },
+  { value: "outro_sistema", label: "Outro sistema" },
+  { value: "misturo", label: "Misturo vários" },
+] as const;
+
+export const LEAD_PAIN_POINTS = [
+  { value: "faltas", label: "Clientes que faltam" },
+  { value: "esquecer", label: "Esquecer horários" },
+  { value: "organizar_agenda", label: "Organizar a agenda" },
+  { value: "responder_whatsapp", label: "Responder WhatsApp" },
+  { value: "confirmar", label: "Confirmar clientes" },
+  { value: "faturamento", label: "Saber quanto estou faturando" },
+  { value: "organizar_clientes", label: "Organizar clientes" },
+  { value: "outro", label: "Outro" },
+] as const;
+
+export const LEAD_WEEKLY_VOLUMES = [
+  { value: "ate_10", label: "Até 10" },
+  { value: "11_25", label: "11 a 25" },
+  { value: "26_50", label: "26 a 50" },
+  { value: "51_100", label: "51 a 100" },
+  { value: "100_mais", label: "Mais de 100" },
+] as const;
+
+export const LEAD_WHATSAPP_RELIANCE = [
+  { value: "pouco", label: "Pouco" },
+  { value: "medio", label: "Médio" },
+  { value: "muito", label: "Muito" },
+  { value: "quase_tudo", label: "Praticamente tudo" },
+] as const;
+
+export const LEAD_INTERESTS = [
+  { value: "sim", label: "Sim, quero testar" },
+  { value: "talvez", label: "Talvez" },
+  { value: "saber_mais", label: "Quero saber mais" },
+  { value: "nao", label: "Não" },
+] as const;
+
+/** Extrai os `value` de uma lista de opções para montar o enum do Zod. */
+function values<T extends readonly { value: string }[]>(options: T) {
+  return options.map((o) => o.value) as [string, ...string[]];
+}
+
+/**
+ * Faixas de tempo perdido da interação "quanto isso custa".
+ *
+ * É a única "pergunta" que a pessoa responde ANTES do formulário — e ela
+ * responde porque quer ver o resultado, não porque pedimos. Por isso vale
+ * mais que uma pergunta direta, e viaja junto com o lead.
+ */
+export const LEAD_HOURS_BANDS = [
+  { value: "ate_2", label: "Até 2h", hoursPerWeek: 2 },
+  { value: "3_5", label: "3 a 5h", hoursPerWeek: 4 },
+  { value: "6_10", label: "6 a 10h", hoursPerWeek: 8 },
+  { value: "10_mais", label: "Mais de 10h", hoursPerWeek: 12 },
+] as const;
+
+/**
+ * O QUE O FORMULÁRIO EXIGE.
+ *
+ * Cinco campos, e nenhum a mais. Cada campo obrigatório extra é uma chance de
+ * a pessoa desistir no último passo — e quem chega ao fim do funil é
+ * exatamente quem não pode esbarrar em pergunta que ninguém pediu.
+ *
+ * O resto do contexto (equipe, volume, dificuldade) é coletado DEPOIS do
+ * envio, em perguntas opcionais, por `leadContextSchema`.
+ */
+export const leadCaptureSchema = z.object({
+  name: clientNameSchema,
+  // Opcional de propósito: muita gente da beleza atende sem marca própria, e
+  // exigir "nome do negócio" faria essa pessoa inventar um ou desistir.
+  business_name: z
+    .string()
+    .trim()
+    .max(80, "Nome muito longo")
+    .optional()
+    .or(z.literal("")),
+  profession: z.enum(values(LEAD_PROFESSIONS), { message: "Escolha uma opção" }),
+  phone: clientPhoneSchema,
+  email: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .max(160, "E-mail muito longo")
+    .pipe(z.email("Informe um e-mail válido")),
+
+  // Aceite explícito de tratamento de dados. `literal(true)` em vez de
+  // `boolean`: um `false` aqui não é "respondeu que não", é formulário que
+  // não pode ser enviado.
+  privacy_accepted: z.literal(true, {
+    message: "É preciso aceitar o uso dos seus dados para continuar",
+  }),
+
+  // Subprodutos de interações voluntárias, não campos de formulário.
+  hours_lost_band: z.enum(values(LEAD_HOURS_BANDS)).optional(),
+  utm: z.record(z.string(), z.string()).optional(),
+});
+
+export type LeadCapture = z.infer<typeof leadCaptureSchema>;
+
+/**
+ * O CONTEXTO OPCIONAL, oferecido depois do envio.
+ *
+ * Tudo opcional, inclusive o conjunto inteiro: quem fechar a página nesse
+ * ponto já é um lead completo. Serve para o time chegar na conversa sabendo
+ * de que rotina está falando.
+ */
+export const leadContextSchema = z.object({
+  id: z.uuid("Lead inválido"),
+  team_size: z.enum(values(LEAD_TEAM_SIZES)).optional(),
+  agenda_tools: z.array(z.enum(values(LEAD_AGENDA_TOOLS))).max(LEAD_AGENDA_TOOLS.length).optional(),
+  pain_points: z.array(z.enum(values(LEAD_PAIN_POINTS))).max(LEAD_PAIN_POINTS.length).optional(),
+  weekly_volume: z.enum(values(LEAD_WEEKLY_VOLUMES)).optional(),
+  whatsapp_reliance: z.enum(values(LEAD_WHATSAPP_RELIANCE)).optional(),
+  improvement_wish: z.string().trim().max(1000, "Máximo de 1000 caracteres").optional().or(z.literal("")),
+});
+
+export type LeadContext = z.infer<typeof leadContextSchema>;
+
+/** Rótulo de um `value` gravado, para montar o resumo legível da notificação. */
+export function leadLabel(
+  options: readonly { value: string; label: string }[],
+  value: string
+): string {
+  return options.find((o) => o.value === value)?.label ?? value;
+}

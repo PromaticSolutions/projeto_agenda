@@ -590,3 +590,149 @@ consulta do limitador é igualdade, igualdade, faixa — a ordem exata das
 colunas —, resolve com a mesma eficiência, serve qualquer outro recorte por
 `kind`, e cabe em uma migração só. Dividir em 0012 + 0013 resolveria também,
 mas duas migrations para um índice é pior que um índice melhor.
+
+## Landing page (2026-09-04)
+
+A rota `/` era `redirect("/login")`. Agora é a landing.
+
+Uma primeira versão foi construída e descartada na revisão: doze seções, ~2.400
+palavras e um formulário de pesquisa de nove etapas. Explicava bem e convertia
+mal — o visitante precisava LER para entender o produto. A versão atual tem
+nove seções e ~700 palavras.
+
+### Não existe logo "Interavia"
+
+O briefing pedia para usar "a logo Interavia já presente no projeto". Ela não
+existe: zero ocorrências de "interavia" em qualquer arquivo. A única marca do
+projeto é o nó de vidro do Timely — `public/brand/logo.png` (via `SystemLogo`)
+e a versão em WebGL (`GlassKnotMark`/`GlassKnotBackdrop`). Decisão do dono do
+produto: usar a marca existente.
+
+### A landing usa a mesma superfície das telas de auth
+
+Hero e seção de custo são `bg-plum-900` com `AuthParticles`, e o hero tem o
+`GlassKnotBackdrop` — os mesmos componentes do `AuthShell`. É o que faz quem
+clica em "Criar conta" cair numa tela com o mesmo fundo, sem sensação de ter
+trocado de site. Nenhuma cor, fonte ou raio novo foi introduzido; o CSS já
+registrava que gradiente violeta→magenta e `rounded-[2rem] shadow-2xl` foram
+removidos de propósito, e isso foi respeitado.
+
+Só um canvas 3D por página: as outras seções escuras repetem as partículas
+mas não o nó. Dois contextos WebGL na mesma rota dobrariam o custo de GPU para
+repetir um efeito já visto.
+
+### O CTA final não é uma pesquisa
+
+Cinco campos: nome, negócio (opcional), profissão, WhatsApp, e-mail. Cada
+campo obrigatório extra é uma chance de desistir no último passo, e quem chega
+ao fim do funil é exatamente quem não pode esbarrar em pergunta que ninguém
+pediu.
+
+A inteligência de mercado vem por dois caminhos que não pesam na conversão:
+
+1. **A faixa da interação de custo** viaja com o lead (`hours_lost_band`). A
+   pessoa respondeu porque queria ver o número, não porque perguntamos — por
+   isso vale mais que uma pergunta direta, e não é perguntada de novo. O
+   transporte entre a seção e o formulário é um store de módulo com
+   `useSyncExternalStore` (`hours-band.tsx`), e não Context: as duas são
+   irmãs dentro de um Server Component, e um provider carregaria JavaScript em
+   volta de seções que não precisam de nenhum.
+2. **Três perguntas opcionais na tela de confirmação**, gravadas uma a uma por
+   `PATCH /api/leads` sem botão de enviar. Fechar a página ali não perde nada:
+   o lead já está completo.
+
+O CTA fica sempre clicável e diz o que falta no envio. Desabilitá-lo até tudo
+estar preenchido deixava um botão cinza na primeira olhada — parece defeito, e
+não informa o que fazer.
+
+### Mockup em HTML, não screenshot
+
+As prévias de produto são a interface montada com os primitivos do sistema
+(`panel`, `Badge`, fonte mono para dado tabular) — a anatomia de
+`components/app/booking-card.tsx`. Imagem estática seria mais fácil e pior:
+não acompanha o tema claro/escuro, desalinha da interface real no primeiro
+ajuste de layout, e um PNG legível no desktop pesa demais no celular.
+
+### O que a landing NÃO afirma
+
+- **Múltiplos profissionais**: não existe cadastro de equipe no banco (nenhuma
+  tabela de staff em `supabase/migrations`). A seção de dúvidas diz isso
+  explicitamente. Prometer geraria cadastro frustrado no primeiro dia.
+- **Responder mensagem**: o produto envia, não recebe. A demo do WhatsApp
+  mostra a cliente respondendo para o DONO, não para um robô.
+- **Depoimentos**: não há nenhum. O carousel de cenários da primeira versão
+  foi REMOVIDO — era o bloco mais pesado da página e ainda assim não era prova
+  social. Sem depoimento real, melhor não ter a seção.
+- **Dinheiro no simulador**: a interação de custo estima só tempo. Multiplicar
+  por um ticket médio que ninguém informou produziria "R$ 4.200/mês perdidos"
+  — número inventado, e o tipo de afirmação que destrói a confiança no resto
+  da página.
+- **Links de privacidade e termos no rodapé**: essas páginas não existem, e um
+  link para 404 custa mais confiança do que a ausência dele.
+
+### Leads em tabela própria, sem policy de RLS
+
+`market_research_leads` (0013) não é `clients`: cliente é quem marca horário
+num estúdio, com `studio_id` obrigatório. Lead é um profissional avaliando o
+produto, sem estúdio. Juntar os dois obrigaria `studio_id` nulo e desmontaria
+a RLS que isola cliente por estúdio.
+
+A tabela não tem policy nenhuma, igual a `message_outbox`: a landing é
+pública, e uma policy de insert para `anon` deixaria qualquer pessoa despejar
+linhas direto no PostgREST sem passar pela validação. Escrita e leitura só por
+`service_role`, via `/api/leads`.
+
+Preencher o formulário NÃO cria conta e não toca `auth.users` — nenhuma
+autenticação paralela. Quem quiser testar passa pelo `/signup` existente.
+
+A 0014 tornou opcionais os campos que a 0013 exigia e acrescentou
+`business_name`, `email`, `hours_lost_band` e `privacy_accepted_at`. Este
+último é separado de `contact_allowed` de propósito: um é aceite de tratamento
+de dados, o outro é permissão de contato, e juntar os dois faria a base perder
+a distinção justamente quando ela for questionada.
+
+### O aviso do lead entra na fila existente
+
+`enqueueLeadNotification` grava em `message_outbox` com `kind = 'lead'` em vez
+de chamar o gateway na hora. Se a Evolution estiver fora do ar quando o lead
+chega — justamente quando ninguém está olhando —, um envio direto perderia o
+aviso. Na fila ele herda a retentativa, a contagem de tentativas e o histórico
+do disparador que roda de 5 em 5 minutos.
+
+`LEADS_NOTIFY_STUDIO_ID` existe porque a arquitetura amarra instância a
+estúdio e a landing não tem sessão. Falhar no aviso nunca derruba o envio: o
+lead já está gravado, e é o dado que interessa.
+
+O resumo OMITE o que não foi respondido, em vez de imprimir "(não respondeu)":
+ele chega no primeiro envio, quando quase todo o contexto está vazio, e uma
+lista de dez "não respondeu" enterraria os cinco dados que importam.
+
+Consequência conhecida: `STALE_AFTER_MINUTES = 120` no disparador cancela
+mensagem vencida há mais de 2h. Se a fila travar esse tempo, o aviso é
+descartado — o lead permanece no banco. Aceitável para notificação.
+
+### Sem instalar analytics
+
+O projeto não tem nenhum. `src/lib/analytics.ts` marca os pontos de medição e
+despacha um `CustomEvent` no `window`; ligar um provedor depois é um
+`addEventListener` num lugar só. Escolher ferramenta de analytics é decisão de
+produto (custo, LGPD, onde o dado fica), não algo para um arquivo de landing
+resolver — e instrumentar as seções depois seria varrer a landing de novo.
+
+### Detalhes que custaram tempo
+
+- **`setState` dentro de efeito** é recusado pelo lint do React Compiler. O
+  tratamento de `prefers-reduced-motion` virou CSS (`motion-reduce:opacity-100`)
+  em vez de JavaScript — melhor de qualquer forma: quem pediu menos movimento
+  não deve depender de um observer disparar para ler a página.
+- **`nativeButton={false}`** é obrigatório no `Button` do Base UI quando ele
+  renderiza um `<Link>`/`<a>`: sem isso o componente promete semântica de
+  `<button>`, entrega um `<a>`, e reclama no console. O mesmo padrão existe em
+  cinco lugares fora da landing (error.tsx, superadmin/layout.tsx,
+  demo-mode-notice.tsx, entre outros) e continua sem a correção.
+- **`scroll-mt-16`** nas seções com âncora: o header é sticky com `h-16`, e sem
+  isso clicar num link do menu esconde o topo da seção atrás dele.
+- **`noscript`**: as seções entram com `opacity-0`. Sem JavaScript a página
+  ficaria em branco (cenário de rastreador ou bundle abortado), então há uma
+  regra `<noscript>` que neutraliza o efeito.
+- A rota `/` sai **estática** no build, apesar das seções interativas.
