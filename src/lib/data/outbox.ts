@@ -47,6 +47,49 @@ export async function enqueueReminders(messages: PlannedMessage[]): Promise<numb
 }
 
 /**
+ * Tempo que uma mensagem pode ficar em "enviando" antes de ser considerada
+ * abandonada.
+ *
+ * A rota do disparador tem `maxDuration = 60`, então uma execução viva jamais
+ * chega perto disto — a folga existe para não competir com um lote que ainda
+ * está rodando.
+ */
+export const STUCK_AFTER_MINUTES = 15;
+
+/**
+ * Devolve à fila as mensagens que ficaram penduradas em "enviando".
+ *
+ * O buraco que isto tapa: `claim_pending_messages` marca o lote como
+ * "enviando" ANTES do envio, de propósito (é o que impede dois disparadores de
+ * mandarem a mesma mensagem duas vezes). Se o processo morrer entre a
+ * reivindicação e o desfecho — timeout da plataforma, deploy no meio da
+ * execução, crash —, a linha fica "enviando" para sempre: nenhuma execução
+ * futura a reivindica (o claim só olha "pendente") e ela nunca vira "falhou".
+ * O lembrete simplesmente não sai, e não aparece em lugar nenhum como
+ * problema.
+ *
+ * A tentativa consumida NÃO é devolvida. A reivindicação já a contou, e
+ * devolvê-la faria uma mensagem que derruba o processo toda vez ficar tentando
+ * para sempre — o teto de `MAX_SEND_ATTEMPTS` existe justamente para isso.
+ */
+export async function requeueStuckMessages(now = new Date()): Promise<number> {
+  const cutoff = new Date(now.getTime() - STUCK_AFTER_MINUTES * 60_000).toISOString();
+  const supabase = createServiceRoleSupabaseClient();
+  const { data, error } = await supabase
+    .from("message_outbox")
+    .update({
+      status: "pendente",
+      last_error: "O disparador foi interrompido antes de concluir o envio",
+      updated_at: now.toISOString(),
+    })
+    .eq("status", "enviando")
+    .lt("updated_at", cutoff)
+    .select("id");
+  if (error) throw error;
+  return data?.length ?? 0;
+}
+
+/**
  * Reivindica o próximo lote pronto para sair, marcando-o como "enviando".
  * A atomicidade vem da função SQL — ver o comentário em 0010.
  */

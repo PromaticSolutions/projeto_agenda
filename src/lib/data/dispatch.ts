@@ -17,6 +17,7 @@ import {
   markMessageAttemptFailed,
   markMessageSent,
   releaseMessage,
+  requeueStuckMessages,
 } from "@/lib/data/outbox";
 import {
   REMINDER_PLAN_HORIZON_MINUTES,
@@ -56,6 +57,8 @@ export interface DispatchReport {
   enfileiradas: number;
   canceladasPorCancelamento: number;
   reivindicadas: number;
+  /** Voltaram de "enviando" para a fila por abandono. Ver `requeueStuckMessages`. */
+  reenfileiradas: number;
   enviadas: number;
   falhas: number;
   adiadas: number;
@@ -212,7 +215,14 @@ export async function sendDueMessages(options?: {
   const now = options?.now ?? new Date();
   const limit = options?.limit ?? SEND_BATCH_LIMIT;
 
-  const vazio = { reivindicadas: 0, enviadas: 0, falhas: 0, adiadas: 0, expiradas: 0 };
+  const vazio = {
+    reivindicadas: 0,
+    reenfileiradas: 0,
+    enviadas: 0,
+    falhas: 0,
+    adiadas: 0,
+    expiradas: 0,
+  };
 
   if (!provider) {
     return {
@@ -223,8 +233,15 @@ export async function sendDueMessages(options?: {
     };
   }
 
+  /* Antes de reivindicar: o que ficou preso em "enviando" numa execução que
+     não terminou volta para a fila. Precisa vir ANTES do claim para que a
+     mensagem resgatada possa sair nesta mesma rodada, e não só na seguinte. */
+  const reenfileiradas = await requeueStuckMessages(now);
+
   const claimed = await claimDueMessages(limit);
-  if (claimed.length === 0) return { ...vazio, gateway: provider.name };
+  if (claimed.length === 0) {
+    return { ...vazio, reenfileiradas, gateway: provider.name };
+  }
 
   // Um sync por estúdio, não por mensagem: dez lembretes do mesmo salão
   // compartilham a mesma sessão.
@@ -299,7 +316,15 @@ export async function sendDueMessages(options?: {
     }
   }
 
-  return { reivindicadas: claimed.length, enviadas, falhas, adiadas, expiradas, gateway: provider.name };
+  return {
+    reivindicadas: claimed.length,
+    reenfileiradas,
+    enviadas,
+    falhas,
+    adiadas,
+    expiradas,
+    gateway: provider.name,
+  };
 }
 
 // ---------------------------------------------------------------------------
