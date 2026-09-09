@@ -931,3 +931,86 @@ para preencher o remetente — que nem é mais o desenho.
 Server Action é endpoint público. O layout do /superadmin esconder a tela não
 impede alguém de chamar a action direto, então o guard está em cada uma, não só
 na rota. Mesmo raciocínio do lado do estúdio, onde o guard é `getMyStudio()`.
+
+## Auditoria do funil de leads e da fila (2026-09-09)
+
+### O QR da plataforma nunca esteve quebrado no gateway
+
+A tela do superadmin mostrava o rótulo "aguardando leitura do QR" e uma imagem
+quebrada. A causa não era a Evolution: `connect()` remove o prefixo
+`data:image/png;base64,` da resposta (o adaptador devolve base64 puro, como o
+tipo `ProviderPairing` declara), e o painel entregava essa string ao
+`next/image` como se fosse uma URL. O painel do estúdio sempre montou a data
+URL na hora de renderizar; o da plataforma foi escrito depois e ficou fora do
+padrão.
+
+Duas consequências do mesmo desalinhamento foram corrigidas junto:
+
+- O QR só era exibido enquanto `status === "conectando"`, e o polling de 3s
+  sobrescreve esse status. Durante o pareamento a Evolution alterna entre
+  `connecting` e `close` a cada código novo, então o QR sumia da tela no
+  primeiro `close`. Agora o material de pareamento tem estado próprio e só sai
+  quando conecta, quando dá erro, ou quando o teto de polling expira.
+- Quando a 2.3.7 responde à primeira conexão sem QR (ela espera 2s e o código
+  pode não ter nascido), a tela ficava muda. Agora diz para gerar de novo.
+
+### O webhook não conhecia a instância da plataforma
+
+`handleEvent` procurava a instância em `whatsapp_connections` e devolvia
+"não é nossa" para qualquer nome que não estivesse lá — inclusive
+`<prefixo>_plataforma`, que mora na linha única de `platform_whatsapp`. O
+efeito: a sessão da plataforma podia morrer no celular e o banco seguir dizendo
+"conectado" até alguém abrir a tela e clicar em atualizar, com o aviso de lead
+sendo enfileirado para um remetente que não existia mais.
+
+### A tela de leads é o registro; o WhatsApp é a notificação
+
+O aviso tem três pontos de falha fora do controle de quem espera por ele:
+sessão caída, destino não configurado, disparador parado. Enquanto o único
+canal era o WhatsApp, um lead que caísse em qualquer um dos três ficava
+gravado e invisível dentro do produto. `/superadmin/leads` fecha isso, e quando
+o aviso não pode sair a tela diz qual condição falta em vez de deixar a
+pergunta para outra tela.
+
+### Mensagem presa em "enviando" agora volta para a fila
+
+`claim_pending_messages` marca o lote como "enviando" ANTES do envio — é o que
+impede dois disparadores de mandarem a mesma mensagem duas vezes. O preço é que
+um processo morto no meio (timeout, deploy, crash) deixa a linha pendurada:
+nenhuma execução futura a reivindica, porque o claim só olha "pendente", e ela
+nunca vira "falhou". O lembrete não sai e não aparece como problema em lugar
+nenhum.
+
+`requeueStuckMessages` roda ANTES do claim, para que o resgate possa sair na
+mesma rodada. A tentativa consumida não é devolvida: uma mensagem que derruba o
+processo toda vez precisa esbarrar em `MAX_SEND_ATTEMPTS` em vez de tentar para
+sempre.
+
+### Teto anti-abuso nos dois caminhos públicos que não tinham
+
+`/api/leads` já contava envios por janela no banco; `/api/bookings` e
+`/api/data-requests` não contavam nada.
+
+- Agendamentos: a constraint anti-colisão impede duas marcações no mesmo
+  horário, não impede encher a agenda inteira com horários diferentes. Trinta
+  por estúdio a cada dez minutos é folgado o bastante para nenhum salão real
+  esbarrar — e dez minutos de espera custa muito menos que uma agenda
+  inutilizada.
+- Solicitações do titular: não exigir identidade é o que torna o canal
+  utilizável, e é também o que o deixa aberto. Dez por estúdio a cada dez
+  minutos nunca alcança quem realmente precisa exercer um direito.
+
+A contagem é no banco nos dois casos, pelo mesmo motivo do lead: na plataforma
+cada requisição pode cair numa instância diferente, e um contador em memória
+começaria do zero em cada uma. A 0018 acrescenta o índice que a contagem de
+agendamentos usa.
+
+### O que foi encontrado e NÃO foi mexido
+
+- `message_outbox_kind` tem `'novo_agendamento'` desde a 0010, e nada no código
+  produz esse tipo. O aviso ao dono acontece pelo `wa.me` que a própria cliente
+  dispara na tela de sucesso (RISKS.md #7). Ligar o envio automático somaria um
+  segundo aviso para o mesmo fato — é decisão de produto, não conserto.
+- `PATCH /api/leads` e `updateLeadContext` não têm chamador: o formulário virou
+  multi-etapas e manda o contexto inteiro na captura. A rota continua de pé e
+  validada; remover é limpeza, não correção.
