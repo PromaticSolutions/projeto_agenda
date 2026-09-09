@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SystemLogo } from "@/components/system-logo";
+import { CookiePreferencesButton } from "@/components/cookie-consent-banner";
 
 /**
  * Rodapé.
@@ -38,13 +39,27 @@ export function SiteFooter() {
         </div>
 
         <div className="border-t border-border pt-6">
-          <p className="text-sm text-muted-foreground">
-            © {year} Timely · Promatic Solutions. Agendamento online para
-            negócios de horário marcado.
-          </p>
-          {/* Sem "Privacidade" e "Termos" aqui: essas páginas não existem no
-              projeto, e um link para 404 no rodapé custa mais confiança do
-              que a ausência dele. Quando existirem, entram nesta lista. */}
+          <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+            <p className="text-sm text-muted-foreground">
+              © {year} Timely · Promatic Solutions. Agendamento online para
+              negócios de horário marcado.
+            </p>
+            <nav className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm" aria-label="Legal">
+              <Link
+                href="/politica-de-privacidade"
+                className="text-muted-foreground hover:text-foreground"
+              >
+                Privacidade
+              </Link>
+              <Link href="/termos-de-uso" className="text-muted-foreground hover:text-foreground">
+                Termos de uso
+              </Link>
+              {/* "Cookies" não leva a lugar nenhum: reabre o aviso, que é o
+                  caminho de rever a decisão. Só aparece quando existe decisão
+                  para revisar. */}
+              <CookiePreferencesButton className="text-sm" />
+            </nav>
+          </div>
         </div>
       </div>
     </footer>

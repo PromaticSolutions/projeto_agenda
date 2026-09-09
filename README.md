@@ -35,11 +35,12 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 
 **Depois de preencher as chaves, rode TODAS as migrações de
 [`supabase/migrations/`](supabase/migrations/) em ordem numérica** (0001,
-0002, … 0011) no SQL Editor do seu projeto (Dashboard → SQL Editor → New
+0002, … 0017) no SQL Editor do seu projeto (Dashboard → SQL Editor → New
 query, cole o arquivo inteiro e rode), ou via qualquer conexão direta ao
 Postgres. Elas criam as tabelas, a constraint anti-colisão de horário, as
 policies de RLS, os grants de tabela, o CRM de clientes, a fila de
-mensagens e a cobrança da plataforma.
+mensagens, a cobrança da plataforma, o registro de consentimento e o
+WhatsApp da própria plataforma.
 
 Cada tela avisa quando falta a migração dela em vez de estourar erro — se
 o painel disser "rode a migração 00XX", é literalmente isso.
@@ -73,11 +74,23 @@ um provedor de e-mail, desative em Authentication → Providers → Email →
 - `src/lib/availability.ts` — algoritmo de horários livres (com testes).
 - `src/lib/data/*` — camada de dados; alterna Supabase real ↔ mock conforme `.env.local`.
 - `src/lib/mock/store.ts` — dados fictícios usados quando o Supabase não está configurado.
-- `src/app/superadmin` — painel da plataforma (visão geral, clientes, faturamento).
+- `src/app/superadmin` — painel da plataforma (visão geral, clientes,
+  faturamento, leads, WhatsApp).
 - `src/lib/billing.ts` — vocabulário e aritmética da cobrança (com testes).
 - `src/lib/data/billing.ts` / `src/lib/data/platformMetrics.ts` — leituras do superadmin (dinheiro e uso).
 - `supabase/migrations/0001_init.sql` — schema + RLS + constraint anti-colisão.
 - `supabase/migrations/0011_billing.sql` — planos, assinaturas, faturas e pagamentos.
+- `supabase/migrations/0015_consents.sql` — prova datada de consentimento do
+  titular (LGPD), amarrada ao agendamento. Sem ela o agendamento público
+  falha ao registrar o aceite — o horário é gravado do mesmo jeito, mas a
+  API devolve `consent: "falhou"` e o log acusa.
+- `supabase/migrations/0016_data_subject_requests.sql` — canal do art. 18
+  (acesso, correção, exclusão), em `/[slug]/meus-dados`, resolvido em
+  `/app/privacidade`.
+- `supabase/migrations/0017_platform_whatsapp.sql` — instância de WhatsApp da
+  PLATAFORMA, separada da de cada estúdio. É por ela que o aviso de lead novo
+  chega; configura-se em `/superadmin/whatsapp`. Também torna
+  `message_outbox.studio_id` opcional: nulo = mensagem da plataforma.
 
 Decisões e riscos documentados em [DECISIONS.md](DECISIONS.md) e
 [RISKS.md](RISKS.md). Status do projeto em [REPORT.md](REPORT.md).
@@ -89,7 +102,7 @@ comum vê "acesso restrito", não um loop de login. Todas as leituras usam a
 `service_role` key e atravessam RLS de propósito; a autorização acontece
 uma vez, no layout.
 
-Três telas:
+Cinco telas:
 
 - **Visão geral** — receita recorrente, uso da base e um bloco "precisa de
   atenção" (faturas em atraso, testes vencendo, estúdios que pararam de
@@ -101,6 +114,14 @@ Três telas:
 - **Faturamento** (`/superadmin/billing`) — MRR, receita realizada por mês,
   método de pagamento, inadimplência por faixa de atraso e a lista de
   faturas com filtro.
+- **Leads** (`/superadmin/leads`) — quem preencheu o formulário da página
+  inicial, do mais recente para o mais antigo, com link direto para o WhatsApp
+  e para o e-mail. É o REGISTRO; o aviso no WhatsApp é a notificação, e ela
+  tem três pontos de falha (sessão caída, destino não configurado, disparador
+  parado). Quando algum deles está em pé, a tela diz qual.
+- **WhatsApp** (`/superadmin/whatsapp`) — a instância da plataforma (quem
+  ENVIA o aviso de lead) e o número que RECEBE. São dois campos porque o
+  WhatsApp não entrega mensagem sem remetente.
 
 ### O que cada número significa
 

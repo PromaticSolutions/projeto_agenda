@@ -10,6 +10,7 @@ import {
   Clock,
   MessageCircle,
   Scissors,
+  ShieldCheck,
   Settings,
   Users,
 } from "lucide-react";
@@ -47,6 +48,7 @@ const NAV_GROUPS = [
   {
     label: "Sistema",
     items: [
+      { href: "/app/privacidade", label: "Privacidade", icon: ShieldCheck },
       { href: "/app/account", label: "Conta", icon: CircleUserRound },
       { href: "/app/settings", label: "Configurações", icon: Settings },
     ],

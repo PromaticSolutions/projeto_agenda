@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Reveal } from "@/components/landing/reveal";
 import { cn } from "@/lib/utils";
 import { track } from "@/lib/analytics";
+import { GlassKnotBackdrop } from "@/components/auth/glass-knot";
 
 /**
  * Demonstração do WhatsApp.
@@ -107,11 +108,16 @@ export function WhatsAppDemo() {
   return (
     <section
       id="whatsapp"
-      className="scroll-mt-16 border-b border-border bg-plum-900 py-20 text-blush-50 sm:py-28"
+      className="relative scroll-mt-16 overflow-hidden border-b border-border bg-plum-900 py-20 text-blush-50 sm:py-28"
     >
-      <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
+      {/* Ver a nota em `cost-interaction.tsx`: toda superfície plum leva a peça,
+          menor e fora do caminho do texto. Aqui o vazio é o alto à direita,
+          acima do painel da conversa. */}
+      <GlassKnotBackdrop scale={0.7} focusX={0.78} focusY={0.2} portraitX={0.72} portraitY={0.985} />
+
+      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 sm:px-6">
         <Reveal sectionName="whatsapp" className="max-w-2xl">
-          <h2 className="text-[2rem] leading-[1.12] font-semibold tracking-tight text-balance sm:text-[2.5rem]">
+          <h2 className="text-[2rem] leading-[1.12] font-semibold text-balance sm:text-[2.5rem]">
             O lembrete que você nunca mais precisa mandar.
           </h2>
           <p className="mt-4 text-[1.0625rem] leading-7 text-blush-50/75">
@@ -150,7 +156,7 @@ export function WhatsAppDemo() {
                     {done ? (
                       <Check className="size-3.5" />
                     ) : (
-                      <span className="font-mono text-[0.625rem]">{i + 1}</span>
+                      <span className="tabular-nums text-[0.625rem]">{i + 1}</span>
                     )}
                   </span>
                   <div className="min-w-0">

@@ -9,12 +9,15 @@ import { cn } from "@/lib/utils";
 /**
  * A marca do produto é um nó de toro em vidro, renderizado ao vivo em WebGL —
  * o mesmo objeto aparece pequeno ao lado do nome ({@link GlassKnotMark}) e
- * grande ao fundo das telas de autenticação ({@link GlassKnotBackdrop}).
+ * grande ao fundo de toda superfície plum ({@link GlassKnotBackdrop}): as
+ * telas de autenticação e, na landing, o hero e as seções escuras.
  *
- * São dois <canvas> independentes de propósito: o do fundo precisa acompanhar
- * o ponteiro e o tamanho da janela, o da marca é fixo e discreto. Compartilhar
- * um renderizador entre eles exigiria compor as duas vistas em um único canvas
- * posicionado por cima do layout, o que amarraria a marca à posição do fundo.
+ * Cada fundo é um <canvas> independente, com o próprio contexto WebGL, e cada
+ * um mede a PRÓPRIA caixa. Compartilhar um renderizador entre seções exigiria
+ * um canvas fixo por cima do layout inteiro, recortado por seção — o que
+ * amarraria cada peça à posição das outras e quebraria na primeira rolagem.
+ * O preço dessa independência é o laço de animação: ver `setActive`, que
+ * garante que só o que está em tela gasta quadro.
  *
  * O `three` é carregado por import dinâmico DENTRO do efeito: mesmo depois do
  * tree-shaking é a maior dependência do projeto, e assim ela não entra no
@@ -43,9 +46,37 @@ const BACKDROP_KNOT_RATIO = 0.075;
 
 type KnotSetup = {
   canvas: HTMLCanvasElement;
-  /** Fundo: preenche a janela, tem plano de fundo próprio e segue o ponteiro.
+  /** Fundo: opaco, com plano de fundo próprio, seguindo o ponteiro.
    *  Marca: canvas pequeno e transparente, só com a rotação. */
   fullscreen: boolean;
+  /** Multiplicador sobre {@link BACKDROP_KNOT_RATIO}. Existe porque a peça
+   *  agora ocupa recortes de alturas muito diferentes: a tela inteira do
+   *  login, o hero, uma faixa de conteúdo no meio da landing. O mesmo valor
+   *  em todos deixaria o nó dominante numa e invisível na outra. */
+  scale: number;
+  /** Onde a peça fica, em fração da caixa (0..1, canto superior esquerdo na
+   *  origem). O nó E o halo que ele refrata andam JUNTOS para cá — mover só um
+   *  dos dois tira do vidro a fonte de luz que ele deforma, e o cristal vira
+   *  silhueta cinza. Dois números soltos, e não um objeto: um `{x, y}` como
+   *  prop trocaria de identidade a cada render e remontaria o WebGL junto. */
+  focusX: number;
+  focusY: number;
+  /** O mesmo ponto, para quando a caixa está em RETRATO — o celular, onde a
+   *  seção vira uma coluna só e o vazio muda de lugar junto. Sem isto, um
+   *  ponto escolhido para a folga entre duas colunas cai em cima do texto
+   *  assim que as colunas viram uma. */
+  portraitX: number;
+  portraitY: number;
+};
+
+/**
+ * O que a montagem devolve. `setActive` liga e desliga o laço de animação sem
+ * derrubar o contexto WebGL — recriar o contexto a cada rolagem custaria o
+ * mapa de ambiente inteiro de novo, que é a parte cara da montagem.
+ */
+type KnotHandle = {
+  dispose: () => void;
+  setActive: (active: boolean) => void;
 };
 
 /**
@@ -53,7 +84,15 @@ type KnotSetup = {
  * nada aqui depende de estado ou de re-render, e manter o ciclo de vida do
  * WebGL num único par montar/desmontar evita vazar contexto gráfico.
  */
-async function mountGlassKnot({ canvas, fullscreen }: KnotSetup): Promise<() => void> {
+async function mountGlassKnot({
+  canvas,
+  fullscreen,
+  scale,
+  focusX,
+  focusY,
+  portraitX,
+  portraitY,
+}: KnotSetup): Promise<KnotHandle> {
   const THREE = await import("three");
   const { RoomEnvironment } = await import("three/addons/environments/RoomEnvironment.js");
 
@@ -189,11 +228,11 @@ async function mountGlassKnot({ canvas, fullscreen }: KnotSetup): Promise<() => 
     /* Halo atrás do nó. É a fonte de luz que a refração vai deslocar: contra
        um fundo uniformemente escuro o vidro não teria o que dobrar e sumiria. */
     const halo = ctx.createRadialGradient(
-      w * 0.5,
-      h * 0.46,
+      w * atX,
+      h * atY,
       0,
-      w * 0.5,
-      h * 0.46,
+      w * atX,
+      h * atY,
       Math.max(w, h) * 0.42
     );
     halo.addColorStop(0, "rgba(226, 210, 255, 0.3)");
@@ -232,11 +271,11 @@ async function mountGlassKnot({ canvas, fullscreen }: KnotSetup): Promise<() => 
       sctx.filter = "none";
       sctx.globalCompositeOperation = "destination-in";
       const mask = sctx.createRadialGradient(
-        w * 0.5,
-        h * 0.46,
+        w * atX,
+        h * atY,
         0,
-        w * 0.5,
-        h * 0.46,
+        w * atX,
+        h * atY,
         Math.max(w, h) * 0.24
       );
       /* O raio mal ultrapassa a silhueta do nó: o que vaza para fora lê como
@@ -273,10 +312,29 @@ async function mountGlassKnot({ canvas, fullscreen }: KnotSetup): Promise<() => 
     }
   }
 
+  /** Se o laço de animação está correndo. Ver `setActive`. */
+  let running = false;
+
+  /* O ponto em vigor. `resize` escolhe entre paisagem e retrato e `drawBackdrop`
+     lê daqui, para que o halo e o nó nunca saiam de sincronia. */
+  let atX = focusX;
+  let atY = focusY;
+
   /** Reajusta câmera, renderizador e escala do nó ao tamanho atual do canvas. */
   function resize(redrawBackdrop: boolean) {
-    const width = fullscreen ? window.innerWidth : canvas.clientWidth || 1;
-    const height = fullscreen ? window.innerHeight : canvas.clientHeight || 1;
+    // Retrato é a caixa mais alta que larga — a mesma medida que decide se o
+    // nó é limitado pela largura ou pela altura, logo abaixo.
+    const portrait = (canvas.clientHeight || 1) > (canvas.clientWidth || 1);
+    atX = portrait ? portraitX : focusX;
+    atY = portrait ? portraitY : focusY;
+    /* A MEDIDA É A DO CANVAS, nos dois modos — não a da janela.
+       O buffer de desenho é esticado para caber na caixa CSS do elemento, então
+       medir a janela só dava certo enquanto o único fundo existente ocupava a
+       tela inteira. Numa seção mais baixa que a janela, o nó saía achatado na
+       horizontal. Com o elemento como referência a proporção fecha em qualquer
+       recorte, e é o que permite a mesma peça no hero e no meio da página. */
+    const width = canvas.clientWidth || 1;
+    const height = canvas.clientHeight || 1;
 
     // `false`: não mexer no style do canvas — quem manda no tamanho em CSS é
     // o layout (inset-0 no fundo, size-* na marca).
@@ -289,23 +347,44 @@ async function mountGlassKnot({ canvas, fullscreen }: KnotSetup): Promise<() => 
         2 * CAMERA_Z * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
       const visibleWidth = visibleHeight * camera.aspect;
       backdropPlane?.scale.set(visibleWidth, visibleHeight, 1);
-      knot.scale.setScalar(Math.min(visibleWidth, visibleHeight) * BACKDROP_KNOT_RATIO);
+      knot.scale.setScalar(
+        Math.min(visibleWidth, visibleHeight) * BACKDROP_KNOT_RATIO * scale
+      );
+
+      /* O nó vive em {@link KNOT_Z}, mais PERTO da câmera que o plano de
+         fundo — então o pedaço de mundo visível na altura dele é menor que o
+         do plano, e converter a fração da tela com o frustum do fundo jogaria
+         a peça para fora do ponto. Daí a medida própria. */
+      const knotHeight =
+        2 * (CAMERA_Z - KNOT_Z) * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+      knot.position.x = knotHeight * camera.aspect * (atX - 0.5);
+      knot.position.y = knotHeight * (0.5 - atY);
 
       if (redrawBackdrop) drawBackdrop(width, height);
     }
 
-    /* Trocar de tamanho descarta o conteúdo do buffer. Com movimento, o
-       próximo quadro já repõe; sem movimento não há próximo quadro, e o canvas
-       ficaria em branco depois de girar o celular ou arrastar a janela. */
-    if (reducedMotion) renderer.render(scene, camera);
+    /* Trocar de tamanho descarta o conteúdo do buffer. Com o laço correndo o
+       próximo quadro já repõe; parado não há próximo quadro, e o canvas ficaria
+       em branco depois de girar o celular ou arrastar a janela. Vale para quem
+       pediu menos movimento e também para a seção que foi redimensionada
+       enquanto estava fora da tela. */
+    if (!running) renderer.render(scene, camera);
   }
 
-  /* Ponteiro em coordenadas normalizadas (-1..1), só no fundo: é ele que
-     transforma a peça de enfeite em algo que responde a quem está lendo. */
+  /* Ponteiro em coordenadas normalizadas (-1..1) DENTRO do canvas, só no
+     fundo: é ele que transforma a peça de enfeite em algo que responde a quem
+     está lendo. Relativo ao elemento, e não à janela, para que cada seção
+     reaja ao ponteiro sobre ela mesma — normalizar pela janela faria o nó do
+     meio da página inclinar por causa de um cursor que está longe dele.
+     O `return` antecipado é o que mantém a leitura de layout restrita à seção
+     que está de fato animando. */
   const pointer = { x: 0, y: 0 };
   const handlePointerMove = (event: PointerEvent) => {
-    pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
-    pointer.y = (event.clientY / window.innerHeight) * 2 - 1;
+    if (!running) return;
+    const rect = canvas.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    pointer.y = ((event.clientY - rect.top) / rect.height) * 2 - 1;
   };
 
   /* `Timer` e não `Clock` (que o three 0.185 marca como obsoleto): ligado ao
@@ -332,33 +411,43 @@ async function mountGlassKnot({ canvas, fullscreen }: KnotSetup): Promise<() => 
   resize(true);
 
   let resizeTimer: ReturnType<typeof setTimeout> | undefined;
-  const handleResize = () => {
+  /* Um ResizeObserver no canvas serve os dois modos agora que a medida saiu da
+     janela. Ele cobre o que `window.onresize` cobria e mais o que ela não via:
+     uma seção que muda de altura porque o carrossel trocou de slide ou porque
+     uma pergunta do FAQ abriu. */
+  const observer = new ResizeObserver(() => {
     // Reenquadra a cada evento (barato) e só redesenha a textura do fundo
     // quando o arrasto para — redesenhar a cada pixel trava o redimensionar.
     resize(false);
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => resize(true), 150);
-  };
+  });
+  observer.observe(canvas);
 
-  let observer: ResizeObserver | null = null;
-  if (fullscreen) {
-    window.addEventListener("resize", handleResize);
-    if (!reducedMotion) window.addEventListener("pointermove", handlePointerMove);
-  } else {
-    // A marca muda de tamanho por breakpoint, não por resize da janela.
-    observer = new ResizeObserver(() => resize(false));
-    observer.observe(canvas);
+  if (fullscreen && !reducedMotion) {
+    window.addEventListener("pointermove", handlePointerMove);
   }
 
-  if (!reducedMotion) renderer.setAnimationLoop(render);
+  /**
+   * Liga e desliga o laço. Quem chama é o hook, a partir do que o
+   * IntersectionObserver diz — com uma instância por seção roxa, deixar as três
+   * girando somaria três passagens de refração por quadro para desenhar duas
+   * delas fora da vista.
+   */
+  const setActive = (active: boolean) => {
+    // Sem movimento não há laço para pausar: a pose única já foi desenhada.
+    if (reducedMotion || active === running) return;
+    running = active;
+    renderer.setAnimationLoop(active ? render : null);
+  };
 
-  return () => {
+  const dispose = () => {
     renderer.setAnimationLoop(null);
+    running = false;
     timer.disconnect();
     clearTimeout(resizeTimer);
-    window.removeEventListener("resize", handleResize);
     window.removeEventListener("pointermove", handlePointerMove);
-    observer?.disconnect();
+    observer.disconnect();
 
     knot.geometry.dispose();
     knot.material.dispose();
@@ -369,61 +458,122 @@ async function mountGlassKnot({ canvas, fullscreen }: KnotSetup): Promise<() => 
     pmrem.dispose();
     renderer.dispose();
   };
+
+  return { dispose, setActive };
 }
 
-function useGlassKnot(fullscreen: boolean) {
+function useGlassKnot(
+  fullscreen: boolean,
+  scale: number,
+  focusX: number,
+  focusY: number,
+  portraitX: number,
+  portraitY: number
+) {
   const ref = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     const canvas = ref.current;
     if (!canvas) return;
 
-    let dispose: (() => void) | null = null;
+    let handle: KnotHandle | null = null;
     let cancelled = false;
+    let onScreen = false;
 
-    const start = () => {
-      mountGlassKnot({ canvas, fullscreen })
-        .then((teardown) => {
+    // "Girando": em tela e com a aba à frente. É a mesma chave do
+    // `landing/agenda-preview.tsx` — um laço que ninguém vê é bateria gasta.
+    const sync = () => handle?.setActive(onScreen && !document.hidden);
+
+    /* As DUAS condições para montar: em tela e com tamanho. Nenhuma sozinha
+       basta — um elemento pode estar na vista e ainda medir zero (o painel de
+       apresentação do login enquanto o breakpoint não vira), e pode ter
+       tamanho estando a três seções de distância. Montar sem tamanho gastaria
+       um contexto WebGL e um mapa de ambiente para desenhar em canvas nenhum;
+       montar fora da vista gastaria os dois adiantado, em celular, que é onde
+       sobra menos fôlego. */
+    let started = false;
+    const maybeStart = () => {
+      if (started || cancelled || !onScreen || canvas.clientWidth === 0) return;
+      started = true;
+      mountGlassKnot({ canvas, fullscreen, scale, focusX, focusY, portraitX, portraitY })
+        .then((mounted) => {
           // O efeito pode ter sido desfeito enquanto o `three` carregava; sem
           // isto o contexto WebGL ficaria órfão a cada navegação.
-          if (cancelled) teardown();
-          else dispose = teardown;
+          if (cancelled) mounted.dispose();
+          else {
+            handle = mounted;
+            sync();
+          }
         })
         .catch(() => {
           // Sem WebGL não há peça 3D — e nada na tela depende dela.
         });
     };
 
-    /* O painel de apresentação é `hidden` abaixo de lg, e a marca dentro dele
-       mede zero. Montar assim mesmo gastaria um contexto WebGL e um mapa de
-       ambiente para desenhar em canvas nenhum — em celular, justamente onde
-       sobra menos fôlego. Espera o elemento ganhar tamanho. */
-    let pending: ResizeObserver | null = null;
-    if (fullscreen || canvas.clientWidth > 0) {
-      start();
-    } else {
-      pending = new ResizeObserver(() => {
-        if (canvas.clientWidth === 0) return;
-        pending?.disconnect();
-        pending = null;
-        start();
-      });
-      pending.observe(canvas);
-    }
+    /* A margem adianta a montagem o suficiente para a peça já estar girando
+       quando a seção encosta na tela, em vez de aparecer parada e ganhar
+       movimento um quadro depois. */
+    const visibility = new IntersectionObserver(
+      ([entry]) => {
+        onScreen = entry.isIntersecting;
+        maybeStart();
+        sync();
+      },
+      { rootMargin: "200px" }
+    );
+    visibility.observe(canvas);
+
+    // O outro lado da condição: o elemento ganhar tamanho depois de já estar
+    // na vista. Depois de montado quem cuida do tamanho é o próprio `resize`.
+    const sizing = new ResizeObserver(() => {
+      maybeStart();
+      if (started) sizing.disconnect();
+    });
+    sizing.observe(canvas);
+
+    document.addEventListener("visibilitychange", sync);
 
     return () => {
       cancelled = true;
-      pending?.disconnect();
-      dispose?.();
+      visibility.disconnect();
+      sizing.disconnect();
+      document.removeEventListener("visibilitychange", sync);
+      handle?.dispose();
     };
-  }, [fullscreen]);
+  }, [fullscreen, scale, focusX, focusY, portraitX, portraitY]);
 
   return ref;
 }
 
-/** Fundo das telas de autenticação: o nó em tamanho grande, seguindo o ponteiro. */
-export function GlassKnotBackdrop({ className }: { className?: string }) {
-  const ref = useGlassKnot(true);
+/**
+ * Fundo de uma superfície plum: o nó em tamanho grande, seguindo o ponteiro,
+ * sobre o degradê que ele refrata.
+ *
+ * O canvas é `absolute inset-0`, então quem define o recorte é o elemento que
+ * o contém — que precisa ser `relative` e, quase sempre, `overflow-hidden`. O
+ * conteúdo da seção vem depois, em `relative z-10`.
+ */
+export function GlassKnotBackdrop({
+  className,
+  scale = 1,
+  focusX = 0.5,
+  focusY = 0.46,
+  portraitX = focusX,
+  portraitY = focusY,
+}: {
+  className?: string;
+  /** Tamanho do nó em relação ao padrão. Ver {@link KnotSetup.scale}. */
+  scale?: number;
+  /** Onde a peça fica na seção, em fração da caixa. Ver {@link KnotSetup.focusX}. */
+  focusX?: number;
+  focusY?: number;
+  /** O ponto para caixas em retrato. Sem valor, repete o de paisagem — que é o
+   *  certo para o hero e para o login, onde a composição só muda de proporção,
+   *  não de arranjo. */
+  portraitX?: number;
+  portraitY?: number;
+}) {
+  const ref = useGlassKnot(true, scale, focusX, focusY, portraitX, portraitY);
   return (
     <canvas
       ref={ref}
@@ -435,7 +585,7 @@ export function GlassKnotBackdrop({ className }: { className?: string }) {
 
 /** A marca ao lado do nome — o mesmo objeto do fundo, em miniatura. */
 export function GlassKnotMark({ className }: { className?: string }) {
-  const ref = useGlassKnot(false);
+  const ref = useGlassKnot(false, 1, 0.5, 0.5, 0.5, 0.5);
   return (
     <canvas
       ref={ref}

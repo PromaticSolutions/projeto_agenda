@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Building2, LayoutDashboard, Receipt, ShieldCheck } from "lucide-react";
+import {
+  Building2,
+  LayoutDashboard,
+  MessageCircle,
+  Receipt,
+  ShieldCheck,
+  UserPlus,
+} from "lucide-react";
 import { SystemLogo } from "@/components/system-logo";
 import { SignOutButton } from "@/components/app/sign-out-button";
 import { ThemeToggle } from "@/components/app/theme-toggle";
@@ -26,6 +33,8 @@ const NAV_ITEMS = [
   { href: "/superadmin", label: "Visão geral", icon: LayoutDashboard },
   { href: "/superadmin/studios", label: "Clientes", icon: Building2 },
   { href: "/superadmin/billing", label: "Faturamento", icon: Receipt },
+  { href: "/superadmin/leads", label: "Leads", icon: UserPlus },
+  { href: "/superadmin/whatsapp", label: "WhatsApp", icon: MessageCircle },
 ] as const;
 
 function isActive(pathname: string, href: string): boolean {

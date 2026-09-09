@@ -24,7 +24,7 @@ export function Problem() {
     <section id="rotina" className="scroll-mt-16 border-b border-border bg-background py-20 sm:py-24">
       <div className="mx-auto w-full max-w-5xl px-4 sm:px-6">
         <Reveal sectionName="rotina">
-          <h2 className="max-w-2xl text-[2rem] leading-[1.12] font-semibold tracking-tight text-balance text-foreground sm:text-[2.5rem]">
+          <h2 className="max-w-2xl text-[2rem] leading-[1.12] font-semibold text-balance text-foreground sm:text-[2.5rem]">
             Sua agenda não deveria dar tanto trabalho.
           </h2>
         </Reveal>

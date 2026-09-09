@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { GlassKnotBackdrop } from "@/components/auth/glass-knot";
 import { AuthParticles } from "@/components/auth/auth-particles";
 import { track } from "@/lib/analytics";
-import { AgendaPreview } from "@/components/landing/agenda-preview";
+import { HeroCarousel } from "@/components/landing/hero-carousel";
 
 /**
  * Hero.
@@ -15,6 +15,11 @@ import { AgendaPreview } from "@/components/landing/agenda-preview";
  * botões, a composição do produto. A versão anterior tinha ainda três
  * micro-benefícios em lista — informação boa, no lugar errado: acima da dobra
  * cada linha extra atrasa a decisão em vez de sustentá-la.
+ *
+ * A composição da direita é um carrossel de três vistas (ver
+ * `hero-carousel.tsx`), e não uma só. É a exceção que confirma a regra acima:
+ * cada slide ocupa o MESMO espaço, então mostrar três coisas ali não custa
+ * altura nenhuma acima da dobra — ao contrário da lista, que custava.
  *
  * A superfície é a MESMA das telas de autenticação — `bg-plum-900`, o nó de
  * vidro em WebGL, o campo de partículas. Não é enfeite: é o que faz quem
@@ -35,7 +40,7 @@ export function Hero() {
             Para quem vive de horário marcado
           </span>
 
-          <h1 className="mt-5 text-[2.5rem] leading-[1.06] font-semibold tracking-tight text-balance sm:text-[3.25rem] lg:text-[3.5rem]">
+          <h1 className="mt-5 text-[2.5rem] leading-[1.06] font-semibold text-balance sm:text-[3.25rem] lg:text-[3.5rem]">
             Sua agenda funcionando enquanto você atende.
           </h1>
 
@@ -67,7 +72,7 @@ export function Hero() {
           </div>
         </div>
 
-        <AgendaPreview />
+        <HeroCarousel />
       </div>
     </section>
   );

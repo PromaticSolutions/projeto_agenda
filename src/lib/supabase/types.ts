@@ -35,6 +35,11 @@ export type MessageOutboxStatus =
 /** enum `lead_interest` — 0013_market_research_leads.sql */
 export type LeadInterest = "sim" | "talvez" | "saber_mais" | "nao";
 
+/** enums `data_request_*` — 0016_data_subject_requests.sql */
+export type DataRequestKind = "acesso" | "correcao" | "exclusao" | "oposicao";
+
+export type DataRequestStatus = "aberta" | "em_andamento" | "concluida" | "recusada";
+
 /** enum `whatsapp_connection_status` — 0009_whatsapp_connections.sql */
 export type WhatsAppConnectionStatus =
   | "desconectado"
@@ -284,7 +289,8 @@ export interface Database {
       message_outbox: {
         Row: {
           id: string;
-          studio_id: string;
+          /** Nulo = mensagem da plataforma (0017). */
+          studio_id: string | null;
           booking_id: string | null;
           kind: MessageOutboxKind;
           to_phone: string;
@@ -300,7 +306,7 @@ export interface Database {
         };
         Insert: {
           id?: string;
-          studio_id: string;
+          studio_id?: string | null;
           booking_id?: string | null;
           kind: MessageOutboxKind;
           to_phone: string;
@@ -315,6 +321,93 @@ export interface Database {
           updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["message_outbox"]["Insert"]>;
+        Relationships: [];
+      };
+      /** 0017_platform_whatsapp.sql — linha única: o remetente da plataforma. */
+      platform_whatsapp: {
+        Row: {
+          id: boolean;
+          status: WhatsAppConnectionStatus;
+          instance_name: string | null;
+          connected_phone: string | null;
+          /** Destino do aviso de lead. Nulo = ninguém é avisado. */
+          notify_phone: string | null;
+          last_error: string | null;
+          last_connected_at: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          id?: boolean;
+          status?: WhatsAppConnectionStatus;
+          instance_name?: string | null;
+          connected_phone?: string | null;
+          notify_phone?: string | null;
+          last_error?: string | null;
+          last_connected_at?: string | null;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["platform_whatsapp"]["Insert"]>;
+        Relationships: [];
+      };
+      /** 0016_data_subject_requests.sql — canal do art. 18 da LGPD. */
+      data_subject_requests: {
+        Row: {
+          id: string;
+          studio_id: string;
+          kind: DataRequestKind;
+          client_name: string;
+          client_phone: string;
+          message: string | null;
+          status: DataRequestStatus;
+          resolution_note: string | null;
+          resolved_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          studio_id: string;
+          kind: DataRequestKind;
+          client_name: string;
+          client_phone: string;
+          message?: string | null;
+          status?: DataRequestStatus;
+          resolution_note?: string | null;
+          resolved_at?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["data_subject_requests"]["Insert"]>;
+        Relationships: [];
+      };
+      /** 0015_consents.sql — prova datada de consentimento do titular (LGPD). */
+      consents: {
+        Row: {
+          id: string;
+          studio_id: string;
+          /** Nulos quando a linha de origem foi excluída: apagar um
+           *  agendamento não pode apagar a prova de que houve consentimento. */
+          booking_id: string | null;
+          client_id: string | null;
+          /** Desnormalizado e obrigatório — é por ele que se acha o registro
+           *  depois que `clients` já não tem a linha. */
+          client_phone: string;
+          /** Bate com POLICY_VERSION em `lib/consent.ts`. */
+          policy_version: string;
+          consented_at: string;
+          ip_address: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          studio_id: string;
+          booking_id?: string | null;
+          client_id?: string | null;
+          client_phone: string;
+          policy_version: string;
+          consented_at?: string;
+          ip_address?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["consents"]["Insert"]>;
         Relationships: [];
       };
       /** 0013_market_research_leads.sql — pesquisa de mercado da landing. */

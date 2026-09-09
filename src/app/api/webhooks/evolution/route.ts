@@ -4,8 +4,16 @@ import {
   findWhatsAppConnectionByInstanceName,
   saveWhatsAppConnection,
 } from "@/lib/data/whatsapp";
+import {
+  getPlatformWhatsApp,
+  savePlatformWhatsApp,
+} from "@/lib/data/platform-whatsapp";
 import { mapState } from "@/lib/whatsapp/evolution";
-import { WEBHOOK_SECRET_HEADER, evolutionWebhookSecret } from "@/lib/whatsapp/provider";
+import {
+  WEBHOOK_SECRET_HEADER,
+  evolutionWebhookSecret,
+  instanceNameForPlatform,
+} from "@/lib/whatsapp/provider";
 import { isSupabaseServiceConfigured } from "@/lib/supabase/env";
 
 /**
@@ -160,6 +168,17 @@ async function handleEvent(
   instanceName: string,
   data: unknown
 ): Promise<boolean> {
+  const record = data && typeof data === "object" ? (data as Record<string, unknown>) : {};
+
+  // A instância da PLATAFORMA não mora em `whatsapp_connections` — ela é a
+  // linha única de `platform_whatsapp` (0017). Sem este desvio, todo evento
+  // dela caía no `return false` abaixo e o estado da conexão que envia os
+  // avisos de lead só mudava por consulta: a sessão podia morrer no celular e
+  // a tela seguir dizendo "conectado" até alguém clicar em atualizar.
+  if (instanceName === instanceNameForPlatform()) {
+    return handlePlatformEvent(event, record);
+  }
+
   // Instância desconhecida: evento de outro sistema que compartilha o mesmo
   // gateway, ou conexão já excluída daqui. Nada a fazer, e responder 200
   // impede o laço de retentativa.
@@ -167,7 +186,6 @@ async function handleEvent(
   if (!connection) return false;
 
   const studioId = connection.studio_id;
-  const record = data && typeof data === "object" ? (data as Record<string, unknown>) : {};
 
   switch (event) {
     case "connection.update": {
@@ -225,6 +243,66 @@ async function handleEvent(
     default:
       // Evento fora do que o app trata. 200 sem trabalho é a resposta certa:
       // 4xx aqui só geraria retentativa de algo que nunca vamos usar.
+      return false;
+  }
+}
+
+/**
+ * O mesmo tratamento acima, para a conexão da plataforma.
+ *
+ * Separado em vez de generalizado pela mesma razão que `syncPlatformWhatsApp`
+ * é separada de `syncWhatsAppConnection` em `data/dispatch.ts`: é a mesma
+ * máquina de estados, mas em tabela diferente e com chave diferente — uma tem
+ * `studio_id`, a outra é linha única.
+ */
+async function handlePlatformEvent(
+  event: string,
+  record: Record<string, unknown>
+): Promise<boolean> {
+  switch (event) {
+    case "connection.update": {
+      const status = mapState(typeof record.state === "string" ? record.state : null);
+      const phone = digitsFromJid(record.wuid);
+      const atual = await getPlatformWhatsApp();
+
+      await savePlatformWhatsApp({
+        status,
+        instance_name: instanceNameForPlatform(),
+        connected_phone: status === "conectado" ? (phone ?? atual.connected_phone) : null,
+        last_error:
+          status === "erro" ? "O pareamento não foi concluído. Gere um novo QR code." : null,
+        ...(status === "conectado" ? { last_connected_at: new Date().toISOString() } : {}),
+      });
+      return true;
+    }
+
+    case "qrcode.updated": {
+      // QR novo = ninguém leu o anterior. Não rebaixa uma sessão já aberta:
+      // um evento atrasado chegando depois da conexão diria o contrário do
+      // que é verdade, e o aviso de lead deixaria de ser enfileirado.
+      const atual = await getPlatformWhatsApp();
+      if (atual.status !== "conectado") {
+        await savePlatformWhatsApp({
+          status: "conectando",
+          instance_name: instanceNameForPlatform(),
+          last_error: null,
+        });
+        return true;
+      }
+      return false;
+    }
+
+    case "logout.instance":
+    case "remove.instance": {
+      await savePlatformWhatsApp({
+        status: "desconectado",
+        connected_phone: null,
+        last_error: null,
+      });
+      return true;
+    }
+
+    default:
       return false;
   }
 }

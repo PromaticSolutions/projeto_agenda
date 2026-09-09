@@ -34,7 +34,7 @@ export function OnboardingPreview({
           <span className="flex size-12 items-center justify-center rounded-full bg-white shadow-sm">
             <SystemLogo className="size-8" size={64} />
           </span>
-          <p className="font-heading text-sm font-semibold">{name.trim() || "Nome do estúdio"}</p>
+          <p className="text-sm font-semibold">{name.trim() || "Nome do estúdio"}</p>
         </div>
         <div className="bg-blush-50 px-4 py-3">
           <p className="truncate text-[11px] text-muted-foreground">

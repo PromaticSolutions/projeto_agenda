@@ -1,6 +1,7 @@
 import "server-only";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/service";
 import { isSupabaseServiceConfigured } from "@/lib/supabase/env";
+import { leadNotifyTarget } from "@/lib/data/platform-whatsapp";
 import {
   LEAD_AGENDA_TOOLS,
   LEAD_HOURS_BANDS,
@@ -27,7 +28,16 @@ import type { MarketResearchLead, MessageOutboxKind } from "@/lib/types";
  * existe caminho de escrita a partir do navegador.
  */
 
-/** Para onde vai o aviso de lead novo, e de qual instância ele sai. */
+/**
+ * Destino do aviso de lead vindo do AMBIENTE.
+ *
+ * Continua existindo como fallback e para quem prefere fixar em variável, mas
+ * a fonte preferida agora é a tabela `platform_whatsapp` (migração 0017),
+ * configurada em /superadmin/whatsapp. O motivo é simples: variável de
+ * ambiente exige redeploy para mudar um número, e obriga alguém a descobrir o
+ * UUID de um estúdio para preencher o remetente — que nem é mais o desenho,
+ * já que o remetente virou a instância da plataforma.
+ */
 export const leadsNotifyPhone = process.env.LEADS_NOTIFY_PHONE?.replace(/\D/g, "") || null;
 export const leadsNotifyStudioId = process.env.LEADS_NOTIFY_STUDIO_ID?.trim() || null;
 
@@ -60,6 +70,12 @@ export async function saveLead(input: LeadCapture): Promise<LeadSaveResult> {
         phone: input.phone,
         email: input.email,
         hours_lost_band: input.hours_lost_band ?? null,
+        team_size: input.team_size ?? null,
+        agenda_tools: input.agenda_tools ?? [],
+        pain_points: input.pain_points ?? [],
+        weekly_volume: input.weekly_volume ?? null,
+        whatsapp_reliance: input.whatsapp_reliance ?? null,
+        improvement_wish: input.improvement_wish || null,
         // Aceite de tratamento de dados, com carimbo de hora: guardar só um
         // booleano não responde "quando ela aceitou?", que é a pergunta que
         // aparece quando o consentimento é questionado.
@@ -123,6 +139,48 @@ export async function updateLeadContext(input: LeadContext): Promise<MarketResea
     .maybeSingle();
   if (error) throw error;
   return data;
+}
+
+/**
+ * Teto de linhas da tela do superadmin.
+ *
+ * Sem paginação de propósito: a pesquisa da landing é um funil de dezenas, não
+ * de milhares, e uma barra de páginas para uma tabela que cabe numa rolagem é
+ * peça de interface que só existe para ser usada uma vez. Quando o volume
+ * passar disto, a tela avisa em vez de mentir mostrando um recorte silencioso.
+ */
+export const LEADS_PAGE_LIMIT = 200;
+
+export interface LeadsListing {
+  leads: MarketResearchLead[];
+  /** Total na base, para a tela saber se o teto acima cortou algo. */
+  total: number;
+}
+
+/**
+ * Os leads gravados, do mais recente para o mais antigo.
+ *
+ * Existe porque o aviso no WhatsApp é CONVENIENCIA, não o registro: ele depende
+ * da sessão estar de pé, do destino estar configurado e do disparador ter
+ * rodado. O lead, esse, já está gravado desde o POST — e sem esta leitura não
+ * havia nenhum lugar no produto para vê-lo.
+ *
+ * Service role, como o resto de `data/leads`: a tabela não tem policy de RLS
+ * (0013). Quem chama é a tela do superadmin, cujo layout já conferiu
+ * `platform_admins`.
+ */
+export async function listLeads(): Promise<LeadsListing> {
+  if (!isSupabaseServiceConfigured) return { leads: [], total: 0 };
+
+  const supabase = createServiceRoleSupabaseClient();
+  const { data, error, count } = await supabase
+    .from("market_research_leads")
+    .select("*", { count: "exact" })
+    .order("created_at", { ascending: false })
+    .limit(LEADS_PAGE_LIMIT);
+
+  if (error) throw error;
+  return { leads: data ?? [], total: count ?? data?.length ?? 0 };
 }
 
 /** Linha do resumo, omitida quando não há resposta. */
@@ -203,16 +261,31 @@ export type NotifyOutcome = "enfileirado" | "sem_configuracao" | "falhou";
 export async function enqueueLeadNotification(
   lead: MarketResearchLead
 ): Promise<NotifyOutcome> {
-  if (!leadsNotifyPhone || !leadsNotifyStudioId) return "sem_configuracao";
+  /* Duas origens, nesta ordem: a configuração do superadmin primeiro, o
+     ambiente como fallback. Quem já tinha as variáveis não perde o aviso; quem
+     configurar pela tela não precisa mexer em deploy.
+
+     `leadNotifyTarget()` só devolve número quando a sessão da plataforma está
+     DE PÉ. Sem isso o aviso entraria na fila para ser adiado a cada rodada do
+     disparador até expirar — barulho no log para um envio que nunca ia sair. */
+  const alvoDaPlataforma = await leadNotifyTarget();
+
+  const destino = alvoDaPlataforma ?? leadsNotifyPhone;
+  // `studio_id` nulo = remetente é a instância da plataforma (0017). Só cai no
+  // estúdio do ambiente quando é o fallback antigo que está no comando.
+  const remetente = alvoDaPlataforma ? null : leadsNotifyStudioId;
+
+  if (!destino) return "sem_configuracao";
+  if (!alvoDaPlataforma && !remetente) return "sem_configuracao";
 
   try {
     const supabase = createServiceRoleSupabaseClient();
     const now = new Date().toISOString();
     const { error } = await supabase.from("message_outbox").insert({
-      studio_id: leadsNotifyStudioId,
+      studio_id: remetente,
       booking_id: null,
       kind: "lead" as MessageOutboxKind,
-      to_phone: leadsNotifyPhone,
+      to_phone: destino,
       body: buildLeadSummary(lead),
       scheduled_for: now,
       status: "pendente",

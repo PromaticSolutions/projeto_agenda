@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { formatDateLocal, formatDurationMin, formatPriceCents, formatTimeLocal } from "@/lib/format";
 import { buildWhatsAppUrl } from "@/lib/whatsapp/link";
 import { clientNameSchema, clientPhoneSchema } from "@/lib/validation";
+import Link from "next/link";
 import type { Service, Studio } from "@/lib/types";
 
 interface Slot {
@@ -68,6 +69,9 @@ export function BookingFlow({ studio, services }: { studio: Studio; services: Se
 
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
+  /* Nasce DESMARCADO e assim tem que ficar. Caixa pré-marcada não é
+     consentimento livre — é o exemplo clássico do que a LGPD não aceita. */
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [whatsappUrl, setWhatsappUrl] = useState<string | null>(null);
@@ -174,6 +178,13 @@ export function BookingFlow({ studio, services }: { studio: Studio; services: Se
       setFormError(phoneResult.error.issues[0]?.message ?? "Telefone inválido");
       return;
     }
+    /* Checagem no cliente só para a mensagem sair na hora. Quem manda é o
+       `createBookingSchema` no servidor: sem `privacyAccepted: true` a API
+       responde 400 e nenhum agendamento é criado. */
+    if (!privacyAccepted) {
+      setFormError("Para agendar, é preciso aceitar a Política de Privacidade.");
+      return;
+    }
     if (!service || !selectedSlot) return;
 
     setSubmitting(true);
@@ -187,6 +198,7 @@ export function BookingFlow({ studio, services }: { studio: Studio; services: Se
           clientName: nameResult.data,
           clientPhone: phoneResult.data,
           startAt: selectedSlot.start,
+          privacyAccepted,
         }),
       });
       const data = await res.json();
@@ -253,9 +265,9 @@ export function BookingFlow({ studio, services }: { studio: Studio; services: Se
           <div className="flex items-center justify-between gap-3">
             <div>
               <FieldLabel>Serviço</FieldLabel>
-              <p className="font-heading text-lg font-semibold text-plum-900">{service.name}</p>
+              <p className="text-lg font-semibold text-plum-900">{service.name}</p>
             </div>
-            <p className="shrink-0 font-heading text-lg font-semibold text-violet-600">
+            <p className="shrink-0 text-lg font-semibold tabular-nums text-violet-600">
               {formatPriceCents(service.price_cents)}
             </p>
           </div>
@@ -367,7 +379,7 @@ export function BookingFlow({ studio, services }: { studio: Studio; services: Se
                     </p>
                   </div>
                 </div>
-                <p className="shrink-0 font-heading font-semibold text-violet-600 transition-transform group-hover:scale-105">
+                <p className="shrink-0 font-semibold tabular-nums text-violet-600 transition-transform group-hover:scale-105">
                   {formatPriceCents(svc.price_cents)}
                 </p>
               </button>
@@ -471,6 +483,35 @@ export function BookingFlow({ studio, services }: { studio: Studio; services: Se
                 onValueChange={setClientPhone}
               />
             </div>
+            {/* Mesma anatomia do aceite em `landing/contact-form.tsx`: input
+                nativo dentro de um label, com `accent-[var(--primary)]`. O
+                projeto não tem componente de checkbox em `components/ui/`, e
+                criar um só para esta caixa seria trocar consistência por
+                abstração. */}
+            <label className="flex cursor-pointer items-start gap-2.5 text-sm leading-5 text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={privacyAccepted}
+                onChange={(e) => setPrivacyAccepted(e.target.checked)}
+                className="mt-0.5 size-4 shrink-0 accent-[var(--primary)]"
+              />
+              <span>
+                Li e concordo com a{" "}
+                {/* Nova aba de propósito: o horário já está reservado nesta
+                    tela, e navegar para fora aqui jogaria fora a escolha de
+                    serviço e de horário. */}
+                <Link
+                  href="/politica-de-privacidade"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary underline underline-offset-2"
+                >
+                  Política de Privacidade
+                </Link>
+                . Seus dados são usados pelo estúdio para o atendimento e para
+                enviar a confirmação no WhatsApp.
+              </span>
+            </label>
             {formError && <p className="text-sm text-destructive">{formError}</p>}
           </form>
           {/* Espaçador pra o conteúdo não ficar escondido atrás da barra fixa abaixo. */}
@@ -491,7 +532,10 @@ export function BookingFlow({ studio, services }: { studio: Studio; services: Se
             <Button
               type="submit"
               form="booking-details-form"
-              disabled={submitting}
+              /* Desabilitado enquanto falta o aceite: o motivo fica visível
+                 logo acima, na própria caixa, então o botão inerte não vira
+                 mistério. */
+              disabled={submitting || !privacyAccepted}
               className="shrink-0 bg-cta text-white hover:opacity-90"
             >
               {submitting ? "Confirmando..." : "Confirmar agendamento"}
