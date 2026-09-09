@@ -1,5 +1,6 @@
 import "server-only";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { fetchAllPages } from "@/lib/supabase/paginate";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/service";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import {
@@ -22,13 +23,19 @@ export async function listMyClients(studioId: string): Promise<Client[]> {
   if (!isSupabaseConfigured) return mockListClients(studioId);
 
   const supabase = await createServerSupabaseClient();
-  const { data, error } = await supabase
-    .from("clients")
-    .select("*")
-    .eq("studio_id", studioId)
-    .order("name");
-  if (error) throw error;
-  return data;
+  // Paginado: a agenda de um salão antigo passa de mil clientes, e o corte do
+  // PostgREST tiraria gente da lista sem devolver erro nenhum. Ver
+  // `fetchAllPages`. O desempate por `id` mantém a paginação estável quando
+  // dois clientes têm o mesmo nome.
+  return fetchAllPages<Client>((from, to) =>
+    supabase
+      .from("clients")
+      .select("*")
+      .eq("studio_id", studioId)
+      .order("name")
+      .order("id")
+      .range(from, to)
+  );
 }
 
 /** Lista de clientes com contagem de agendamentos e última visita — para a tela /app/clients. */
@@ -40,12 +47,22 @@ export async function listMyClientsWithStats(studioId: string): Promise<ClientWi
     bookings = mockListBookings(studioId);
   } else {
     const supabase = await createServerSupabaseClient();
-    const { data, error } = await supabase
-      .from("bookings")
-      .select("client_id, start_at, status")
-      .eq("studio_id", studioId);
-    if (error) throw error;
-    bookings = data;
+    /* Todo o histórico do estúdio, paginado: é sobre ele que saem "quantas
+       vezes veio" e "última visita" de cada cliente. Truncado em mil, os dois
+       números ficariam menores para os clientes mais antigos — errado de um
+       jeito plausível, que é o pior. */
+    bookings = await fetchAllPages<{
+      client_id: string | null;
+      start_at: string;
+      status: string;
+    }>((from, to) =>
+      supabase
+        .from("bookings")
+        .select("client_id, start_at, status")
+        .eq("studio_id", studioId)
+        .order("id")
+        .range(from, to)
+    );
   }
 
   const statsByClient = new Map<string, { count: number; lastVisitAt: string | null }>();
