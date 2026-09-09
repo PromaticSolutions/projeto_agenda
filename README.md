@@ -74,7 +74,8 @@ um provedor de e-mail, desative em Authentication → Providers → Email →
 - `src/lib/availability.ts` — algoritmo de horários livres (com testes).
 - `src/lib/data/*` — camada de dados; alterna Supabase real ↔ mock conforme `.env.local`.
 - `src/lib/mock/store.ts` — dados fictícios usados quando o Supabase não está configurado.
-- `src/app/superadmin` — painel da plataforma (visão geral, clientes, faturamento).
+- `src/app/superadmin` — painel da plataforma (visão geral, clientes,
+  faturamento, leads, WhatsApp).
 - `src/lib/billing.ts` — vocabulário e aritmética da cobrança (com testes).
 - `src/lib/data/billing.ts` / `src/lib/data/platformMetrics.ts` — leituras do superadmin (dinheiro e uso).
 - `supabase/migrations/0001_init.sql` — schema + RLS + constraint anti-colisão.
@@ -101,7 +102,7 @@ comum vê "acesso restrito", não um loop de login. Todas as leituras usam a
 `service_role` key e atravessam RLS de propósito; a autorização acontece
 uma vez, no layout.
 
-Três telas:
+Cinco telas:
 
 - **Visão geral** — receita recorrente, uso da base e um bloco "precisa de
   atenção" (faturas em atraso, testes vencendo, estúdios que pararam de
@@ -113,6 +114,14 @@ Três telas:
 - **Faturamento** (`/superadmin/billing`) — MRR, receita realizada por mês,
   método de pagamento, inadimplência por faixa de atraso e a lista de
   faturas com filtro.
+- **Leads** (`/superadmin/leads`) — quem preencheu o formulário da página
+  inicial, do mais recente para o mais antigo, com link direto para o WhatsApp
+  e para o e-mail. É o REGISTRO; o aviso no WhatsApp é a notificação, e ela
+  tem três pontos de falha (sessão caída, destino não configurado, disparador
+  parado). Quando algum deles está em pé, a tela diz qual.
+- **WhatsApp** (`/superadmin/whatsapp`) — a instância da plataforma (quem
+  ENVIA o aviso de lead) e o número que RECEBE. São dois campos porque o
+  WhatsApp não entrega mensagem sem remetente.
 
 ### O que cada número significa
 

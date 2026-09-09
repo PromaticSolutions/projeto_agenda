@@ -141,6 +141,48 @@ export async function updateLeadContext(input: LeadContext): Promise<MarketResea
   return data;
 }
 
+/**
+ * Teto de linhas da tela do superadmin.
+ *
+ * Sem paginação de propósito: a pesquisa da landing é um funil de dezenas, não
+ * de milhares, e uma barra de páginas para uma tabela que cabe numa rolagem é
+ * peça de interface que só existe para ser usada uma vez. Quando o volume
+ * passar disto, a tela avisa em vez de mentir mostrando um recorte silencioso.
+ */
+export const LEADS_PAGE_LIMIT = 200;
+
+export interface LeadsListing {
+  leads: MarketResearchLead[];
+  /** Total na base, para a tela saber se o teto acima cortou algo. */
+  total: number;
+}
+
+/**
+ * Os leads gravados, do mais recente para o mais antigo.
+ *
+ * Existe porque o aviso no WhatsApp é CONVENIENCIA, não o registro: ele depende
+ * da sessão estar de pé, do destino estar configurado e do disparador ter
+ * rodado. O lead, esse, já está gravado desde o POST — e sem esta leitura não
+ * havia nenhum lugar no produto para vê-lo.
+ *
+ * Service role, como o resto de `data/leads`: a tabela não tem policy de RLS
+ * (0013). Quem chama é a tela do superadmin, cujo layout já conferiu
+ * `platform_admins`.
+ */
+export async function listLeads(): Promise<LeadsListing> {
+  if (!isSupabaseServiceConfigured) return { leads: [], total: 0 };
+
+  const supabase = createServiceRoleSupabaseClient();
+  const { data, error, count } = await supabase
+    .from("market_research_leads")
+    .select("*", { count: "exact" })
+    .order("created_at", { ascending: false })
+    .limit(LEADS_PAGE_LIMIT);
+
+  if (error) throw error;
+  return { leads: data ?? [], total: count ?? data?.length ?? 0 };
+}
+
 /** Linha do resumo, omitida quando não há resposta. */
 function line(label: string, value: string | null | undefined): string[] {
   return value ? [`*${label}:* ${value}`] : [];
