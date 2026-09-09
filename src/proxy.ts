@@ -33,10 +33,16 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isAppRoute = request.nextUrl.pathname.startsWith("/app");
-  if (isAppRoute && !user) {
+  /* /superadmin entra aqui junto com /app por causa da RENOVAÇÃO, não do
+     redirect: o layout do painel já barra quem não é `platform_admin`, mas
+     quem passasse uma hora inteira dentro do /superadmin sem tocar em nenhuma
+     rota do /app via o access token expirar sem ninguém renovar — e caía no
+     login no meio do trabalho. É este handler que atualiza o cookie. */
+  const path = request.nextUrl.pathname;
+  const isProtected = path.startsWith("/app") || path.startsWith("/superadmin");
+  if (isProtected && !user) {
     const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("next", request.nextUrl.pathname);
+    loginUrl.searchParams.set("next", path);
     return NextResponse.redirect(loginUrl);
   }
 
@@ -52,6 +58,7 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     "/app/:path*",
+    "/superadmin/:path*",
     "/login",
     "/signup",
   ],
