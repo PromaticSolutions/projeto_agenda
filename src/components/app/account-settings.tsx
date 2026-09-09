@@ -5,6 +5,7 @@ import { Check, ExternalLink, LoaderCircle, Save, ShieldCheck } from "lucide-rea
 import { toast } from "sonner";
 import { updateAccountAction, type AccountActionState } from "@/app/app/(dashboard)/account/actions";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
+import { authErrorMessage } from "@/lib/auth-errors";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,7 +32,11 @@ function PasswordPanel() {
     setPending(true);
     const { error } = await createBrowserSupabaseClient().auth.updateUser({ password });
     setPending(false);
-    if (error) return toast.error(error.message);
+    if (error) {
+      return toast.error(
+        authErrorMessage(error, "Não foi possível trocar a senha agora. Tente de novo.")
+      );
+    }
 
     setPassword("");
     setConfirmation("");

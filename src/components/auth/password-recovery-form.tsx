@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { ArrowLeft, CheckCircle2, Mail, Send } from "lucide-react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
+import { authErrorMessage } from "@/lib/auth-errors";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,7 +23,11 @@ export function PasswordRecoveryForm() {
       redirectTo: `${window.location.origin}/reset-password`,
     });
     setLoading(false);
-    if (recoveryError) return setError(recoveryError.message);
+    if (recoveryError) {
+      return setError(
+        authErrorMessage(recoveryError, "Não foi possível enviar o e-mail agora. Tente de novo.")
+      );
+    }
     setSent(true);
   }
 

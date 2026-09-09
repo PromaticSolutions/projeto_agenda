@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { Check, ShieldCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
+import { authErrorMessage } from "@/lib/auth-errors";
 import { EmailConfirmationDialog } from "@/components/auth/email-confirmation-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,7 +34,7 @@ export function SignupForm() {
     setLoading(false);
 
     if (signUpError) {
-      setError(signUpError.message);
+      setError(authErrorMessage(signUpError, "Não foi possível criar a conta agora. Tente de novo."));
       return;
     }
 

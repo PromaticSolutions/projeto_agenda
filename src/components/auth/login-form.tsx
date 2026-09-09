@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, LockKeyhole, Mail } from "lucide-react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
+import { authErrorMessage } from "@/lib/auth-errors";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,11 +31,7 @@ export function LoginForm() {
 
     setLoading(false);
     if (signInError) {
-      setError(
-        signInError.message === "Invalid login credentials"
-          ? "E-mail ou senha incorretos."
-          : signInError.message
-      );
+      setError(authErrorMessage(signInError, "Não foi possível entrar agora. Tente de novo."));
       return;
     }
 
