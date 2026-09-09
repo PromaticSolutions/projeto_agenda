@@ -1,10 +1,12 @@
 import "server-only";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/service";
+import { fetchAllPages } from "@/lib/supabase/paginate";
 import { STUDIO_TIMEZONE, utcToLocalDate } from "@/lib/availability";
 import type {
   Block,
   Booking,
   BookingStatus,
+  Client,
   MessageOutbox,
   ReminderSettings,
   Service,
@@ -104,17 +106,35 @@ export async function getPlatformOverview(): Promise<PlatformOverview> {
   }
   const n = (index: number) => counts[index].count ?? 0;
 
-  // Volume atendido + atividade por estúdio: uma passada só nas linhas.
-  const [{ data: recentBookings, error: bookingsError }, { data: services, error: servicesError }] =
-    await Promise.all([
-      supabase.from("bookings").select("studio_id, service_id, status, start_at, created_at").gte("start_at", since30d),
-      supabase.from("services").select("id, price_cents"),
-    ]);
-  if (bookingsError) throw bookingsError;
-  if (servicesError) throw servicesError;
+  /* Volume atendido + atividade por estúdio: uma passada só nas linhas.
 
-  const priceById = new Map((services ?? []).map((s) => [s.id, s.price_cents]));
-  const attended = (recentBookings ?? []).filter((b) => b.status === "finalizado");
+     Paginado porque estas duas leituras somam sobre a PLATAFORMA inteira, e o
+     corte de 1000 linhas do PostgREST não daria erro nenhum — daria um total
+     menor que o real, que é o pior jeito de um número errado aparecer num
+     painel de decisão. */
+  const [recentBookings, services] = await Promise.all([
+    fetchAllPages<{
+      studio_id: string;
+      service_id: string;
+      status: BookingStatus;
+      start_at: string;
+      created_at: string;
+    }>((from, to) =>
+      supabase
+        .from("bookings")
+        .select("studio_id, service_id, status, start_at, created_at")
+        .gte("start_at", since30d)
+        .order("start_at")
+        .order("id")
+        .range(from, to)
+    ),
+    fetchAllPages<{ id: string; price_cents: number }>((from, to) =>
+      supabase.from("services").select("id, price_cents").order("id").range(from, to)
+    ),
+  ]);
+
+  const priceById = new Map(services.map((s) => [s.id, s.price_cents]));
+  const attended = recentBookings.filter((b) => b.status === "finalizado");
   const attendedVolume30dCents = attended.reduce(
     (total, booking) => total + (priceById.get(booking.service_id) ?? 0),
     0
@@ -197,26 +217,73 @@ export async function listStudiosWithActivity(): Promise<StudioActivityRow[]> {
   const atRiskSince = new Date(now - AT_RISK_DAYS * DAY_MS).toISOString();
   const newSince = new Date(now - 14 * DAY_MS).toISOString();
 
+  /* Todas as leituras que varrem a plataforma inteira são paginadas: sem isso
+     o PostgREST devolve as primeiras mil linhas em silêncio, e uma tabela de
+     clientes ordenada por uso passaria a mentir a partir do milésimo
+     agendamento — sem erro, sem aviso, com número menor. `bookings` e
+     `clients` são as que crescem mais rápido. */
   const [studios, bookings, services, clients, connections, reminders] = await Promise.all([
-    supabase.from("studios").select("*").order("created_at", { ascending: false }),
-    supabase.from("bookings").select("studio_id, service_id, status, created_at, start_at"),
-    supabase.from("services").select("id, studio_id, price_cents, active, archived_at"),
-    supabase.from("clients").select("studio_id"),
-    supabase.from("whatsapp_connections").select("studio_id, status"),
-    supabase.from("reminder_settings").select("studio_id, enabled"),
+    fetchAllPages<Studio>((from, to) =>
+      supabase
+        .from("studios")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .order("id")
+        .range(from, to)
+    ),
+    fetchAllPages<{
+      studio_id: string;
+      service_id: string;
+      status: BookingStatus;
+      created_at: string;
+      start_at: string;
+    }>((from, to) =>
+      supabase
+        .from("bookings")
+        .select("studio_id, service_id, status, created_at, start_at")
+        .order("id")
+        .range(from, to)
+    ),
+    fetchAllPages<{
+      id: string;
+      studio_id: string;
+      price_cents: number;
+      active: boolean;
+      archived_at: string | null;
+    }>((from, to) =>
+      supabase
+        .from("services")
+        .select("id, studio_id, price_cents, active, archived_at")
+        .order("id")
+        .range(from, to)
+    ),
+    fetchAllPages<{ studio_id: string }>((from, to) =>
+      supabase.from("clients").select("studio_id").order("id").range(from, to)
+    ),
+    fetchAllPages<{ studio_id: string; status: WhatsAppConnectionStatus }>((from, to) =>
+      supabase
+        .from("whatsapp_connections")
+        .select("studio_id, status")
+        .order("studio_id")
+        .range(from, to)
+    ),
+    fetchAllPages<{ studio_id: string; enabled: boolean }>((from, to) =>
+      supabase
+        .from("reminder_settings")
+        .select("studio_id, enabled")
+        .order("studio_id")
+        .range(from, to)
+    ),
   ]);
-  for (const result of [studios, bookings, services, clients, connections, reminders]) {
-    if (result.error) throw result.error;
-  }
 
-  const priceById = new Map((services.data ?? []).map((s) => [s.id, s.price_cents]));
+  const priceById = new Map(services.map((s) => [s.id, s.price_cents]));
   const activeServicesByStudio = countBy(
-    (services.data ?? []).filter((s) => s.active && !s.archived_at),
+    services.filter((s) => s.active && !s.archived_at),
     (s) => s.studio_id
   );
-  const clientsByStudio = countBy(clients.data ?? [], (c) => c.studio_id);
-  const statusByStudio = new Map((connections.data ?? []).map((c) => [c.studio_id, c.status]));
-  const remindersByStudio = new Map((reminders.data ?? []).map((r) => [r.studio_id, r.enabled]));
+  const clientsByStudio = countBy(clients, (c) => c.studio_id);
+  const statusByStudio = new Map(connections.map((c) => [c.studio_id, c.status]));
+  const remindersByStudio = new Map(reminders.map((r) => [r.studio_id, r.enabled]));
 
   interface Agg {
     total: number;
@@ -228,7 +295,7 @@ export async function listStudiosWithActivity(): Promise<StudioActivityRow[]> {
     lastBookingAt: string | null;
   }
   const agg = new Map<string, Agg>();
-  for (const booking of bookings.data ?? []) {
+  for (const booking of bookings) {
     const row =
       agg.get(booking.studio_id) ??
       ({
@@ -257,7 +324,7 @@ export async function listStudiosWithActivity(): Promise<StudioActivityRow[]> {
     agg.set(booking.studio_id, row);
   }
 
-  return (studios.data ?? [])
+  return studios
     .map((studio) => {
       const row = agg.get(studio.id);
       const bookingsLast30d = row?.last30d ?? 0;
@@ -321,11 +388,21 @@ function countBy<T>(rows: T[], key: (row: T) => string): Map<string, number> {
 export async function getBookingsTrend(days = 30, studioId?: string): Promise<DailyPoint[]> {
   const supabase = createServiceRoleSupabaseClient();
   const since = new Date(Date.now() - days * DAY_MS).toISOString();
-  let query = supabase.from("bookings").select("created_at").gte("created_at", since);
-  if (studioId) query = query.eq("studio_id", studioId);
-  const { data, error } = await query;
-  if (error) throw error;
-  return bucketByDay(data ?? [], days);
+  // Paginado: trinta dias da plataforma inteira passam de mil linhas antes de
+  // a base ficar grande, e o corte silencioso apareceria como uma queda no
+  // gráfico — o tipo de número errado que leva a decisão errada.
+  const linhas = await fetchAllPages<{ created_at: string }>((from, to) => {
+    let query = supabase
+      .from("bookings")
+      .select("created_at")
+      .gte("created_at", since)
+      .order("created_at")
+      .order("id")
+      .range(from, to);
+    if (studioId) query = query.eq("studio_id", studioId);
+    return query;
+  });
+  return bucketByDay(linhas, days);
 }
 
 /** Série diária de novos estúdios cadastrados. */
@@ -428,23 +505,45 @@ export async function getStudioDetail(studioId: string): Promise<StudioDetail | 
   const since30d = new Date(now.getTime() - 30 * DAY_MS).toISOString();
   const in30d = new Date(now.getTime() + 30 * DAY_MS).toISOString();
 
-  const [bookings, services, clients, hours, blocks, connection, reminders, outbox, trend] =
+  /* As três leituras que crescem com o TEMPO de uso do estúdio — histórico de
+     agendamentos, base de clientes e fila de mensagens — são paginadas. Um
+     salão de dois anos passa das mil linhas em qualquer uma delas, e o corte
+     do PostgREST não daria erro: daria ticket médio, volume total e taxa de
+     retorno calculados sobre um pedaço do histórico. As demais (serviços,
+     turnos, bloqueios dos próximos 30 dias) têm teto natural pequeno. */
+  const [allBookings, services, allClients, hours, blocks, connection, reminders, outbox, trend] =
     await Promise.all([
-      supabase.from("bookings").select("*").eq("studio_id", studioId).order("start_at", { ascending: false }),
+      fetchAllPages<Booking>((from, to) =>
+        supabase
+          .from("bookings")
+          .select("*")
+          .eq("studio_id", studioId)
+          .order("start_at", { ascending: false })
+          .order("id")
+          .range(from, to)
+      ),
       supabase.from("services").select("*").eq("studio_id", studioId).order("created_at"),
-      supabase.from("clients").select("*").eq("studio_id", studioId),
+      fetchAllPages<Client>((from, to) =>
+        supabase.from("clients").select("*").eq("studio_id", studioId).order("id").range(from, to)
+      ),
       supabase.from("working_hours").select("*").eq("studio_id", studioId),
       supabase.from("blocks").select("*").eq("studio_id", studioId).gte("start_at", now.toISOString()).lt("start_at", in30d),
       supabase.from("whatsapp_connections").select("*").eq("studio_id", studioId).maybeSingle(),
       supabase.from("reminder_settings").select("*").eq("studio_id", studioId).maybeSingle(),
-      supabase.from("message_outbox").select("status, created_at").eq("studio_id", studioId),
+      fetchAllPages<{ status: MessageOutbox["status"]; created_at: string }>((from, to) =>
+        supabase
+          .from("message_outbox")
+          .select("status, created_at")
+          .eq("studio_id", studioId)
+          .order("id")
+          .range(from, to)
+      ),
       getBookingsTrend(30, studioId),
     ]);
-  for (const result of [bookings, services, clients, hours, blocks, connection, reminders, outbox]) {
+  for (const result of [services, hours, blocks, connection, reminders]) {
     if (result.error) throw result.error;
   }
 
-  const allBookings = (bookings.data ?? []) as Booking[];
   const allServices = (services.data ?? []) as Service[];
   const priceById = new Map(allServices.map((s) => [s.id, s.price_cents]));
   const durationById = new Map(allServices.map((s) => [s.id, s.duration_min]));
@@ -505,7 +604,6 @@ export async function getStudioDetail(studioId: string): Promise<StudioDetail | 
     if (!row.last || booking.start_at > row.last) row.last = booking.start_at;
     bookingsByClient.set(booking.client_id, row);
   }
-  const allClients = clients.data ?? [];
   const returningClients = Array.from(bookingsByClient.values()).filter((r) => r.count >= 2).length;
   const topClients: ClientUsageRow[] = allClients
     .map((client) => ({
@@ -527,7 +625,7 @@ export async function getStudioDetail(studioId: string): Promise<StudioDetail | 
   );
   const availableMinutes30d = availableMinutesInLast30Days(hours.data ?? [], now);
 
-  const outboxRows = (outbox.data ?? []) as Pick<MessageOutbox, "status" | "created_at">[];
+  const outboxRows = outbox;
   const lastMessageAt = outboxRows.reduce<string | null>(
     (latest, row) => (!latest || row.created_at > latest ? row.created_at : latest),
     null

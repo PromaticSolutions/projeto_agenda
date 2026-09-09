@@ -1,5 +1,6 @@
 import "server-only";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/service";
+import { fetchAllPages } from "@/lib/supabase/paginate";
 import { isMissingTableError } from "@/lib/supabase/errors";
 import { utcToLocalDate } from "@/lib/availability";
 import {
@@ -95,15 +96,23 @@ export async function listPlans(): Promise<Plan[]> {
  */
 export async function mapCurrentSubscriptions(): Promise<Map<string, SubscriptionWithPlan>> {
   const supabase = createServiceRoleSupabaseClient();
-  const [{ data: subs, error: subsError }, plans] = await Promise.all([
-    supabase.from("subscriptions").select("*").neq("status", "cancelada"),
+  const [subs, plans] = await Promise.all([
+    // Paginado: é uma assinatura por estúdio, e o corte de mil linhas do
+    // PostgREST apagaria clientes do painel sem devolver erro nenhum.
+    fetchAllPages<Subscription>((from, to) =>
+      supabase
+        .from("subscriptions")
+        .select("*")
+        .neq("status", "cancelada")
+        .order("id")
+        .range(from, to)
+    ),
     listPlans(),
   ]);
-  if (subsError) throw subsError;
 
   const planById = new Map(plans.map((p) => [p.id, p]));
   const result = new Map<string, SubscriptionWithPlan>();
-  for (const subscription of subs ?? []) {
+  for (const subscription of subs) {
     const plan = planById.get(subscription.plan_id) ?? null;
     const interval = plan?.billing_interval ?? "mensal";
     result.set(subscription.studio_id, {
@@ -177,21 +186,34 @@ export async function getBillingOverview(): Promise<BillingOverview> {
   const thisMonth = months[months.length - 1];
   const lastMonth = months[months.length - 2] ?? thisMonth;
 
-  const [
-    { data: allSubs, error: subsError },
-    plans,
-    { data: invoices, error: invoicesError },
-    { data: payments, error: paymentsError },
-  ] = await Promise.all([
-    supabase.from("subscriptions").select("*"),
+  /* Tudo paginado: são as três leituras que sustentam MRR, inadimplência e
+     receita realizada. Faturas e pagamentos crescem um por mês por cliente, e
+     o corte de mil linhas do PostgREST não daria erro — daria dinheiro a
+     menos no painel, que é o pior lugar para um número silenciosamente
+     errado. */
+  const [allSubs, plans, invoices, payments] = await Promise.all([
+    fetchAllPages<Subscription>((from, to) =>
+      supabase.from("subscriptions").select("*").order("id").range(from, to)
+    ),
     listPlans(),
     // Faturas em aberto de qualquer época + as pagas na janela do gráfico.
-    supabase.from("invoices").select("*").or(`status.neq.paga,paid_at.gte.${windowStart}`),
-    supabase.from("payments").select("*").gte("created_at", windowStart),
+    fetchAllPages<Invoice>((from, to) =>
+      supabase
+        .from("invoices")
+        .select("*")
+        .or(`status.neq.paga,paid_at.gte.${windowStart}`)
+        .order("id")
+        .range(from, to)
+    ),
+    fetchAllPages<Payment>((from, to) =>
+      supabase
+        .from("payments")
+        .select("*")
+        .gte("created_at", windowStart)
+        .order("id")
+        .range(from, to)
+    ),
   ]);
-  if (subsError) throw subsError;
-  if (invoicesError) throw invoicesError;
-  if (paymentsError) throw paymentsError;
 
   const planById = new Map(plans.map((p) => [p.id, p]));
   const intervalOf = (sub: Subscription): PlanInterval =>
@@ -205,9 +227,9 @@ export async function getBillingOverview(): Promise<BillingOverview> {
     pausada: 0,
     cancelada: 0,
   };
-  for (const sub of allSubs ?? []) subscriptionsByStatus[sub.status] += 1;
+  for (const sub of allSubs) subscriptionsByStatus[sub.status] += 1;
 
-  const mrrInput = (allSubs ?? []).map((sub) => ({
+  const mrrInput = allSubs.map((sub) => ({
     status: sub.status,
     amount_cents: sub.amount_cents,
     interval: intervalOf(sub),
@@ -216,19 +238,19 @@ export async function getBillingOverview(): Promise<BillingOverview> {
   const mrrAtRiskCents = sumMonthlyRecurringCents(mrrInput, ["inadimplente"]);
   const payingSubscriptions = subscriptionsByStatus.ativa + subscriptionsByStatus.inadimplente;
 
-  const canceledRecently = (allSubs ?? []).filter(
+  const canceledRecently = allSubs.filter(
     (sub) => sub.status === "cancelada" && sub.canceled_at && sub.canceled_at >= since30d
   );
   const lostMrrCents = canceledRecently.reduce(
     (total, sub) => total + monthlyAmountCents(sub.amount_cents, intervalOf(sub)),
     0
   );
-  const trialsEndingSoon = (allSubs ?? []).filter(
+  const trialsEndingSoon = allSubs.filter(
     (sub) => sub.status === "trial" && sub.trial_ends_at && sub.trial_ends_at <= in7d
   ).length;
 
   // --- Faturas ---
-  const paidInWindow = (invoices ?? []).filter(
+  const paidInWindow = invoices.filter(
     (inv) => inv.status === "paga" && inv.paid_at && inv.paid_at >= windowStart
   );
   const revenueOfMonth = (month: string) =>
@@ -238,7 +260,7 @@ export async function getBillingOverview(): Promise<BillingOverview> {
 
   const revenueWindowCents = paidInWindow.reduce((total, inv) => total + inv.total_cents, 0);
 
-  const openInvoices = (invoices ?? []).filter((inv) => inv.status === "aberta" || inv.status === "vencida");
+  const openInvoices = invoices.filter((inv) => inv.status === "aberta" || inv.status === "vencida");
   const overdue = openInvoices.filter((inv) => isInvoiceOverdue(inv, today));
   const openReceivableCents = openInvoices
     .filter((inv) => !isInvoiceOverdue(inv, today))
@@ -256,7 +278,7 @@ export async function getBillingOverview(): Promise<BillingOverview> {
   }
 
   // --- Pagamentos ---
-  const approved = (payments ?? []).filter((p) => p.status === "aprovado");
+  const approved = payments.filter((p) => p.status === "aprovado");
   const feesWindowCents = approved.reduce((total, p) => total + p.fee_cents, 0);
   const methodTotals = new Map<PaymentMethod, { cents: number; count: number }>();
   for (const payment of approved) {
@@ -265,7 +287,7 @@ export async function getBillingOverview(): Promise<BillingOverview> {
     row.count += 1;
     methodTotals.set(payment.method, row);
   }
-  const failedPaymentsWindow = (payments ?? []).filter(
+  const failedPaymentsWindow = payments.filter(
     (p) => p.status === "recusado" || p.status === "expirado"
   ).length;
 
@@ -389,7 +411,7 @@ export async function listInvoices(filters: InvoiceFilters = {}): Promise<Invoic
 
   const studioById = new Map((studios ?? []).map((s) => [s.id, s]));
   const paymentsByInvoice = new Map<string, Payment[]>();
-  for (const payment of payments ?? []) {
+  for (const payment of payments) {
     const list = paymentsByInvoice.get(payment.invoice_id) ?? [];
     list.push(payment);
     paymentsByInvoice.set(payment.invoice_id, list);
@@ -468,13 +490,13 @@ export async function getStudioBilling(studioId: string): Promise<StudioBilling>
   const interval = currentPlan?.billing_interval ?? "mensal";
 
   const paymentsByInvoice = new Map<string, Payment[]>();
-  for (const payment of payments ?? []) {
+  for (const payment of payments) {
     const list = paymentsByInvoice.get(payment.invoice_id) ?? [];
     list.push(payment);
     paymentsByInvoice.set(payment.invoice_id, list);
   }
 
-  const invoiceRows: InvoiceRow[] = (invoices ?? []).map((invoice) => ({
+  const invoiceRows: InvoiceRow[] = invoices.map((invoice) => ({
     invoice,
     studioName: "",
     studioSlug: "",
@@ -484,7 +506,7 @@ export async function getStudioBilling(studioId: string): Promise<StudioBilling>
 
   const paid = invoiceRows.filter((row) => row.invoice.status === "paga");
   const overdue = invoiceRows.filter((row) => row.effectiveStatus === "vencida");
-  const approvedPayments = (payments ?? []).filter((p) => p.status === "aprovado");
+  const approvedPayments = payments.filter((p) => p.status === "aprovado");
 
   // Pontualidade: só faz sentido sobre fatura efetivamente paga.
   const payDelays = paid

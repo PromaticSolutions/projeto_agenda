@@ -1,6 +1,7 @@
 import "server-only";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/service";
+import { fetchAllPages } from "@/lib/supabase/paginate";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import {
   mockCreateBooking,
@@ -513,13 +514,24 @@ export async function listBookingsForStudiosInRange(
 ): Promise<Booking[]> {
   if (studioIds.length === 0) return [];
   const supabase = createServiceRoleSupabaseClient();
-  const { data, error } = await supabase
-    .from("bookings")
-    .select("*")
-    .in("studio_id", studioIds)
-    .gte("start_at", fromIso)
-    .lte("start_at", toIso)
-    .order("start_at");
-  if (error) throw error;
-  return data ?? [];
+
+  /* Paginado, e não um `select` solto: o PostgREST corta em 1000 linhas sem
+     avisar, e aqui o corte não apareceria como página faltando — apareceria
+     como lembrete que ninguém planejou. A janela é a maior antecedência
+     configurada entre TODOS os estúdios, então cresce com a base.
+
+     O desempate por `id` é o que torna a paginação estável: dois agendamentos
+     no mesmo instante podem trocar de ordem entre uma página e outra, e a
+     linha que troca some do resultado. */
+  return fetchAllPages<Booking>((from, to) =>
+    supabase
+      .from("bookings")
+      .select("*")
+      .in("studio_id", studioIds)
+      .gte("start_at", fromIso)
+      .lte("start_at", toIso)
+      .order("start_at")
+      .order("id")
+      .range(from, to)
+  );
 }
