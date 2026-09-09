@@ -736,3 +736,198 @@ resolver — e instrumentar as seções depois seria varrer a landing de novo.
   ficaria em branco (cenário de rastreador ou bundle abortado), então há uma
   regra `<noscript>` que neutraliza o efeito.
 - A rota `/` sai **estática** no build, apesar das seções interativas.
+
+## Reposicionamento visual para o setor de estética
+
+### A tipografia sóbria foi revertida — de propósito
+
+O par IBM Plex Sans + IBM Plex Mono foi escolhido para o sistema ler como
+"software profissional de gestão", e lia. O problema é que essa era a leitura
+errada para o público: quem contrata o Timely trabalha com estética, e um
+grotesco corporativo com dado em mono faz a página parecer ferramenta de TI.
+
+Agora são **Playfair Display** em título (a serifa editorial que o setor
+reconhece de revista e de vitrine) e **Nunito Sans** no corpo (humanista, de
+terminações arredondadas, com a altura-x que tela densa exige). O IBM Plex Mono
+sobreviveu com papel bem menor: só IDENTIFICADOR — nome de instância, slug,
+chave. Horário e valor saíram do mono e viraram `tabular-nums`, que alinha a
+coluna sem o ar de terminal.
+
+**A serifa só entra a partir de ~1.25rem.** A regra base aplicava
+`font-heading` até `h4`; com uma sans isso era inofensivo, com uma display de
+alto contraste não é — `h3`/`h4` sem classe de tamanho caem em 1rem, e a
+Playfair a 16px perde as hastes finas. A regra agora cobre `h1`/`h2`, `h3`/`h4`
+voltaram para a sans, e `font-heading` foi removido de `card.tsx`,
+`dialog.tsx`, `onboarding-preview.tsx` e dos preços do `booking-flow.tsx`, que
+eram usos em corpo pequeno. O `tracking-tight` saiu dos títulos: tracking
+negativo fecha os brancos internos da serifa e come justamente o desenho pelo
+qual ela foi escolhida.
+
+### Neutros quentes e cantos macios
+
+Nenhum cinza do sistema é neutro puro agora — todos carregam um resto de
+vermelho. O fundo saiu de `#f4f5f7` (cinza frio) para `#faf7f4` (marfim), e o
+tema escuro seguiu junto, de cinza azulado para cinza com resto de vinho: a
+marca é roxa e ficava mal acomodada sobre um fundo frio.
+
+A escala de raio parava em 10px no MAIOR passo, deixando botão e campo com 4px.
+Canto duro é um dos sinais mais fortes de "ferramenta técnica". Agora
+`rounded-lg` (botão, campo — 41 usos) vale 10px e `rounded-2xl` (o `panel`)
+vale 16px. Continua uma escala curta: nada aqui vira pílula.
+
+O `panel` ganhou `--shadow-panel`, uma sombra baixa e quente. Só a borda de 1px
+era o desenho de planilha; só a sombra deixaria o bloco sem contorno no tema
+escuro, onde ela some. Os dois juntos dão separação com ar de papel apoiado.
+
+**A ação primária continua violeta, não magenta.** Magenta sobre branco fica em
+~4,9:1 e o violeta em ~6,6:1 — trocar a cor de todo botão do sistema por uma
+menos legível seria pagar acessibilidade por charme. O rosa ganhou espaço onde
+decora sem carregar texto pequeno. Os dez pares de cor do sistema foram medidos
+e todos passam em AA (4,5:1) nos dois temas.
+
+### Consentimento de cookies
+
+O aviso é FLUTUANTE e não bloqueante, e as duas opções têm o mesmo peso visual.
+Modal que trava a página até o clique irrita quem chegou para ler e, por coagir,
+enfraquece o consentimento que diz coletar; recusa escondida tem o mesmo
+problema. Não há X que fecha sem escolher — fechar sem responder viraria
+consentimento presumido.
+
+O texto descreve o que o site FAZ, conferido no navegador: a landing e o login
+não escrevem cookie nenhum antes de entrar, e não existe analytics instalado.
+Por isso nada de "parceiros de publicidade".
+
+O que a escolha controla de fato é o `track()` de `lib/analytics.ts`, que agora
+só despacha com consentimento. O corte fica ali, e não no provedor futuro, para
+que ligar uma ferramenta continue sendo um `addEventListener` num lugar só —
+ela nasce sem receber dado de quem recusou, sem precisar saber que
+consentimento existe.
+
+A escolha vive num cookie próprio (`timely.consent`, 180 dias), lido por
+`useSyncExternalStore` — cookie é estado externo, e `useState`+`useEffect` aqui
+gera o render em cascata que o compilador do React 19 aponta. O instantâneo do
+servidor é `"desconhecida"`, não `"nenhuma"`: chutar "nenhuma" colocaria o
+cartão no HTML de toda visita, inclusive de quem já respondeu, para escondê-lo
+na hidratação.
+
+## Base de conformidade com a LGPD
+
+### O aviso de cookies tem um botão só, e isso é honestidade
+
+Não existe cookie de rastreamento neste site — conferido no navegador: a
+landing, a página pública e o login não escrevem cookie nenhum, e os de sessão
+do Supabase só nascem depois de entrar. O "Aceitar" grava `analytics: false`,
+porque não há analytics para autorizar. Um botão "Recusar" ao lado sugeriria
+que existe algo sendo recusado, que é teatro de consentimento.
+
+A categoria `analytics` existe mesmo assim em `lib/consent.ts`, e nasce
+`false`. Quando um provedor for ligado, o banner ganha o segundo botão sem que
+cookie, gate ou política precisem ser refeitos.
+
+### `policyVersion` dentro do cookie, e comparação por igualdade
+
+O cookie guarda a versão da política aceita. `isConsentCurrent` compara por
+IGUALDADE, não por ordem: versões são rótulos ("2026-09"), e `<` daria a
+resposta errada no dia em que o formato mudar. Cookie de versão desconhecida —
+anterior OU posterior — manda perguntar de novo, que é o lado seguro. Registro
+corrompido cai no mesmo caminho: `parseConsent` devolve `null` e o banner volta.
+
+A data exibida em `/politica-de-privacidade` é DERIVADA de `POLICY_VERSION`,
+não digitada. Se as duas pudessem divergir, o texto mudaria sem ninguém ser
+perguntado de novo.
+
+### `consent.ts` e `consent-server.ts` são dois arquivos por necessidade
+
+`next/headers` lança fora do runtime de servidor, e o núcleo é importado pelo
+banner, que é Client Component. Num arquivo só, o bundle do navegador
+arrastaria `next/headers` e a página quebraria na hidratação. O que os dois
+lados compartilham — parse, categorias, versão — ficou num lugar só.
+
+O instantâneo de `useSyncExternalStore` devolve a STRING crua do cookie, não o
+registro parseado: o hook compara por identidade, e um objeto novo a cada
+leitura seria laço infinito de render. E o instantâneo do servidor é
+`"desconhecida"`, distinto de "não existe cookie" — chutar "não existe" poria o
+cartão no HTML de toda visita, inclusive de quem já respondeu, para escondê-lo
+na hidratação.
+
+### Consentimento do agendamento é tabela, não coluna
+
+`consents` (0015) guarda um FATO DATADO: quem aceitou qual versão da política,
+quando. Um booleano em `bookings` responderia "aceitou?" e perderia qual texto
+foi aceito — que é justamente o que muda quando a política é reescrita. Em
+tabela à parte o registro sobrevive ao agendamento ser excluído (`on delete set
+null`), e é isso que mantém a prova de pé.
+
+A policy é `for select`, não `for all`: o dono precisa consultar para responder
+ao titular, mas registro de consentimento que o interessado pode reescrever não
+prova nada.
+
+**A falha ao gravar o consentimento NÃO derruba o agendamento.** O horário já
+está reservado quando o registro roda, e a constraint anti-colisão significa
+que desfazer abriria a vaga que a pessoa acabou de garantir — ela veria "não
+foi possível confirmar" para um horário que é dela. O aceite em si é validado
+ANTES, pelo `createBookingSchema` no servidor: nada é criado sem ele. O que se
+perde numa falha é a prova, não o ato, e por isso o resultado volta na resposta
+da API (`consent`) e a falha vai para o log.
+
+### O canal do art. 18 fica sob `/[slug]`, não na plataforma
+
+O controlador dos dados de agendamento é o estúdio, não o Timely. Um canal
+único da plataforma daria a impressão errada de quem decide e ainda obrigaria a
+cliente a lembrar em qual estúdio marcou — o link já carrega isso.
+
+O formulário NÃO pede documento: exigir prova de identidade para exercer um
+direito transformaria isso numa nova coleta de dado sensível. A verificação
+acontece quando o estúdio for atender, e ele já conhece a cliente pelo telefone.
+
+O atendimento é manual de propósito. Apagar dados pode esbarrar em guarda
+fiscal ou atendimento em andamento; automatizar exclusão sem essa avaliação
+criaria um botão de apagar histórico disfarçado de conformidade.
+
+## O aviso de lead ganhou um remetente próprio
+
+### Por que não bastava "cadastrar o WhatsApp que recebe"
+
+WhatsApp não tem caixa de entrada avulsa: para a mensagem chegar, alguma sessão
+conectada precisa ENVIAR. Quem lê o QR vira o remetente, não o destinatário —
+daí a tela pedir dois números em vez de um. Se forem o mesmo, a mensagem cai em
+"Mensagem para você mesmo", que é o arranjo de quem tem um chip só.
+
+### A instância da plataforma é separada da de cada estúdio
+
+Até aqui `message_outbox.studio_id` era `not null` e o disparador derivava a
+instância de `instanceNameForStudio(studio_id)` — ou seja, todo envio saía pela
+sessão de um inquilino. Mandar aviso de lead por ali significaria usar o
+WhatsApp de um cliente para tráfego que não é dele.
+
+A 0017 torna `studio_id` opcional (nulo = mensagem da plataforma) e cria
+`platform_whatsapp`, linha única com a sessão própria e o número de destino. A
+policy de leitura do outbox compara `studio_id in (...)`, e nulo não casa com
+nada — então nenhum dono passa a ver mensagem da plataforma. O índice único de
+idempotência já era parcial em `booking_id is not null`, então avisos sem
+agendamento não colidem entre si.
+
+No disparador o desvio é de três linhas: a instância vem da plataforma quando
+`studio_id` é nulo, do estúdio quando não é. Expiração, tentativa e erro não
+sabem a diferença.
+
+### A fila só nasce com a sessão de pé
+
+`leadNotifyTarget()` devolve número apenas quando existe destino E o status é
+`conectado`. Sem essa checagem o aviso entraria na fila para ser adiado a cada
+rodada do cron até expirar — barulho no log para um envio que nunca ia sair. O
+lead em si é gravado de qualquer jeito: perder a notificação é um problema,
+perder o lead é outro.
+
+### As variáveis de ambiente viraram fallback
+
+`LEADS_NOTIFY_PHONE` e `LEADS_NOTIFY_STUDIO_ID` continuam funcionando para quem
+já as tinha, mas a fonte preferida é a tabela. Variável de ambiente exige
+redeploy para trocar um número e obriga alguém a descobrir o UUID de um estúdio
+para preencher o remetente — que nem é mais o desenho.
+
+### Cada server action repete o `checkPlatformAdmin`
+
+Server Action é endpoint público. O layout do /superadmin esconder a tela não
+impede alguém de chamar a action direto, então o guard está em cada uma, não só
+na rota. Mesmo raciocínio do lado do estúdio, onde o guard é `getMyStudio()`.

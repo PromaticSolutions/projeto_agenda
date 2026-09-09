@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getPublicStudioBySlug } from "@/lib/data/studios";
@@ -55,7 +56,7 @@ export default async function PublicStudioPage(props: StudioPageProps) {
           </span>
         )}
         <div>
-          <h1 className="font-heading text-3xl font-semibold tracking-tight">{studio.name}</h1>
+          <h1 className="font-heading text-3xl font-semibold">{studio.name}</h1>
           <p className="mt-1 text-sm text-white/80">Seu próximo momento começa por aqui.</p>
         </div>
         <div className="relative mt-1 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs font-medium text-white/80">
@@ -74,9 +75,20 @@ export default async function PublicStudioPage(props: StudioPageProps) {
         )}
       </main>
 
-      <footer className="relative px-4 py-7 text-center text-xs text-muted-foreground">
+      <footer className="relative flex flex-col items-center gap-3 px-4 py-7 text-center text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-950/8 bg-white/60 px-3 py-1.5 shadow-sm">
           <Sparkles className="size-3 text-violet-600" /> Agendamento por <span className="font-semibold text-plum-900">Timely</span>
+        </span>
+        {/* O canal do art. 18 da LGPD precisa ser ALCANÇÁVEL, não só existir
+            escrito na política. Aqui é o único lugar do produto por onde uma
+            cliente do estúdio passa — ela não tem login nem painel. */}
+        <span className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+          <Link href={`/${slug}/meus-dados`} className="underline underline-offset-4 hover:text-foreground">
+            Meus dados
+          </Link>
+          <Link href="/politica-de-privacidade" className="underline underline-offset-4 hover:text-foreground">
+            Privacidade
+          </Link>
         </span>
       </footer>
     </div>

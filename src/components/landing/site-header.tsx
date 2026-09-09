@@ -26,6 +26,7 @@ const SECTIONS = [
   { href: "#rotina", label: "A rotina" },
   { href: "#como-funciona", label: "Como funciona" },
   { href: "#whatsapp", label: "WhatsApp" },
+  { href: "#para-quem", label: "Para quem é" },
   { href: "#duvidas", label: "Dúvidas" },
 ];
 
@@ -63,9 +64,17 @@ export function SiteHeader() {
   return (
     <header
       className={cn(
-        "sticky top-0 z-50 w-full transition-colors duration-300",
-        // Só ganha fundo depois de sair do topo: sobre o hero escuro, uma
-        // barra opaca desde o início cortaria a composição em duas.
+        "sticky top-0 z-50 w-full bg-plum-900 transition-colors duration-300",
+        // O fundo é o MESMO do hero, e por isso a barra não aparece como
+        // barra no topo: as duas superfícies se encostam e a composição
+        // continua inteira. Deixar o header transparente aqui — que era o
+        // desenho anterior — só funcionaria se ele estivesse SOBRE o hero;
+        // sendo `sticky`, ele ocupa a faixa acima dele, sobre o fundo claro
+        // da página, e o texto em blush-50 sumia contra o branco.
+        //
+        // Depois do topo, o que muda é a separação: translucidez, desfoque e
+        // uma borda, para o conteúdo claro que passa por baixo não encostar
+        // no menu.
         scrolled
           ? "border-b border-white/10 bg-plum-900/80 backdrop-blur-md"
           : "border-b border-transparent"

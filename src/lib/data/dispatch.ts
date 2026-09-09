@@ -1,6 +1,10 @@
 import "server-only";
 import { listEnabledReminderSettings } from "@/lib/data/reminders";
 import { listStudiosByIds } from "@/lib/data/studios";
+import {
+  savePlatformWhatsApp,
+  type PlatformWhatsApp,
+} from "@/lib/data/platform-whatsapp";
 import { listServicesByStudioIds } from "@/lib/data/services";
 import { listBookingsForStudiosInRange } from "@/lib/data/bookings";
 import { saveWhatsAppConnection } from "@/lib/data/whatsapp";
@@ -22,6 +26,7 @@ import {
 import {
   WhatsAppProviderError,
   getWhatsAppProvider,
+  instanceNameForPlatform,
   instanceNameForStudio,
   type WhatsAppProvider,
 } from "@/lib/whatsapp/provider";
@@ -142,6 +147,38 @@ export async function planReminderQueue(now = new Date()): Promise<{
  * "conectado" enquanto a sessão caiu, com todas as mensagens do estúdio
  * gastando as quatro tentativas até serem dadas como falhas.
  */
+/**
+ * A gêmea da função abaixo, para a instância da plataforma.
+ *
+ * Duplicação deliberada e curta: as duas consultam o mesmo gateway e gravam o
+ * mesmo formato, mas em tabelas diferentes e com chaves diferentes (uma tem
+ * `studio_id`, a outra é linha única). Generalizar renderia uma função com um
+ * parâmetro "onde salvar" e dois caminhos por dentro — mais difícil de ler que
+ * as duas lado a lado.
+ */
+export async function syncPlatformWhatsApp(
+  provider: WhatsAppProvider
+): Promise<PlatformWhatsApp> {
+  const instanceName = instanceNameForPlatform();
+  try {
+    const status = await provider.status(instanceName);
+    return await savePlatformWhatsApp({
+      status: status.state,
+      instance_name: instanceName,
+      connected_phone: status.phone,
+      last_error: status.state === "erro" ? status.error : null,
+      ...(status.state === "conectado" ? { last_connected_at: new Date().toISOString() } : {}),
+    });
+  } catch (cause) {
+    const message = cause instanceof Error ? cause.message : "Falha ao consultar o gateway";
+    return savePlatformWhatsApp({
+      status: "erro",
+      instance_name: instanceName,
+      last_error: message,
+    });
+  }
+}
+
 export async function syncWhatsAppConnection(
   studioId: string,
   provider: WhatsAppProvider
@@ -191,11 +228,22 @@ export async function sendDueMessages(options?: {
 
   // Um sync por estúdio, não por mensagem: dez lembretes do mesmo salão
   // compartilham a mesma sessão.
-  const studioIds = [...new Set(claimed.map((m) => m.studio_id))];
+  const studioIds = [
+    ...new Set(claimed.map((m) => m.studio_id).filter((id): id is string => id !== null)),
+  ];
   const connections = new Map<string, WhatsAppConnection>();
   for (const studioId of studioIds) {
     connections.set(studioId, await syncWhatsAppConnection(studioId, provider));
   }
+
+  /* Mensagem SEM estúdio é da plataforma (migração 0017) e sai pela instância
+     de plataforma — não pela de um inquilino. Sincronizada uma vez, e só se
+     existir alguma mensagem assim no lote: quem nunca configurou o aviso de
+     lead não deve pagar uma ida ao gateway por rodada do cron. */
+  const temMensagemDaPlataforma = claimed.some((m) => m.studio_id === null);
+  const plataforma = temMensagemDaPlataforma
+    ? await syncPlatformWhatsApp(provider)
+    : null;
 
   const staleBefore = new Date(now.getTime() - STALE_AFTER_MINUTES * 60_000);
   let enviadas = 0;
@@ -212,16 +260,31 @@ export async function sendDueMessages(options?: {
       continue;
     }
 
-    const connection = connections.get(message.studio_id);
-    if (!connection || connection.status !== "conectado" || !connection.instance_name) {
-      await releaseMessage(message, "WhatsApp do estúdio não está conectado");
+    /* Duas origens, uma máquina de estados: a instância do estúdio quando a
+       mensagem é de um inquilino, a da plataforma quando não é. O resto do
+       laço — expiração, tentativa, erro — não sabe a diferença. */
+    const remetente =
+      message.studio_id === null
+        ? { instancia: plataforma?.instance_name ?? null, ok: plataforma?.status === "conectado" }
+        : {
+            instancia: connections.get(message.studio_id)?.instance_name ?? null,
+            ok: connections.get(message.studio_id)?.status === "conectado",
+          };
+
+    if (!remetente.ok || !remetente.instancia) {
+      await releaseMessage(
+        message,
+        message.studio_id === null
+          ? "WhatsApp da plataforma não está conectado"
+          : "WhatsApp do estúdio não está conectado"
+      );
       adiadas++;
       continue;
     }
 
     try {
       const { providerMessageId } = await provider.sendText({
-        instanceName: connection.instance_name,
+        instanceName: remetente.instancia,
         toPhone: message.to_phone,
         body: message.body,
       });

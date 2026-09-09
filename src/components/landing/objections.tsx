@@ -19,6 +19,10 @@ import { Reveal } from "@/components/landing/reveal";
 
 const FAQ = [
   {
+    q: "O que é o Timely?",
+    a: "Uma agenda online para quem trabalha com horário marcado. Você cadastra seus procedimentos, com duração e valor, e os horários em que atende. A partir daí tem um link público para compartilhar: a cliente escolhe o horário sozinha, e o lembrete de confirmação sai pelo seu WhatsApp, sem você digitar.",
+  },
+  {
     q: "Preciso entender de tecnologia?",
     a: "Não. Você cadastra seus procedimentos e horários uma vez, e o resto acontece sozinho. A proposta é justamente tirar trabalho da sua rotina, não acrescentar.",
   },
@@ -39,6 +43,10 @@ const FAQ = [
     a: "Ainda não. Hoje o Timely trabalha com uma agenda por conta. Se o seu espaço tem várias pessoas atendendo em paralelo, essa divisão não existe no sistema.",
   },
   {
+    q: "Como funciona o cadastro?",
+    a: "Você cria a conta com e-mail e senha e confirma o e-mail. Em seguida monta o seu estúdio em três etapas — o nome, o link público com a cor da sua marca e o WhatsApp de contato. Dá para ajustar tudo depois nas configurações.",
+  },
+  {
     q: "Meus dados ficam seguros?",
     a: "Cada conta só alcança os próprios dados, e isso é imposto no banco — não apenas na tela. Todo o tráfego é por conexão segura.",
   },
@@ -50,7 +58,7 @@ export function Objections() {
       <div className="mx-auto w-full max-w-3xl px-4 sm:px-6">
         <Reveal sectionName="duvidas">
           <p className="section-label text-primary">Dúvidas</p>
-          <h2 className="mt-3 text-[2rem] leading-[1.15] font-semibold tracking-tight text-balance text-foreground sm:text-[2.5rem]">
+          <h2 className="mt-3 text-[2rem] leading-[1.15] font-semibold text-balance text-foreground sm:text-[2.5rem]">
             O que costumam perguntar antes de começar.
           </h2>
         </Reveal>

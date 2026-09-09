@@ -148,6 +148,18 @@ export function instanceNameForStudio(studioId: string): string {
 }
 
 /**
+ * A instância da PRÓPRIA plataforma — a que envia os avisos que não pertencem
+ * a estúdio nenhum (lead novo na landing). Nome fixo pelo mesmo motivo do
+ * derivado acima: reencontrável sem consultar o banco, estável entre deploys.
+ *
+ * O sufixo é uma palavra, não um UUID, para não haver a menor chance de colidir
+ * com o nome de um estúdio — id de estúdio é UUID, e "plataforma" não é.
+ */
+export function instanceNameForPlatform(): string {
+  return `${evolutionInstancePrefix}_plataforma`;
+}
+
+/**
  * Eventos que o app pede ao gateway.
  *
  * QRCODE_UPDATED + CONNECTION_UPDATE são o que faz a tela mudar de "conectando"

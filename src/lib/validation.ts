@@ -225,11 +225,39 @@ export const blockInputSchema = z
 // Agendamentos
 // ---------------------------------------------------------------------------
 
+const ACEITE_OBRIGATORIO = "É preciso aceitar a Política de Privacidade para agendar.";
+
 export const createBookingSchema = z.object({
   serviceId: z.uuid(),
   clientName: clientNameSchema,
   clientPhone: clientPhoneSchema,
   startAt: z.iso.datetime({ offset: true }),
+  /* Aceite da política, exigido NO SERVIDOR e não só no formulário. Um
+     checkbox desmarcável no navegador não é prova de nada: quem chamar a API
+     direto criaria agendamento sem consentimento, e é exatamente esse caminho
+     que precisa estar fechado para o registro em `consents` valer alguma
+     coisa. `refine` em vez de `z.literal(true)` porque a mensagem de erro
+     precisa dizer o que fazer, e não "invalid literal". */
+  privacyAccepted: z
+    // A mensagem se repete no tipo e no refine porque são dois erros
+    // diferentes — campo ausente e campo `false` — e quem chama a API não tem
+    // nada a ganhar sabendo qual dos dois foi.
+    .boolean({ error: ACEITE_OBRIGATORIO })
+    .refine((v) => v === true, ACEITE_OBRIGATORIO),
+});
+
+/**
+ * Solicitação do titular (LGPD art. 18), enviada da página pública
+ * `/[slug]/meus-dados`. `message` é opcional: quem pede exclusão não deve ser
+ * obrigada a justificar — o direito não depende de motivo.
+ */
+export const dataSubjectRequestSchema = z.object({
+  kind: z.enum(["acesso", "correcao", "exclusao", "oposicao"], {
+    error: "Escolha o tipo de solicitação.",
+  }),
+  clientName: clientNameSchema,
+  clientPhone: clientPhoneSchema,
+  message: z.string().trim().max(1000, "Mensagem muito longa").optional(),
 });
 
 export const bookingStatusSchema = z.enum([
@@ -478,6 +506,14 @@ export const leadCaptureSchema = z.object({
 
   // Subprodutos de interações voluntárias, não campos de formulário.
   hours_lost_band: z.enum(values(LEAD_HOURS_BANDS)).optional(),
+  // Contexto do fluxo comercial. Continua opcional no contrato para que o
+  // endpoint aceite capturas curtas, mas a landing o envia já estruturado.
+  team_size: z.enum(values(LEAD_TEAM_SIZES)).optional(),
+  agenda_tools: z.array(z.enum(values(LEAD_AGENDA_TOOLS))).max(LEAD_AGENDA_TOOLS.length).optional(),
+  pain_points: z.array(z.enum(values(LEAD_PAIN_POINTS))).max(LEAD_PAIN_POINTS.length).optional(),
+  weekly_volume: z.enum(values(LEAD_WEEKLY_VOLUMES)).optional(),
+  whatsapp_reliance: z.enum(values(LEAD_WHATSAPP_RELIANCE)).optional(),
+  improvement_wish: z.string().trim().max(1000, "Máximo de 1000 caracteres").optional().or(z.literal("")),
   utm: z.record(z.string(), z.string()).optional(),
 });
 

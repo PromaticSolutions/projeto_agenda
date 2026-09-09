@@ -7,13 +7,18 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-ibm-plex-sans);
+  --font-sans: var(--font-nunito-sans);
   --font-mono: var(--font-ibm-plex-mono);
-  /* Headings usam a MESMA família do corpo: a hierarquia vem de peso,
-     corpo e tracking, não de uma segunda fonte display. Um sistema de
-     gestão fica mais formal com uma única voz tipográfica. O token é
-     mantido para não quebrar as ~40 chamadas de `font-heading` no app. */
-  --font-heading: var(--font-ibm-plex-sans);
+  /* Headings agora têm voz PRÓPRIA: uma serifa editorial contra a sans do
+     corpo. A regra antiga era a oposta — uma família só, hierarquia por peso e
+     corpo — e existia para o sistema soar sóbrio. Soou técnico demais para o
+     público, e a segunda voz é justamente o que dá à página o ar de vitrine em
+     vez de painel de controle.
+
+     Só entra em título GRANDE. `font-heading` está aplicado onde o texto tem
+     corpo para sustentar a serifa; rótulo, tabela, botão e dado seguem na sans,
+     onde a Playfair perderia legibilidade em vez de ganhar charme. */
+  --font-heading: var(--font-playfair-display);
   --color-plum-900: var(--plum-900);
   --color-violet-600: var(--violet-600);
   --color-violet-500: var(--violet-500);
@@ -50,19 +55,22 @@
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
 
-  /* Escala de raio deliberadamente CURTA e quase linear. Antes era
-     `calc(var(--radius) * 2.6)` no topo, o que levava `rounded-4xl` a ~2rem
-     e dava ao painel aparência de cartão de app, não de sistema de gestão.
-     Agora o maior raio é 10px: cantos suaves, nunca "pílula". Componentes
-     que precisam de círculo continuam usando `rounded-full` explicitamente
-     (avatar, marcador de status). */
-  --radius-sm: 0.125rem;
-  --radius-md: 0.1875rem;
-  --radius-lg: 0.25rem;
-  --radius-xl: 0.3125rem;
-  --radius-2xl: 0.375rem;
-  --radius-3xl: 0.5rem;
-  --radius-4xl: 0.625rem;
+  /* Escala de raio. A anterior parava em 10px no MAIOR passo, deixando botão
+     e campo com 4px — quase quadrados. Canto duro é um dos sinais mais fortes
+     de "ferramenta técnica": a mesma caixa, arredondada, lê como convite.
+     Aqui botão e campo (`rounded-lg`, 41 usos) vão a 10px e o painel
+     (`rounded-2xl`) a 16px.
+
+     Ainda assim é uma escala CURTA e nunca chega a "pílula" — o que precisa de
+     círculo continua pedindo `rounded-full` explicitamente (avatar, marcador
+     de status), e nada aqui transforma um cartão de conteúdo em bolha. */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.4375rem;
+  --radius-lg: 0.625rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+  --radius-3xl: 1.25rem;
+  --radius-4xl: 1.5rem;
 }
 
 :root {
@@ -74,66 +82,89 @@
   --blush-50: #fbf4fa;
   --wa: #128c4a;
 
-  /* Fundo neutro-frio em vez do blush rosado: menos "template", mais
-     ferramenta de trabalho. A marca segue presente nos acentos. */
-  --background: #f4f5f7;
-  --foreground: #1c1b22;
+  /* Neutros QUENTES. Eram cinza-frio (#f4f5f7 e derivados), escolhidos para
+     ler como ferramenta de trabalho — e é exatamente essa a temperatura que
+     fazia a página parecer painel de TI. A régua aqui é simples: nenhum cinza
+     puro. Todo neutro carrega um resto de vermelho, o que aproxima a base do
+     marfim sem virar rosa-bebê.
+
+     Os tokens de marca (plum, violeta, magenta, blush, wa) não mudaram: a
+     identidade continua a mesma, o que mudou foi o papel onde ela pousa. */
+  --background: #faf7f4;
+  --foreground: #2b2229;
   --card: #ffffff;
-  --card-foreground: #1c1b22;
+  --card-foreground: #2b2229;
   --popover: #ffffff;
-  --popover-foreground: #1c1b22;
+  --popover-foreground: #2b2229;
+  /* Ação primária segue no violeta da marca, não no magenta. Magenta sobre
+     branco fica em ~4,9:1 e o violeta em ~7,4:1 — trocar a cor de TODO botão
+     do sistema por uma menos legível seria pagar acessibilidade por charme. O
+     rosa ganhou espaço onde ele decora e não carrega texto pequeno: rótulos de
+     seção, selos e superfícies. */
   --primary: var(--violet-600);
   --primary-foreground: #ffffff;
-  --secondary: #eceef2;
-  --secondary-foreground: #2b2a33;
-  --muted: #f1f2f5;
-  --muted-foreground: #61616e;
+  --secondary: #f3ebe7;
+  --secondary-foreground: #3a2f36;
+  --muted: #f6f0ec;
+  --muted-foreground: #6f6068;
   --accent: var(--magenta);
   --accent-foreground: #ffffff;
   --destructive: #c3312f;
-  --border: #dcdee4;
-  --input: #cfd2da;
+  --border: #ebe0da;
+  --input: #ddcfc7;
   --ring: var(--violet-600);
   --chart-1: var(--violet-600);
   --chart-2: var(--magenta);
   --chart-3: #3f7fb8;
   --chart-4: #b0862d;
   --chart-5: #4b4a57;
-  --radius: 0.25rem;
+  --radius: 0.625rem;
   /* Sombra do movimento de hover (ver o utilitário `card-lift`). Fica em
      token porque a mesma sombra precisa de opacidades diferentes nos dois
      temas: no escuro, uma sombra fraca some contra o fundo. */
-  --shadow-lift: 0 14px 28px -14px rgb(28 27 34 / 0.3);
+  --shadow-lift: 0 14px 28px -14px rgb(74 44 60 / 0.28);
+  /* Sombra de repouso dos painéis. NOVA: antes o bloco de conteúdo se separava
+     do fundo só por uma borda de 1px, que é o desenho de planilha. Uma sombra
+     muito baixa e quente faz o mesmo trabalho com ar de papel sobre a mesa. */
+  --shadow-panel: 0 1px 2px rgb(74 44 60 / 0.04), 0 6px 16px -10px rgb(74 44 60 / 0.14);
   --sidebar: #ffffff;
-  --sidebar-foreground: #1c1b22;
+  --sidebar-foreground: #2b2229;
   --sidebar-primary: var(--violet-600);
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #eceef2;
-  --sidebar-accent-foreground: #1c1b22;
-  --sidebar-border: #dcdee4;
+  --sidebar-accent: #f5ede9;
+  --sidebar-accent-foreground: #2b2229;
+  --sidebar-border: #ebe0da;
   --sidebar-ring: var(--violet-600);
 }
 
 .dark {
-  --background: #16161a;
-  --foreground: #e8e8ed;
-  --card: #1e1e24;
-  --card-foreground: #e8e8ed;
-  --popover: #1e1e24;
-  --popover-foreground: #e8e8ed;
+  /* O escuro seguiu o claro para o quente: os cinzas azulados (#16161a e
+     derivados) viraram cinzas com resto de vinho. Sem isto o tema escuro
+     continuaria sendo o painel de TI que o claro deixou de ser, e a marca
+     plum, que é roxa, ficava mal acomodada sobre um fundo frio. */
+  --background: #191317;
+  --foreground: #ede7ea;
+  --card: #221a1f;
+  --card-foreground: #ede7ea;
+  --popover: #221a1f;
+  --popover-foreground: #ede7ea;
   --primary: #9b74f0;
-  --primary-foreground: #16161a;
-  --secondary: #2a2a32;
-  --secondary-foreground: #e8e8ed;
-  --muted: #26262d;
-  --muted-foreground: #a0a0ad;
+  --primary-foreground: #191317;
+  --secondary: #302530;
+  --secondary-foreground: #ede7ea;
+  --muted: #2b212a;
+  --muted-foreground: #ada2a8;
   --accent: #e05fa4;
-  --accent-foreground: #16161a;
+  --accent-foreground: #191317;
   --destructive: #e5726f;
-  --border: #33333d;
-  --input: #3c3c47;
+  --border: #3a2e37;
+  --input: #453742;
   --ring: #9b74f0;
   --shadow-lift: 0 14px 28px -14px rgb(0 0 0 / 0.65);
+  /* No escuro a sombra some contra o fundo; o painel se separa por uma borda
+     um pouco mais clara. O token existe nos dois temas para o utilitário
+     `panel` não precisar saber em qual está. */
+  --shadow-panel: 0 1px 2px rgb(0 0 0 / 0.3);
   --chart-1: #9b74f0;
   --chart-2: #e05fa4;
   /* Azul mais saturado que o #6ba3d8 anterior: naquele passo o token
@@ -143,14 +174,14 @@
      testes nos dois temas — é a paleta usada nos gráficos do /superadmin. */
   --chart-3: #4f97e8;
   --chart-4: #d4a94a;
-  --chart-5: #b8b8c4;
-  --sidebar: #1a1a1f;
-  --sidebar-foreground: #e8e8ed;
+  --chart-5: #c0b2ba;
+  --sidebar: #1e161b;
+  --sidebar-foreground: #ede7ea;
   --sidebar-primary: #9b74f0;
-  --sidebar-primary-foreground: #16161a;
-  --sidebar-accent: #2a2a32;
-  --sidebar-accent-foreground: #e8e8ed;
-  --sidebar-border: #33333d;
+  --sidebar-primary-foreground: #191317;
+  --sidebar-accent: #302530;
+  --sidebar-accent-foreground: #ede7ea;
+  --sidebar-border: #3a2e37;
   --sidebar-ring: #9b74f0;
 }
 
@@ -164,12 +195,22 @@
   html {
     @apply font-sans;
   }
+  /* Só h1 e h2 recebem a serifa. A regra antiga ia até h4, o que com uma sans
+     era inofensivo e com uma display de alto contraste não é: h3/h4 sem classe
+     de tamanho caem em 1rem, e a Playfair a 16px perde as hastes finas e vira
+     ruído numa tela densa. A régua do sistema é ~1.25rem para baixo, sans.
+     Título pequeno que ainda queira a serifa pede `font-heading` na mão. */
   h1,
-  h2,
+  h2 {
+    @apply font-heading;
+    /* Tracking NEUTRO. O -0.011em anterior existia para apertar um grotesco;
+       aplicado a uma serifa de alto contraste ele fecha os brancos internos e
+       come justamente o desenho pelo qual a fonte foi escolhida. */
+    letter-spacing: normal;
+  }
   h3,
   h4 {
-    @apply font-heading;
-    /* Títulos formais: sem tracking solto, sem peso display. */
+    @apply font-sans;
     letter-spacing: -0.011em;
   }
   /* Números em contexto tabular (horários, preços, contadores) alinham em
@@ -197,8 +238,13 @@
    shadow-violet-950/5` que existiam antes. */
 @utility panel {
   background-color: var(--card);
+  /* A borda continua, bem mais clara, e ganhou uma sombra baixa por baixo.
+     Só a borda de 1px era o desenho de planilha; só a sombra deixaria o bloco
+     flutuando sem contorno no tema escuro, onde ela some. Os dois juntos dão a
+     mesma separação com ar de papel apoiado. */
   border: 1px solid var(--border);
   border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-panel);
 }
 
 /* Movimento de hover dos objetos que aparecem em coleção: cards de

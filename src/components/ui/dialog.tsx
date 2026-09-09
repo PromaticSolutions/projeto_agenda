@@ -124,7 +124,7 @@ function DialogTitle({ className, ...props }: DialogPrimitive.Title.Props) {
       className={cn(
         // `text-foreground`, e não o plum fixo que estava aqui: no tema escuro
         // o popover é quase preto, e um roxo #241238 sumia dentro dele.
-        "font-heading text-lg leading-none font-semibold text-foreground",
+        "text-lg leading-none font-semibold text-foreground",
         className
       )}
       {...props}
