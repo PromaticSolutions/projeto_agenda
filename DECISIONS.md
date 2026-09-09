@@ -1014,3 +1014,64 @@ agendamentos usa.
 - `PATCH /api/leads` e `updateLeadContext` não têm chamador: o formulário virou
   multi-etapas e manda o contexto inteiro na captura. A rota continua de pé e
   validada; remover é limpeza, não correção.
+
+## Avaliação do sistema inteiro (2026-09-09, segunda passada)
+
+### O corte de mil linhas do PostgREST era o achado mais caro
+
+`db.max_rows = 1000` (supabase/config.toml) vale para TODA resposta, e o corte
+não é um erro: são as primeiras mil linhas, status 200, `error: null`. Numa
+listagem isso é uma página incompleta. Nas leituras que AGREGAM é outra coisa:
+
+- o planejador de lembretes lê os agendamentos de todos os estúdios na janela
+  da maior antecedência configurada — passando de mil, o lembrete da
+  milésima-primeira cliente não é planejado, e nada acusa;
+- MRR, inadimplência, receita realizada, volume atendido, ticket médio, taxa de
+  retorno e a série diária do gráfico são somas sobre a plataforma inteira ou
+  sobre todo o histórico de um estúdio;
+- "quantas vezes veio" e "última visita" na tela de clientes encolhem
+  justamente para os clientes mais antigos.
+
+`fetchAllPages` (src/lib/supabase/paginate.ts) percorre com `.range()` e tem
+teto de 50 mil linhas: acima disso ele levanta erro em vez de virar consulta
+infinita — nesse ponto o cálculo precisa descer para o banco (view ou função de
+agregação), não subir o teto daqui.
+
+Toda consulta paginada ganhou desempate por `id`. Sem ordem total, uma linha
+empatada em `start_at` (ou em `name`) troca de página entre uma chamada e
+outra, e some do resultado — o mesmo bug que a paginação veio corrigir, em
+menor escala.
+
+Ficaram de fora, de propósito: serviços, turnos e bloqueios de um estúdio (teto
+natural pequeno) e as listagens de tela, que já têm `.limit()` explícito.
+
+### Erro de auth não fala mais inglês
+
+O login traduzia um caso e repassava o resto cru; cadastro, recuperação e troca
+de senha repassavam tudo. `authErrorMessage` lê o `code` primeiro (estável
+entre versões do GoTrue) e o texto como reserva. O fallback não repete a
+mensagem original: se não está mapeada, é texto técnico em inglês, e mostrá-lo
+não ajuda ninguém.
+
+Uma diferença de comportamento veio junto na tela de nova senha: antes, link
+expirado, senha fraca e senha igual à anterior viravam todas "solicite uma nova
+redefinição", e a pessoa refazia o processo inteiro por causa de uma senha que
+só precisava trocar.
+
+### /superadmin entrou no proxy pela renovação, não pelo bloqueio
+
+O layout já barra quem não é `platform_admin`. O que faltava era atualizar o
+cookie de sessão: quem passasse uma hora inteira dentro do painel sem tocar em
+nenhuma rota do /app via o access token expirar e caía no login no meio do
+trabalho.
+
+### Cabeçalhos de segurança, menos CSP
+
+nosniff, SAMEORIGIN, Referrer-Policy, Permissions-Policy e HSTS — o mínimo para
+um app que coleta nome, telefone e e-mail de terceiros, e que nem o Next nem a
+Vercel colocam sozinhos.
+
+`Content-Security-Policy` ficou de fora porque uma CSP útil aqui precisa de
+nonce por requisição (o Next injeta script inline) e da lista de origens do
+Supabase e do Storage. Escrita no chute, ela quebra a página pública em
+produção sem aviso — é trabalho próprio, não linha copiada.
