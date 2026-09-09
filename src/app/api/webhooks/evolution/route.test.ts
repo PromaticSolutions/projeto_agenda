@@ -23,6 +23,17 @@ vi.mock("@/lib/data/whatsapp", () => ({
     saveConnection(studioId, patch),
 }));
 
+// A conexão da plataforma é linha única em outra tabela (0017). O receptor
+// precisa reconhecê-la pelo nome da instância; sem isso, o evento dela caía no
+// caminho de "instância desconhecida".
+const readPlatform = vi.fn<() => Promise<{ status: string; connected_phone: string | null }>>();
+const savePlatform = vi.fn<(patch: Record<string, unknown>) => Promise<unknown>>();
+
+vi.mock("@/lib/data/platform-whatsapp", () => ({
+  getPlatformWhatsApp: () => readPlatform(),
+  savePlatformWhatsApp: (patch: Record<string, unknown>) => savePlatform(patch),
+}));
+
 function connectionOf(overrides: Partial<WhatsAppConnection> = {}): WhatsAppConnection {
   return {
     studio_id: "estudio-A",
@@ -53,6 +64,10 @@ beforeEach(() => {
   findConnection.mockReset();
   saveConnection.mockReset();
   saveConnection.mockResolvedValue({} as WhatsAppConnection);
+  readPlatform.mockReset();
+  readPlatform.mockResolvedValue({ status: "conectando", connected_phone: null });
+  savePlatform.mockReset();
+  savePlatform.mockResolvedValue({});
   process.env.EVOLUTION_WEBHOOK_SECRET = SEGREDO;
   process.env.NEXT_PUBLIC_SUPABASE_URL = "https://projeto.supabase.co";
   process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role-de-teste";
@@ -123,6 +138,48 @@ describe("multi-tenant", () => {
     });
     expect(saveConnection).toHaveBeenCalledTimes(1);
     expect(saveConnection.mock.calls[0]![0]).toBe("estudio-A");
+  });
+});
+
+describe("instância da plataforma", () => {
+  const INSTANCIA = "promatic_plataforma";
+
+  it("grava em platform_whatsapp, e não na tabela dos estúdios", async () => {
+    const response = await post({
+      event: "connection.update",
+      instance: INSTANCIA,
+      data: { state: "open", wuid: "5511934476935@s.whatsapp.net" },
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ ok: true, handled: true });
+    expect(saveConnection).not.toHaveBeenCalled();
+    expect(findConnection).not.toHaveBeenCalled();
+    expect(savePlatform).toHaveBeenCalledTimes(1);
+    expect(savePlatform.mock.calls[0]![0]).toMatchObject({
+      status: "conectado",
+      connected_phone: "5511934476935",
+    });
+  });
+
+  it("derruba o estado quando a sessão da plataforma some do celular", async () => {
+    readPlatform.mockResolvedValue({ status: "conectado", connected_phone: "5511934476935" });
+    await post({ event: "logout.instance", instance: INSTANCIA, data: {} });
+
+    expect(savePlatform.mock.calls[0]![0]).toMatchObject({
+      status: "desconectado",
+      connected_phone: null,
+    });
+  });
+
+  it("QR novo não rebaixa uma sessão da plataforma já aberta", async () => {
+    // Evento atrasado depois do pareamento: dizer "conectando" aqui faria o
+    // aviso de lead parar de ser enfileirado por uma conexão que está de pé.
+    readPlatform.mockResolvedValue({ status: "conectado", connected_phone: "5511934476935" });
+    const response = await post({ event: "qrcode.updated", instance: INSTANCIA, data: {} });
+
+    await expect(response.json()).resolves.toMatchObject({ handled: false });
+    expect(savePlatform).not.toHaveBeenCalled();
   });
 });
 
