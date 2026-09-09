@@ -65,6 +65,29 @@ export async function createDataSubjectRequest(
 }
 
 /**
+ * Quantas solicitações este estúdio recebeu na janela recente.
+ *
+ * `head: true` pede só a contagem: o teto não precisa das linhas, e trazê-las
+ * seria transferir dado pessoal de titulares para decidir um número.
+ */
+export async function countRecentDataRequests(
+  studioId: string,
+  windowMinutes: number
+): Promise<number> {
+  if (!isSupabaseServiceConfigured) return 0;
+
+  const since = new Date(Date.now() - windowMinutes * 60_000).toISOString();
+  const supabase = createServiceRoleSupabaseClient();
+  const { count, error } = await supabase
+    .from("data_subject_requests")
+    .select("id", { count: "exact", head: true })
+    .eq("studio_id", studioId)
+    .gte("created_at", since);
+  if (error) throw error;
+  return count ?? 0;
+}
+
+/**
  * A fila do estúdio. Sem paginação de propósito: uma conta que acumular
  * centenas de solicitações abertas tem um problema de processo, não de
  * interface, e o limite deixa isso visível em vez de esconder.

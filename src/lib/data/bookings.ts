@@ -185,6 +185,30 @@ export type CreateBookingOutcome =
  * a sugestão no cliente, e ainda depende da exclusion constraint do Postgres
  * como última linha de defesa contra corrida (ver RISKS.md).
  */
+/**
+ * Quantos agendamentos este estúdio recebeu pela página pública na janela
+ * recente. Usado como teto anti-abuso em `/api/bookings`.
+ *
+ * `head: true` traz só a contagem — nenhum dado de cliente atravessa a rede
+ * para decidir um número.
+ */
+export async function countRecentBookings(
+  studioId: string,
+  windowMinutes: number
+): Promise<number> {
+  if (!isSupabaseConfigured) return 0;
+
+  const since = new Date(Date.now() - windowMinutes * 60_000).toISOString();
+  const supabase = createServiceRoleSupabaseClient();
+  const { count, error } = await supabase
+    .from("bookings")
+    .select("id", { count: "exact", head: true })
+    .eq("studio_id", studioId)
+    .gte("created_at", since);
+  if (error) throw error;
+  return count ?? 0;
+}
+
 export async function createBookingServerSide(
   input: CreateBookingInput
 ): Promise<CreateBookingOutcome> {

@@ -91,6 +91,9 @@ um provedor de e-mail, desative em Authentication → Providers → Email →
   PLATAFORMA, separada da de cada estúdio. É por ela que o aviso de lead novo
   chega; configura-se em `/superadmin/whatsapp`. Também torna
   `message_outbox.studio_id` opcional: nulo = mensagem da plataforma.
+- `supabase/migrations/0018_rate_limit_indexes.sql` — índice
+  `(studio_id, created_at desc)` em `bookings`, que sustenta o teto anti-abuso
+  por janela de `/api/bookings`.
 
 Decisões e riscos documentados em [DECISIONS.md](DECISIONS.md) e
 [RISKS.md](RISKS.md). Status do projeto em [REPORT.md](REPORT.md).

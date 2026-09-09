@@ -1,6 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getPublicStudioBySlug } from "@/lib/data/studios";
-import { createDataSubjectRequest } from "@/lib/data/data-requests";
+import {
+  countRecentDataRequests,
+  createDataSubjectRequest,
+} from "@/lib/data/data-requests";
 import { dataSubjectRequestSchema } from "@/lib/validation";
 
 /**
@@ -16,6 +19,22 @@ import { dataSubjectRequestSchema } from "@/lib/validation";
  * estúdio for atender o pedido — ele já conhece a cliente pelo telefone, que é
  * o mesmo identificador do agendamento. O que se grava aqui é o PEDIDO.
  */
+
+/**
+ * Teto por estúdio e por janela.
+ *
+ * Não exigir identidade é o que torna o canal utilizável; é também o que o
+ * deixa aberto para alguém entupir a fila de um salão com pedidos falsos. O
+ * número é alto o bastante para nunca alcançar quem realmente precisa exercer
+ * um direito — ninguém abre dez solicitações em dez minutos — e baixo o
+ * bastante para que o script pare cedo.
+ *
+ * Contado no banco, e não em memória, pela mesma razão de /api/leads: cada
+ * requisição pode cair numa instância diferente da plataforma, e um contador
+ * em memória começaria do zero em cada uma.
+ */
+const MAX_REQUESTS_PER_WINDOW = 10;
+const WINDOW_MINUTES = 10;
 export async function POST(request: NextRequest) {
   let body: unknown;
   try {
@@ -43,6 +62,17 @@ export async function POST(request: NextRequest) {
   const studio = await getPublicStudioBySlug(slug);
   if (!studio) {
     return NextResponse.json({ error: "Estúdio não encontrado" }, { status: 404 });
+  }
+
+  const recentes = await countRecentDataRequests(studio.id, WINDOW_MINUTES);
+  if (recentes >= MAX_REQUESTS_PER_WINDOW) {
+    return NextResponse.json(
+      {
+        error:
+          "Já recebemos várias solicitações agora. Tente novamente em alguns minutos — nada do que você enviou se perdeu.",
+      },
+      { status: 429, headers: { "Retry-After": String(WINDOW_MINUTES * 60) } }
+    );
   }
 
   const result = await createDataSubjectRequest({
