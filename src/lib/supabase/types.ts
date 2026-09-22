@@ -47,6 +47,20 @@ export type WhatsAppConnectionStatus =
   | "conectado"
   | "erro";
 
+/** enums `whatsapp_message_*` — 0019_whatsapp_messages.sql */
+export type WhatsAppMessageDirection = "recebida" | "enviada";
+
+export type WhatsAppMessageType =
+  | "texto"
+  | "imagem"
+  | "video"
+  | "audio"
+  | "documento"
+  | "figurinha"
+  | "localizacao"
+  | "contato"
+  | "outro";
+
 /** enums de cobrança — 0011_billing.sql */
 export type PlanInterval = "mensal" | "anual";
 
@@ -149,6 +163,32 @@ export interface Database {
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["services"]["Insert"]>;
+        Relationships: [];
+      };
+      /** 0020_service_attachments.sql — fotos e anexos internos do serviço. */
+      service_attachments: {
+        Row: {
+          id: string;
+          studio_id: string;
+          service_id: string;
+          /** Caminho no bucket privado `service-attachments`, prefixado por `<studio_id>/`. */
+          storage_path: string;
+          file_name: string;
+          mime_type: string;
+          size_bytes: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          studio_id: string;
+          service_id: string;
+          storage_path: string;
+          file_name: string;
+          mime_type: string;
+          size_bytes: number;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["service_attachments"]["Insert"]>;
         Relationships: [];
       };
       working_hours: {
@@ -347,6 +387,52 @@ export interface Database {
           updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["platform_whatsapp"]["Insert"]>;
+        Relationships: [];
+      };
+      /** 0019_whatsapp_messages.sql — conversas com clientes cadastradas. */
+      whatsapp_messages: {
+        Row: {
+          id: string;
+          studio_id: string;
+          /** 0021 — nulo quando o número não é de uma cliente cadastrada. */
+          client_id: string | null;
+          /** 0021 — JID do WhatsApp: `<numero>@s.whatsapp.net` ou `<id>@g.us`. */
+          chat_id: string;
+          /** Só dígitos; nulo em grupo. */
+          chat_phone: string | null;
+          /** pushName do contato ou assunto do grupo, quando o evento traz. */
+          chat_name: string | null;
+          /** Em grupo, quem falou. */
+          sender_name: string | null;
+          is_group: boolean;
+          direction: WhatsAppMessageDirection;
+          message_type: WhatsAppMessageType;
+          /** Texto, legenda ou nome do arquivo. Nulo para mídia sem legenda. */
+          body: string | null;
+          /** `key.id` do WhatsApp — único por estúdio. */
+          provider_message_id: string;
+          sent_at: string;
+          read_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          studio_id: string;
+          client_id?: string | null;
+          chat_id: string;
+          chat_phone?: string | null;
+          chat_name?: string | null;
+          sender_name?: string | null;
+          is_group?: boolean;
+          direction: WhatsAppMessageDirection;
+          message_type?: WhatsAppMessageType;
+          body?: string | null;
+          provider_message_id: string;
+          sent_at: string;
+          read_at?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["whatsapp_messages"]["Insert"]>;
         Relationships: [];
       };
       /** 0016_data_subject_requests.sql — canal do art. 18 da LGPD. */
@@ -681,7 +767,28 @@ export interface Database {
         Relationships: [];
       };
     };
-    Views: Record<string, never>;
+    Views: {
+      /** 0019 — última mensagem e não lidas por cliente (security_invoker). */
+      whatsapp_conversations: {
+        Row: {
+          studio_id: string;
+          /** JID que identifica a conversa — é o id na URL de /app/conversations. */
+          chat_id: string;
+          chat_phone: string | null;
+          is_group: boolean;
+          /** Preenchido quando o telefone bate com uma cliente do estúdio. */
+          client_id: string | null;
+          /** Nome do cadastro, ou o do WhatsApp, ou o próprio número. */
+          display_name: string;
+          last_body: string | null;
+          last_type: WhatsAppMessageType;
+          last_direction: WhatsAppMessageDirection;
+          last_at: string;
+          unread_count: number;
+        };
+        Relationships: [];
+      };
+    };
     Functions: {
       /** 0010_message_outbox.sql — reivindicação atômica do lote a enviar. */
       claim_pending_messages: {

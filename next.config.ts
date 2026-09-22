@@ -8,13 +8,15 @@ const nextConfig: NextConfig = {
        * multipart/form-data. O padrão do Next é 1 MB, insuficiente para uma
        * foto de celular.
        *
-       * O teto real de arquivo é 4 MB, checado no servidor
-       * (MAX_IMAGE_UPLOAD_BYTES em src/lib/validation.ts) e também pelo
-       * bucket do Supabase (0007_storage_studio_media.sql). Os 5 MB aqui
-       * deixam folga para o overhead de boundaries e headers do multipart,
-       * que conta para este limite.
+       * O teto real de arquivo é checado no servidor e pelo bucket: 4 MB para
+       * logo/banner (MAX_IMAGE_UPLOAD_BYTES, 0007) e 10 MB para fotos e
+       * anexos de serviço (MAX_ATTACHMENT_BYTES, 0020) — PDF de ficha ou
+       * termo passa fácil de 4 MB. Os 11 MB aqui deixam folga para o overhead
+       * de boundaries e headers do multipart, que conta para este limite. O
+       * formulário de serviço manda um arquivo por requisição, então vários
+       * anexos de uma vez não somam.
        */
-      bodySizeLimit: "5mb",
+      bodySizeLimit: "11mb",
     },
   },
 

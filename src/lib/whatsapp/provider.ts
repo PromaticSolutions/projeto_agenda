@@ -11,10 +11,11 @@ import "server-only";
  * É esta indireção que a seção 31 do plano pede: o frontend fala
  * `POST /api/whatsapp/send`, nunca `POST <ip>:8080/message/sendText/...`.
  *
- * O que NÃO está aqui, de propósito: listar conversas, ler contatos, baixar
- * histórico. O escopo decidido é envio (ver DECISIONS.md) — e o webhook existe
- * para manter o ESTADO DA CONEXÃO em dia, não para trazer a caixa de entrada
- * das clientes para dentro da nossa infraestrutura.
+ * Ler o histórico do gateway (`fetchChats`/`fetchMessages`) entrou depois, e
+ * só para a IMPORTAÇÃO: a conversa do dia a dia continua chegando pelo webhook
+ * e vivendo no NOSSO banco. É uma operação que o dono dispara de propósito,
+ * uma vez, para não começar com a tela vazia — não uma consulta que a tela faz
+ * a cada abertura.
  */
 
 export type ProviderConnectionState = "conectado" | "conectando" | "desconectado" | "erro";
@@ -46,6 +47,12 @@ export interface SetWebhookInput {
   url: string;
   /** Vai como header em toda entrega; é o que autentica a chamada no app. */
   secret: string;
+  /**
+   * Assina também as mensagens (`EVOLUTION_MESSAGE_EVENTS`). Só a instância de
+   * ESTÚDIO pede: a da plataforma manda aviso de lead e não tem conversa para
+   * mostrar a ninguém.
+   */
+  includeMessages?: boolean;
 }
 
 export interface WhatsAppProvider {
@@ -67,6 +74,30 @@ export interface WhatsAppProvider {
    */
   checkNumbers(instanceName: string, numbers: string[]): Promise<Map<string, boolean>>;
   sendText(input: SendTextInput): Promise<{ providerMessageId: string | null }>;
+  /** Conversas que o gateway guarda para esta instância. */
+  fetchChats(instanceName: string): Promise<ProviderChat[]>;
+  /**
+   * Mensagens de UMA conversa, as mais recentes primeiro.
+   *
+   * Devolve os registros crus: eles têm o mesmo formato dos eventos de webhook
+   * (é o que a Evolution guardou deles), então quem entende de verdade é
+   * `parseEvolutionMessage`, e não mais um leitor paralelo.
+   */
+  fetchMessages(input: FetchMessagesInput): Promise<unknown[]>;
+}
+
+export interface ProviderChat {
+  /** JID da conversa: `<numero>@s.whatsapp.net` ou `<id>@g.us`. */
+  remoteJid: string;
+  /** Nome que o gateway guardou para o contato, quando tem. */
+  name: string | null;
+}
+
+export interface FetchMessagesInput {
+  instanceName: string;
+  remoteJid: string;
+  /** Teto de mensagens desta conversa. */
+  limit: number;
 }
 
 export const evolutionApiUrl = process.env.EVOLUTION_API_URL;
@@ -167,13 +198,8 @@ export function instanceNameForPlatform(): string {
  * quando a sessão morre do lado do WhatsApp — aparelho desvinculado no celular,
  * por exemplo — e é o único jeito de a tela saber disso antes do próximo envio.
  *
- * MESSAGES_UPSERT (mensagem recebida) está FORA da assinatura de propósito: o
- * produto só envia, e assinar a caixa de entrada de cada salão traria conversa
- * de cliente para dentro da nossa infraestrutura sem ninguém ter pedido — além
- * de ser volume que não serve a nada hoje. O receptor em
- * /api/webhooks/evolution entende o evento e responde 200 se ele chegar
- * (gateway configurado à mão, por exemplo), então ligar isso no futuro é
- * acrescentar uma linha aqui.
+ * As mensagens ficam numa lista à parte (abaixo) porque nem toda instância
+ * as quer.
  */
 export const EVOLUTION_WEBHOOK_EVENTS = [
   "QRCODE_UPDATED",
@@ -181,6 +207,22 @@ export const EVOLUTION_WEBHOOK_EVENTS = [
   "LOGOUT_INSTANCE",
   "REMOVE_INSTANCE",
 ] as const;
+
+/**
+ * Eventos de mensagem, para as conversas de /app/conversations (0019).
+ *
+ * São dois porque a 2.3.7 separa por origem, e a instância roda com
+ * `emitOwnEvents: false`:
+ *  - MESSAGES_UPSERT: o que chega no número e o que o dono digita no celular;
+ *  - SEND_MESSAGE: o que sai pela API (lembrete, envio manual, resposta pela
+ *    tela). Sem ele, a conversa mostraria a cliente respondendo a um lembrete
+ *    que não aparece.
+ *
+ * Assinar não é guardar: o receptor descarta o que não é conversa (status,
+ * lista de transmissão, canal) e grava o resto — conversa de uma pessoa ou de
+ * grupo, cliente cadastrada ou não (0021, ver `recordInboundMessage`).
+ */
+export const EVOLUTION_MESSAGE_EVENTS = ["MESSAGES_UPSERT", "SEND_MESSAGE"] as const;
 
 export const evolutionWebhookSecret = process.env.EVOLUTION_WEBHOOK_SECRET;
 

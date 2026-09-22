@@ -111,6 +111,57 @@ describe("sendText", () => {
   });
 });
 
+describe("fetchChats e fetchMessages (importação de histórico)", () => {
+  it("aceita array puro e { chats: [...] }, que convivem entre versões 2.x", async () => {
+    enqueue(200, [
+      { remoteJid: "5511987654321@s.whatsapp.net", pushName: "Ana" },
+      { id: "120363025246125888@g.us", name: "Salão" },
+      { pushName: "sem jid" },
+    ]);
+    const primeiro = await (await provider()).fetchChats("promatic_estudio");
+
+    expect(calls[0].url).toBe("http://gateway.test:8080/chat/findChats/promatic_estudio");
+    expect(calls[0].method).toBe("POST");
+    // Chat sem JID é descartado: não há conversa para abrir.
+    expect(primeiro).toEqual([
+      { remoteJid: "5511987654321@s.whatsapp.net", name: "Ana" },
+      { remoteJid: "120363025246125888@g.us", name: "Salão" },
+    ]);
+
+    enqueue(200, { chats: [{ remoteJid: "5511911112222@s.whatsapp.net" }] });
+    const segundo = await (await provider()).fetchChats("promatic_estudio");
+    expect(segundo).toEqual([{ remoteJid: "5511911112222@s.whatsapp.net", name: null }]);
+  });
+
+  it("lê as mensagens tanto de { messages: { records } } quanto de array", async () => {
+    const registro = { key: { id: "M1", remoteJid: "5511987654321@s.whatsapp.net" } };
+
+    enqueue(200, { messages: { records: [registro], total: 1 } });
+    const paginado = await (await provider()).fetchMessages({
+      instanceName: "promatic_estudio",
+      remoteJid: "5511987654321@s.whatsapp.net",
+      limit: 300,
+    });
+    expect(paginado).toEqual([registro]);
+    expect(calls[0].body).toMatchObject({
+      where: { key: { remoteJid: "5511987654321@s.whatsapp.net" } },
+    });
+
+    enqueue(200, [registro]);
+    const direto = await (await provider()).fetchMessages({
+      instanceName: "promatic_estudio",
+      remoteJid: "5511987654321@s.whatsapp.net",
+      limit: 300,
+    });
+    expect(direto).toEqual([registro]);
+  });
+
+  it("resposta inesperada vira lista vazia, não exceção", async () => {
+    enqueue(200, { erro: "formato que não conhecemos" });
+    expect(await (await provider()).fetchChats("promatic_estudio")).toEqual([]);
+  });
+});
+
 describe("status", () => {
   it("busca o número em fetchInstances, porque connectionState não o traz", async () => {
     // connectionState na 2.3.7 devolve SÓ { instance: { instanceName, state } }.
@@ -232,8 +283,24 @@ describe("setWebhook", () => {
     // Eventos são assinados em MAIÚSCULAS, mesmo chegando em minúsculas.
     expect(body.webhook.events).toContain("CONNECTION_UPDATE");
     expect(body.webhook.events).toContain("QRCODE_UPDATED");
-    // Caixa de entrada fica fora: o produto só envia.
+    // Sem pedir, mensagens ficam fora: é o caso da instância da plataforma.
     expect(body.webhook.events).not.toContain("MESSAGES_UPSERT");
+  });
+
+  it("assina recebidas e enviadas pela API quando a instância tem conversas", async () => {
+    enqueue(201, {});
+    await (await provider()).setWebhook({
+      instanceName: "promatic_e1",
+      url: "https://app.exemplo.com/api/webhooks/evolution",
+      secret: "s3gr3d0",
+      includeMessages: true,
+    });
+    const body = calls[0].body as { webhook: { events: string[] } };
+    // SEND_MESSAGE é o que traz lembrete e resposta pela tela: a instância
+    // roda com emitOwnEvents: false e eles não passam por MESSAGES_UPSERT.
+    expect(body.webhook.events).toEqual(
+      expect.arrayContaining(["CONNECTION_UPDATE", "MESSAGES_UPSERT", "SEND_MESSAGE"])
+    );
   });
 });
 

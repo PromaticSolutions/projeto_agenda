@@ -34,6 +34,16 @@ vi.mock("@/lib/data/platform-whatsapp", () => ({
   savePlatformWhatsApp: (patch: Record<string, unknown>) => savePlatform(patch),
 }));
 
+// Conversas (0019 + 0021). O receptor decide O QUE gravar e EM QUAL estúdio;
+// achar a cliente pelo telefone é trabalho da camada de dados.
+const recordMessage =
+  vi.fn<(studioId: string, message: Record<string, unknown>) => Promise<boolean>>();
+
+vi.mock("@/lib/data/conversations", () => ({
+  recordInboundMessage: (studioId: string, message: Record<string, unknown>) =>
+    recordMessage(studioId, message),
+}));
+
 function connectionOf(overrides: Partial<WhatsAppConnection> = {}): WhatsAppConnection {
   return {
     studio_id: "estudio-A",
@@ -68,6 +78,8 @@ beforeEach(() => {
   readPlatform.mockResolvedValue({ status: "conectando", connected_phone: null });
   savePlatform.mockReset();
   savePlatform.mockResolvedValue({});
+  recordMessage.mockReset();
+  recordMessage.mockResolvedValue(true);
   process.env.EVOLUTION_WEBHOOK_SECRET = SEGREDO;
   process.env.NEXT_PUBLIC_SUPABASE_URL = "https://projeto.supabase.co";
   process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role-de-teste";
@@ -259,20 +271,104 @@ describe("fim de sessão", () => {
   });
 });
 
-describe("eventos fora de escopo", () => {
-  it("responde 200 a messages.upsert sem guardar a conversa", async () => {
-    // O produto só envia. Guardar mensagem de cliente traria dado pessoal de
-    // terceiro para a base sem ninguém ter pedido.
-    findConnection.mockResolvedValue(connectionOf());
+describe("conversas", () => {
+  const texto = {
+    key: { id: "3EB0A1", remoteJid: "5511987654321@s.whatsapp.net", fromMe: false },
+    message: { conversation: "Posso chegar 10 min antes?" },
+    messageType: "conversation",
+    messageTimestamp: 1789484400,
+  };
+
+  it("grava a mensagem no estúdio dono da instância", async () => {
+    findConnection.mockResolvedValue(connectionOf({ studio_id: "estudio-A" }));
     const response = await post({
       event: "messages.upsert",
       instance: "promatic_estudio-A",
-      data: { key: { id: "X" }, message: { conversation: "oi" } },
+      data: texto,
     });
+
     expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ handled: true });
+    expect(recordMessage).toHaveBeenCalledTimes(1);
+    expect(recordMessage.mock.calls[0]![0]).toBe("estudio-A");
+    expect(recordMessage.mock.calls[0]![1]).toMatchObject({
+      providerMessageId: "3EB0A1",
+      chatId: "5511987654321@s.whatsapp.net",
+      chatPhone: "5511987654321",
+      isGroup: false,
+      fromMe: false,
+      body: "Posso chegar 10 min antes?",
+    });
+    // Mensagem não mexe no estado da conexão.
     expect(saveConnection).not.toHaveBeenCalled();
   });
 
+  it("send.message entra na mesma conversa, como enviada pelo estúdio", async () => {
+    // Lembrete e resposta pela tela saem pela API e só chegam por este evento
+    // (a instância roda com emitOwnEvents: false).
+    findConnection.mockResolvedValue(connectionOf());
+    await post({
+      event: "send.message",
+      instance: "promatic_estudio-A",
+      data: { ...texto, key: { ...texto.key, fromMe: true } },
+    });
+    expect(recordMessage.mock.calls[0]![1]).toMatchObject({ fromMe: true });
+  });
+
+  it("responde 200 sem 'handled' quando a camada de dados não gravou", async () => {
+    // Acontece quando a migração ainda não rodou: repetir a entrega não
+    // resolveria, então o gateway não pode ser mandado tentar de novo.
+    findConnection.mockResolvedValue(connectionOf());
+    recordMessage.mockResolvedValue(false);
+    const response = await post({
+      event: "messages.upsert",
+      instance: "promatic_estudio-A",
+      data: texto,
+    });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ handled: false });
+  });
+
+  it("grupo também vira conversa (0021)", async () => {
+    findConnection.mockResolvedValue(connectionOf());
+    await post({
+      event: "messages.upsert",
+      instance: "promatic_estudio-A",
+      data: { ...texto, key: { ...texto.key, remoteJid: "120363025246125888@g.us" } },
+    });
+    expect(recordMessage.mock.calls[0]![1]).toMatchObject({
+      chatId: "120363025246125888@g.us",
+      isGroup: true,
+      chatPhone: null,
+    });
+  });
+
+  it("nem consulta o banco para reação, status ou canal", async () => {
+    findConnection.mockResolvedValue(connectionOf());
+    await post({
+      event: "messages.upsert",
+      instance: "promatic_estudio-A",
+      data: { ...texto, message: { reactionMessage: { text: "👍" } } },
+    });
+    for (const remoteJid of ["status@broadcast", "120363144038483540@newsletter"]) {
+      await post({
+        event: "messages.upsert",
+        instance: "promatic_estudio-A",
+        data: { ...texto, key: { ...texto.key, remoteJid } },
+      });
+    }
+    expect(recordMessage).not.toHaveBeenCalled();
+  });
+
+  it("não guarda conversa de instância desconhecida nem da plataforma", async () => {
+    findConnection.mockResolvedValue(null);
+    await post({ event: "messages.upsert", instance: "instancia-de-outro-sistema", data: texto });
+    await post({ event: "messages.upsert", instance: "promatic_plataforma", data: texto });
+    expect(recordMessage).not.toHaveBeenCalled();
+  });
+});
+
+describe("eventos fora de escopo", () => {
   it("responde 200 a evento desconhecido em vez de 4xx", async () => {
     // 4xx faria a Evolution repetir algo que nunca vamos usar.
     findConnection.mockResolvedValue(connectionOf());

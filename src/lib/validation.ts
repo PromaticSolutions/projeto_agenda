@@ -129,6 +129,69 @@ export function validateImageUpload(
 }
 
 // ---------------------------------------------------------------------------
+// Fotos e anexos de serviço
+// ---------------------------------------------------------------------------
+
+/** Teto por arquivo. Casado com o bucket service-attachments (0020) e com o
+ *  serverActions.bodySizeLimit de next.config.ts. */
+export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+
+/** Quantos arquivos um serviço pode ter. Evita que a tela vire um drive. */
+export const MAX_ATTACHMENTS_PER_SERVICE = 20;
+
+export const ALLOWED_ATTACHMENT_MIME_TYPES = [
+  ...ALLOWED_IMAGE_MIME_TYPES,
+  "application/pdf",
+] as const;
+
+export const ATTACHMENT_UPLOAD_ACCEPT = ALLOWED_ATTACHMENT_MIME_TYPES.join(",");
+
+export function isImageMime(mime: string): boolean {
+  return (ALLOWED_IMAGE_MIME_TYPES as readonly string[]).includes(mime);
+}
+
+/** Mesma ideia de `validateImageUpload`: dica rápida antes de ler os bytes. */
+export function validateAttachmentUpload(
+  file: File
+): { ok: true } | { ok: false; error: string } {
+  if (file.size === 0) return { ok: false, error: "Arquivo vazio." };
+  if (file.size > MAX_ATTACHMENT_BYTES) {
+    const mb = (MAX_ATTACHMENT_BYTES / 1024 / 1024).toFixed(0);
+    return { ok: false, error: `"${file.name}" passa de ${mb} MB. Reduza o arquivo e tente de novo.` };
+  }
+  if (
+    !ALLOWED_ATTACHMENT_MIME_TYPES.includes(
+      file.type as (typeof ALLOWED_ATTACHMENT_MIME_TYPES)[number]
+    )
+  ) {
+    return { ok: false, error: `"${file.name}": formato não aceito. Use foto (JPG, PNG, WebP) ou PDF.` };
+  }
+  return { ok: true };
+}
+
+/**
+ * Um item da lista que o formulário do serviço envia no Salvar. Anexo que já
+ * existia vai só com `id`; anexo recém-enviado vai com os dados do arquivo que
+ * o upload devolveu. O caminho é conferido de novo no servidor (tem de estar
+ * na pasta do estúdio) — o campo escondido é editável por quem quiser.
+ */
+export const serviceAttachmentItemSchema = z.union([
+  z.object({ id: z.string().uuid() }),
+  z.object({
+    storage_path: z.string().min(1).max(300),
+    file_name: z.string().trim().min(1).max(200),
+    mime_type: z.enum(ALLOWED_ATTACHMENT_MIME_TYPES),
+    size_bytes: z.number().int().positive().max(MAX_ATTACHMENT_BYTES),
+  }),
+]);
+
+export const serviceAttachmentListSchema = z
+  .array(serviceAttachmentItemSchema)
+  .max(MAX_ATTACHMENTS_PER_SERVICE, `Até ${MAX_ATTACHMENTS_PER_SERVICE} arquivos por serviço.`);
+
+export type ServiceAttachmentItem = z.infer<typeof serviceAttachmentItemSchema>;
+
+// ---------------------------------------------------------------------------
 // Estúdio
 // ---------------------------------------------------------------------------
 

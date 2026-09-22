@@ -8,7 +8,9 @@ import {
   getPlatformWhatsApp,
   savePlatformWhatsApp,
 } from "@/lib/data/platform-whatsapp";
+import { recordInboundMessage } from "@/lib/data/conversations";
 import { mapState } from "@/lib/whatsapp/evolution";
+import { parseEvolutionMessage } from "@/lib/whatsapp/inbound";
 import {
   WEBHOOK_SECRET_HEADER,
   evolutionWebhookSecret,
@@ -33,6 +35,11 @@ import { isSupabaseServiceConfigured } from "@/lib/supabase/env";
  *   { event, instance, data, destination, date_time, sender, server_url, apikey }
  * com `event` em minúsculas e pontos ("connection.update"), mesmo que os
  * eventos sejam ASSINADOS em maiúsculas ("CONNECTION_UPDATE").
+ *
+ * MENSAGENS (0019): `messages.upsert` e `send.message` alimentam as conversas
+ * de /app/conversations. Só vira linha o que foi trocado com um número
+ * cadastrado em `clients` do estúdio dono da instância; o resto é descartado
+ * aqui, sem gravar nada.
  *
  * ATENÇÃO: o corpo inclui `apikey` — a chave GLOBAL do gateway. Nada aqui
  * loga o corpo inteiro por causa disso; um `console.log(body)` neste arquivo
@@ -233,12 +240,23 @@ async function handleEvent(
     }
 
     case "messages.upsert":
-      // Mensagem recebida. O produto só ENVIA (ver DECISIONS.md): guardar
-      // conversa de cliente traria dado pessoal de terceiro para dentro da
-      // nossa base sem ninguém ter pedido. O evento não é assinado por padrão
-      // (ver EVOLUTION_WEBHOOK_EVENTS); este caso existe para responder 200 a
-      // um gateway configurado à mão, em vez de deixá-lo repetindo.
-      return false;
+    case "send.message": {
+      // Conversas (0019 + 0021). `messages.upsert` é o que chega e o que o
+      // dono digita no celular; `send.message` é o que saiu pela API. O estúdio
+      // vem da instância (acima): um evento não tem como gravar conversa na
+      // base de outro.
+      //
+      // A 2.3.7 manda uma mensagem por entrega; a lista é tolerada porque
+      // versões vizinhas agrupam, e o teto evita um corpo gigante virando
+      // centenas de consultas numa rota que tem 15s.
+      const items = Array.isArray(data) ? data.slice(0, 50) : [data];
+      let handled = false;
+      for (const item of items) {
+        const message = parseEvolutionMessage(item);
+        if (message && (await recordInboundMessage(studioId, message))) handled = true;
+      }
+      return handled;
+    }
 
     default:
       // Evento fora do que o app trata. 200 sem trabalho é a resposta certa:

@@ -1,13 +1,14 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { LayoutGrid, List } from "lucide-react";
+import { LayoutGrid, List, Paperclip } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ServiceRowActions } from "@/components/app/service-row-actions";
 import { formatDurationMin, formatPriceCents } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { Service } from "@/lib/types";
+import { isImageMime } from "@/lib/validation";
+import type { ServiceWithAttachments } from "@/lib/types";
 
 type ViewMode = "grid" | "list";
 const STORAGE_KEY = "agenda:services-view";
@@ -46,7 +47,7 @@ function storeView(next: ViewMode) {
  * localStorage: é decisão de exibição por dispositivo, não dado de negócio,
  * então não vale uma ida ao servidor nem um parâmetro na URL.
  */
-export function ServicesView({ services }: { services: Service[] }) {
+export function ServicesView({ services }: { services: ServiceWithAttachments[] }) {
   const view = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   function changeView(next: ViewMode) {
@@ -91,46 +92,55 @@ export function ServicesView({ services }: { services: Service[] }) {
   );
 }
 
-function GridView({ services }: { services: Service[] }) {
+function GridView({ services }: { services: ServiceWithAttachments[] }) {
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      {services.map((service) => (
-        <article key={service.id} className="panel card-lift flex flex-col overflow-hidden">
-          <div className="h-1" style={{ backgroundColor: service.color }} />
-          <div className="flex flex-1 flex-col gap-3 p-4">
-            <div className="flex items-start justify-between gap-2">
-              <h3 className="min-w-0 truncate font-medium text-foreground">{service.name}</h3>
-              {!service.active && (
-                <Badge variant="secondary" className="shrink-0">
-                  Pausado
-                </Badge>
-              )}
-            </div>
-
-            <div className="flex items-baseline gap-2">
-              <output className="text-xl font-semibold text-foreground">
-                {formatPriceCents(service.price_cents)}
-              </output>
-              <span className="text-sm text-muted-foreground">
-                · {formatDurationMin(service.duration_min)}
-              </span>
-            </div>
-
-            {service.notes && (
-              <p className="line-clamp-2 text-sm text-muted-foreground">{service.notes}</p>
+      {services.map((service) => {
+        const cover = service.attachments.find((a) => isImageMime(a.mime_type) && a.url);
+        return (
+          <article key={service.id} className="panel card-lift flex flex-col overflow-hidden">
+            <div className="h-1" style={{ backgroundColor: service.color }} />
+            {cover?.url && (
+              /* URL assinada e temporária — ver ServiceAttachmentsField. */
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={cover.url} alt="" className="h-32 w-full object-cover" />
             )}
-
-            <div className="mt-auto flex items-center justify-end border-t border-border pt-3">
-              <ServiceRowActions service={service} />
+            <div className="flex flex-1 flex-col gap-3 p-4">
+              <div className="flex items-start justify-between gap-2">
+                <h3 className="min-w-0 truncate font-medium text-foreground">{service.name}</h3>
+                {!service.active && (
+                  <Badge variant="secondary" className="shrink-0">
+                    Pausado
+                  </Badge>
+                )}
+              </div>
+  
+              <div className="flex items-baseline gap-2">
+                <output className="text-xl font-semibold text-foreground">
+                  {formatPriceCents(service.price_cents)}
+                </output>
+                <span className="text-sm text-muted-foreground">
+                  · {formatDurationMin(service.duration_min)}
+                </span>
+              </div>
+  
+              {service.notes && (
+                <p className="line-clamp-2 text-sm text-muted-foreground">{service.notes}</p>
+              )}
+  
+              <div className="mt-auto flex items-center justify-between gap-2 border-t border-border pt-3">
+                <AttachmentCount count={service.attachments.length} />
+                <ServiceRowActions service={service} />
+              </div>
             </div>
-          </div>
-        </article>
-      ))}
+          </article>
+        );
+      })}
     </div>
   );
 }
 
-function ListView({ services }: { services: Service[] }) {
+function ListView({ services }: { services: ServiceWithAttachments[] }) {
   return (
     <div className="panel overflow-hidden">
       <div className="overflow-x-auto">
@@ -158,6 +168,7 @@ function ListView({ services }: { services: Service[] }) {
                     />
                     <span className="font-medium text-foreground">{service.name}</span>
                     {!service.active && <Badge variant="secondary">Pausado</Badge>}
+                    <AttachmentCount count={service.attachments.length} />
                   </div>
                 </td>
                 <td className="px-4 py-3 text-right font-medium">
@@ -180,5 +191,18 @@ function ListView({ services }: { services: Service[] }) {
         </table>
       </div>
     </div>
+  );
+}
+
+function AttachmentCount({ count }: { count: number }) {
+  if (count === 0) return <span />;
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-xs text-muted-foreground"
+      title={`${count} ${count === 1 ? "arquivo anexado" : "arquivos anexados"}`}
+    >
+      <Paperclip className="size-3.5" aria-hidden />
+      {count}
+    </span>
   );
 }

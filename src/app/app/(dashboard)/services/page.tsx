@@ -1,5 +1,5 @@
 import { getMyStudio } from "@/lib/data/studios";
-import { listMyServices } from "@/lib/data/services";
+import { listMyServicesWithAttachments } from "@/lib/data/services";
 import { ServiceFormDialog } from "@/components/app/service-form-dialog";
 import { ServicesView } from "@/components/app/services-view";
 
@@ -9,7 +9,7 @@ export default async function ServicesPage() {
   const studio = await getMyStudio();
   if (!studio) return null;
 
-  const services = await listMyServices(studio.id);
+  const services = await listMyServicesWithAttachments(studio.id);
 
   return (
     <div className="flex flex-col gap-6">

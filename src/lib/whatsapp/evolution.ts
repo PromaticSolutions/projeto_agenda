@@ -1,10 +1,13 @@
 import "server-only";
 import {
+  EVOLUTION_MESSAGE_EVENTS,
   EVOLUTION_WEBHOOK_EVENTS,
   WEBHOOK_SECRET_HEADER,
   WhatsAppProviderError,
   evolutionApiKey,
   evolutionApiUrl,
+  type FetchMessagesInput,
+  type ProviderChat,
   type ProviderPairing,
   type ProviderStatus,
   type SendTextInput,
@@ -291,7 +294,7 @@ export function createEvolutionProvider(): WhatsAppProvider {
       });
     },
 
-    async setWebhook({ instanceName, url, secret }: SetWebhookInput): Promise<void> {
+    async setWebhook({ instanceName, url, secret, includeMessages }: SetWebhookInput): Promise<void> {
       // `POST /webhook/set/{nome}` faz upsert no gateway (webhook.controller.ts),
       // então chamar a cada conexão é seguro e mantém a URL em dia quando o
       // domínio do app muda.
@@ -313,7 +316,11 @@ export function createEvolutionProvider(): WhatsAppProvider {
             headers: { [WEBHOOK_SECRET_HEADER]: secret, "Content-Type": "application/json" },
             byEvents: false,
             base64: false,
-            events: [...EVOLUTION_WEBHOOK_EVENTS],
+            // `base64: false` acima vale também para as mensagens: foto e
+            // áudio de cliente chegam sem o arquivo, que o app não guarda.
+            events: includeMessages
+              ? [...EVOLUTION_WEBHOOK_EVENTS, ...EVOLUTION_MESSAGE_EVENTS]
+              : [...EVOLUTION_WEBHOOK_EVENTS],
           },
         },
         userMessage: "A conexão foi criada, mas o aviso automático de status não pôde ser ligado.",
@@ -363,7 +370,76 @@ export function createEvolutionProvider(): WhatsAppProvider {
       const id = pick(data, "key", "id");
       return { providerMessageId: typeof id === "string" ? id : null };
     },
+
+    /**
+     * `POST /chat/findChats/{nome}` — a caixa de entrada que o gateway guarda.
+     *
+     * O formato da resposta mudou dentro da própria 2.x: já foi um array puro
+     * de chats e já foi `{ chats: [...] }` com paginação. Aqui as duas formas
+     * são aceitas, porque a versão do gateway não é nossa para fixar.
+     */
+    async fetchChats(instanceName: string) {
+      const { data } = await callEvolution({
+        path: `/chat/findChats/${encodeURIComponent(instanceName)}`,
+        method: "POST",
+        body: {},
+        userMessage: "Não foi possível ler as conversas no servidor do WhatsApp.",
+      });
+
+      return recordsOf(data, "chats")
+        .map((row) => {
+          const jid = firstString(row, ["remoteJid", "id", "jid"]);
+          if (!jid) return null;
+          return { remoteJid: jid, name: firstString(row, ["pushName", "name", "subject"]) };
+        })
+        .filter((chat): chat is ProviderChat => chat !== null);
+    },
+
+    /**
+     * `POST /chat/findMessages/{nome}` — as mensagens de uma conversa.
+     *
+     * O corpo é o filtro do Prisma que a Evolution repassa ao banco dela. O
+     * mesmo cuidado da resposta vale aqui: `{ messages: { records } }` e array
+     * puro convivem entre versões.
+     */
+    async fetchMessages({ instanceName, remoteJid, limit }: FetchMessagesInput) {
+      const { data } = await callEvolution({
+        path: `/chat/findMessages/${encodeURIComponent(instanceName)}`,
+        method: "POST",
+        body: { where: { key: { remoteJid } }, limit, page: 1, offset: limit },
+        userMessage: "Não foi possível ler as mensagens no servidor do WhatsApp.",
+      });
+
+      return recordsOf(data, "messages");
+    },
   };
+}
+
+/** Extrai a lista de uma resposta que pode vir em três formatos diferentes. */
+function recordsOf(data: unknown, key: "chats" | "messages"): Record<string, unknown>[] {
+  const candidates: unknown[] = [
+    data,
+    isRecord(data) ? data[key] : null,
+    isRecord(data) && isRecord(data[key]) ? (data[key] as Record<string, unknown>).records : null,
+    isRecord(data) ? data.records : null,
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) return candidate.filter(isRecord);
+  }
+  return [];
+}
+
+function firstString(row: Record<string, unknown>, keys: string[]): string | null {
+  for (const key of keys) {
+    const value = row[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 /** Estados da Evolution → vocabulário do nosso enum `whatsapp_connection_status`. */

@@ -7,9 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { ServiceFormDialog } from "@/components/app/service-form-dialog";
 import { deleteServiceAction, toggleServiceActiveAction } from "@/app/app/(dashboard)/services/actions";
-import type { Service } from "@/lib/types";
+import type { ServiceWithAttachments } from "@/lib/types";
 
-export function ServiceRowActions({ service }: { service: Service }) {
+export function ServiceRowActions({ service }: { service: ServiceWithAttachments }) {
   const [pending, startTransition] = useTransition();
   const [active, setActive] = useState(service.active);
 

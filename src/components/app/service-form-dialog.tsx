@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { Pencil, Plus } from "lucide-react";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -16,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { ServiceAttachmentsField } from "@/components/app/service-attachments-field";
 import {
   createServiceAction,
   updateServiceAction,
@@ -23,11 +25,11 @@ import {
 } from "@/app/app/(dashboard)/services/actions";
 import { centsToReaisInput } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { Service } from "@/lib/types";
+import type { ServiceWithAttachments } from "@/lib/types";
 
 const PRESET_COLORS = ["#7C3AED", "#8B5CF6", "#E23FA0", "#A93CC9", "#25D366", "#241238"];
 
-export function ServiceFormDialog({ service }: { service?: Service }) {
+export function ServiceFormDialog({ service }: { service?: ServiceWithAttachments }) {
   const isEdit = Boolean(service);
   const action = isEdit ? updateServiceAction.bind(null, service!.id) : createServiceAction;
   const [state, formAction, pending] = useActionState<ServiceActionState, FormData>(
@@ -36,6 +38,7 @@ export function ServiceFormDialog({ service }: { service?: Service }) {
   );
   const [open, setOpen] = useState(false);
   const [color, setColor] = useState(service?.color ?? "#7C3AED");
+  const [uploading, setUploading] = useState(false);
 
   // Fecha o diálogo quando a Server Action termina com sucesso. Ajuste de
   // estado durante a renderização (em vez de useEffect) para não disparar
@@ -44,7 +47,10 @@ export function ServiceFormDialog({ service }: { service?: Service }) {
   const [lastState, setLastState] = useState(state);
   if (state !== lastState) {
     setLastState(state);
-    if (state?.ok) setOpen(false);
+    if (state?.ok) {
+      setOpen(false);
+      if (state.warning) toast.warning(state.warning);
+    }
   }
 
   return (
@@ -62,12 +68,12 @@ export function ServiceFormDialog({ service }: { service?: Service }) {
           </>
         )}
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Editar serviço" : "Novo serviço"}</DialogTitle>
           <DialogDescription>
             Nome, preço, duração e cor aparecem para o cliente na página pública.
-            As observações ficam só para você.
+            Observações, fotos e anexos ficam só para você.
           </DialogDescription>
         </DialogHeader>
         <form action={formAction} className="flex flex-col gap-4">
@@ -161,11 +167,16 @@ export function ServiceFormDialog({ service }: { service?: Service }) {
             </p>
           </div>
 
+          <ServiceAttachmentsField
+            defaultValue={service?.attachments}
+            onBusyChange={setUploading}
+          />
+
           {state && !state.ok && <p className="text-sm text-destructive">{state.error}</p>}
 
           <DialogFooter>
-            <Button type="submit" className="bg-cta text-white hover:opacity-90" disabled={pending}>
-              {pending ? "Salvando..." : "Salvar"}
+            <Button type="submit" className="bg-cta text-white hover:opacity-90" disabled={pending || uploading}>
+              {pending ? "Salvando..." : uploading ? "Enviando arquivos..." : "Salvar"}
             </Button>
           </DialogFooter>
         </form>

@@ -12,6 +12,7 @@ import {
   mockUpdateClientNotes,
   mockUpsertClient,
 } from "@/lib/mock/store";
+import { phoneVariants } from "@/lib/whatsapp/inbound";
 import type { Client } from "@/lib/types";
 
 export interface ClientWithStats extends Client {
@@ -97,6 +98,35 @@ export async function getMyClient(studioId: string, id: string): Promise<Client 
     .maybeSingle();
   if (error) throw error;
   return data;
+}
+
+/**
+ * A cliente daquele celular, nas duas formas possíveis do número.
+ *
+ * Usada pela tela de Conversas para começar conversa com quem está no cadastro
+ * mas nunca escreveu — aí não existe conversa para tirar o número de dentro.
+ */
+export async function getMyClientByPhone(
+  studioId: string,
+  phone: string
+): Promise<Client | null> {
+  const variants = phoneVariants(phone);
+
+  if (!isSupabaseConfigured) {
+    return (
+      mockListClients(studioId).find((client) => variants.includes(client.phone)) ?? null
+    );
+  }
+
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("clients")
+    .select("*")
+    .eq("studio_id", studioId)
+    .in("phone", variants);
+  if (error) throw error;
+  // Cadastro com as duas formas: vale a que bate exatamente.
+  return data?.find((client) => client.phone === phone) ?? data?.[0] ?? null;
 }
 
 /**

@@ -10,6 +10,7 @@ import {
   getWhatsAppProvider,
   instanceNameForStudio,
   resolveWebhookTarget,
+  type WhatsAppProvider,
 } from "@/lib/whatsapp/provider";
 import type { WhatsAppConnectionStatus } from "@/lib/types";
 
@@ -33,6 +34,36 @@ export type WhatsAppActionState =
 
 const SEM_GATEWAY = "O WhatsApp ainda não está disponível neste ambiente.";
 
+/**
+ * Registra (ou atualiza) o webhook da instância do estúdio, já com os eventos
+ * de mensagem das Conversas.
+ *
+ * Chamado ao conectar E ao reler o estado com a sessão aberta. O segundo caso
+ * alcança o número que já estava conectado antes das Conversas existirem: sem
+ * ele, o webhook antigo (só eventos de conexão) valeria até alguém desconectar
+ * e ler o QR de novo. `webhook/set` é upsert, então repetir custa uma
+ * requisição e nada mais. Falha aqui nunca derruba a ação: o polling cobre o
+ * estado, e a conversa volta a chegar no próximo registro bem-sucedido.
+ */
+async function registerStudioWebhook(
+  provider: WhatsAppProvider,
+  instanceName: string,
+  context: string
+): Promise<void> {
+  const target = resolveWebhookTarget();
+  if (!target) return;
+  try {
+    await provider.setWebhook({
+      instanceName,
+      url: target.url,
+      secret: target.secret,
+      includeMessages: true,
+    });
+  } catch (cause) {
+    console.error(`[whatsapp/${context}] setWebhook`, cause);
+  }
+}
+
 export async function connectWhatsAppAction(): Promise<WhatsAppActionState> {
   const studio = await getMyStudio();
   if (!studio) return { ok: false, error: "Estúdio não encontrado" };
@@ -49,14 +80,7 @@ export async function connectWhatsAppAction(): Promise<WhatsAppActionState> {
     // `qrcode.updated` e `connection.update` durante o pareamento, e um
     // webhook registrado depois perderia justamente o evento que diz
     // "conectou". Falha aqui não aborta a conexão — o polling da tela cobre.
-    const target = resolveWebhookTarget();
-    if (target) {
-      try {
-        await provider.setWebhook({ instanceName, url: target.url, secret: target.secret });
-      } catch (cause) {
-        console.error("[whatsapp/connect] setWebhook", cause);
-      }
-    }
+    await registerStudioWebhook(provider, instanceName, "connect");
 
     const pairing = await provider.connect(instanceName);
 
@@ -119,6 +143,9 @@ export async function refreshWhatsAppStatusAction(): Promise<
   if (!provider) return { ok: false, error: SEM_GATEWAY };
 
   const connection = await syncWhatsAppConnection(studio.id, provider);
+  if (connection.status === "conectado") {
+    await registerStudioWebhook(provider, instanceNameForStudio(studio.id), "refresh");
+  }
   revalidatePath("/app/whatsapp");
   return { ok: true, status: connection.status, phone: connection.connected_phone };
 }
