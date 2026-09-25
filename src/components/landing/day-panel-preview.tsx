@@ -70,8 +70,8 @@ export function DayPanelPreview() {
       aria-label="Resumo do dia no Timely: seis atendimentos na terça-feira, sendo quatro agendados, um em atendimento e um finalizado, com a agenda do dia abaixo."
     >
       {/* Tema claro fixo, como nos outros slides: o painel é uma superfície
-          clara, e o contraste com o plum é o que separa produto de página. */}
-      <div className="panel overflow-hidden bg-white text-[#1c1b22] shadow-2xl shadow-black/30">
+          clara, independente do tema do visitante. */}
+      <div className="panel overflow-hidden bg-white text-[#1c1b22]">
         <header className="flex items-center justify-between gap-3 border-b border-[#dcdee4] px-4 py-3">
           <div>
             <p className="font-semibold">Painel do dia</p>
@@ -152,26 +152,14 @@ export function DayPanelPreview() {
         </div>
       </div>
 
-      {/* Selos de UMA linha, nos mesmos cantos dos outros slides. A referência
-          de dashboard que inspirou esta vista usa cartões de duas linhas
-          apontando para cada número; aqui eles cobriam o título e a última
-          linha da agenda. Num cartão deste tamanho a legenda de duas linhas
-          não cabe fora do conteúdo — e legenda que tapa o dado que explica
-          é pior do que legenda nenhuma. */}
-      <Seal
-        shown
-        className="float-soft -top-7 -left-5 hidden border-white/15 bg-plum-900/90 text-blush-50 sm:flex"
-      >
-        <Check className="size-3.5 shrink-0 text-emerald-400" aria-hidden />
+      {/* Notas de UMA linha, ao pé do cartão como nos outros slides. */}
+      <Seal shown>
+        <Check aria-hidden />
         O dia fechado, sem contar na mão
       </Seal>
 
-      <Seal
-        shown
-        className="float-soft -right-2 -bottom-5 hidden border-white/15 bg-plum-900/90 text-blush-50 sm:flex"
-        style={{ animationDelay: "1.4s" }}
-      >
-        <CalendarDays className="size-3.5 shrink-0 text-violet-400" aria-hidden />
+      <Seal shown>
+        <CalendarDays aria-hidden />
         A semana inteira em um toque
       </Seal>
     </div>

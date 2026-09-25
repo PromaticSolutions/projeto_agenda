@@ -68,9 +68,9 @@ export function PhonePreview() {
       role="img"
       aria-label="O Timely aberto no celular, no painel do dia: a régua da semana, os contadores de agendamentos por status e a agenda de terça-feira."
     >
-      {/* A moldura. Escura de propósito: contra o plum do hero ela desenha a
+      {/* A moldura. Escura de propósito: contra o papel ela desenha a
           silhueta do aparelho sem precisar de imagem nenhuma. */}
-      <div className="rounded-[2rem] border border-white/15 bg-[#120a1e] p-2 shadow-2xl shadow-black/45">
+      <div className="rounded-[2rem] border border-white/15 bg-[#120a1e] p-2">
         <div className="relative overflow-hidden rounded-[1.6rem] bg-[#f4f5f7] text-[#1c1b22]">
           {/* Pílula da câmera — o único elemento aqui que é só desenho. */}
           <div
@@ -160,25 +160,15 @@ export function PhonePreview() {
         </div>
       </div>
 
-      {/* Os mesmos selos do primeiro slide, no mesmo lugar da composição: é o
-          que faz a troca ler como "outra vista do mesmo produto". */}
-      <Seal
-        shown
-        className="float-soft -top-6 -left-8 hidden border-white/15 bg-plum-900/90 text-blush-50 sm:flex"
-      >
-        <Check className="size-3.5 shrink-0 text-emerald-400" aria-hidden />
+      {/* As mesmas notas de margem do primeiro slide: é o que faz a troca ler
+          como "outra vista do mesmo produto". */}
+      <Seal shown>
+        <Check aria-hidden />
         Agenda de hoje atualizada
       </Seal>
 
-      <Seal
-        shown
-        /* Mais para fora que nos outros slides: a moldura do celular é
-           estreita, e no recuo padrão o selo cobriria a última linha da
-           agenda em vez de decorar o canto. */
-        className="float-soft -right-12 -bottom-6 hidden border-white/15 bg-[var(--wa)]/95 font-medium text-white sm:flex"
-        style={{ animationDelay: "1.4s" }}
-      >
-        <BellRing className="size-3.5 shrink-0" aria-hidden />
+      <Seal shown>
+        <BellRing aria-hidden />
         Lembrete de amanhã programado
       </Seal>
     </div>

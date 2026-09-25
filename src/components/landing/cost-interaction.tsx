@@ -1,13 +1,12 @@
 "use client";
 
 import { useId, useRef, useState } from "react";
-import { ArrowRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Reveal } from "@/components/landing/reveal";
+import { SignupButton } from "@/components/landing/signup-cta";
 import { LEAD_HOURS_BANDS } from "@/lib/validation";
 import { setHoursBand } from "@/components/landing/hours-band";
 import { track } from "@/lib/analytics";
-import { GlassKnotBackdrop } from "@/components/auth/glass-knot";
+import { SectionHeading } from "@/components/landing/section-heading";
 
 /**
  * "Quanto tempo você perde organizando sua agenda?"
@@ -117,26 +116,22 @@ export function CostInteraction() {
     .replace(".", ",");
 
   return (
-    <section className="relative overflow-hidden border-b border-border bg-plum-900 py-20 text-blush-50 sm:py-24">
-      {/* A mesma peça do hero, girando ao fundo. Duas diferenças, e as duas
-          existem pelo mesmo motivo: aqui ela é fundo de uma faixa de conteúdo,
-          não a abertura da página. Menor (`scale`) e deslocada para o vazio
-          entre o fim do título e o topo do cartão (`focus*`) — centralizada e
-          no tamanho do hero, ela passava por baixo dos valores dos controles,
-          e vidro atrás de número é número que não se lê. */}
-      <GlassKnotBackdrop scale={0.7} focusX={0.8} focusY={0.26} portraitX={0.72} portraitY={0.985} />
-
-      <div className="relative z-10 mx-auto w-full max-w-5xl px-4 sm:px-6">
+    <section className="band-dark relative overflow-hidden border-t border-white/10 bg-plum-900 py-24 text-blush-50 sm:py-32">
+      <div className="relative mx-auto w-full max-w-6xl px-4 sm:px-6">
         <Reveal sectionName="custo" className="max-w-2xl">
-          <h2 className="text-[1.75rem] leading-[1.15] font-semibold text-balance sm:text-[2.25rem]">
-            Quanto tempo você perde organizando sua agenda?
-          </h2>
-          <p className="mt-4 text-[1.0625rem] leading-7 text-blush-50/70">
+          <SectionHeading
+            tone="dark"
+            time="13:00"
+            eyebrow="A conta"
+            lead="Quanto tempo você perde"
+            trail="organizando sua agenda?"
+          />
+          <p className="mt-5 text-[1.0625rem] leading-7 text-blush-50/70">
             Ajuste com a sua rotina. A conta é simples — e costuma surpreender.
           </p>
         </Reveal>
 
-        <div className="mt-12 grid gap-10 lg:grid-cols-[1.1fr_1fr] lg:items-center lg:gap-16">
+        <div className="mt-14 grid gap-12 lg:grid-cols-[1.1fr_1fr] lg:items-center lg:gap-20">
           <Reveal className="flex flex-col gap-8">
             {SLIDERS.map((slider) => (
               <Slider
@@ -157,44 +152,36 @@ export function CostInteraction() {
               existir: nasce calculado com valores comuns, então ninguém
               precisa mexer para entender o que a seção faz. */}
           <Reveal delay={90}>
-            <div className="rounded-xl border border-white/15 bg-white/5 p-7 text-center sm:p-9">
-              <p className="section-label text-blush-50/60">Por semana</p>
+            {/* Sem caixa: o número grande, preso a um fio vertical,
+                é o resultado — como a soma no pé de uma coluna de caderno. */}
+            <div className="border-l border-white/20 pl-8 sm:pl-10">
+              <p className="time-label text-blush-50/60">Por semana</p>
               <p
                 aria-live="polite"
-                // Sem `tabular-nums` neste número: em corpo 64 a mono reserva
-                // uma célula inteira para a vírgula, e "2,9h" sai lido como
-                // "2 , 9h". `tabular-nums` mantém o alinhamento dos dígitos
-                // enquanto a pessoa arrasta os controles, que é o motivo real
-                // de a mono estar em todo dado tabular do sistema.
-                className="mt-3 text-[3.25rem] leading-none font-semibold tracking-tight tabular-nums sm:text-[4rem]"
+                className="mt-2 text-[4.5rem] leading-[0.95] font-semibold tracking-[-0.04em] tabular-nums sm:text-[6rem]"
               >
-                {formattedHours}h
+                {formattedHours}
+                <span className="text-[#c4b0fb]">h</span>
               </p>
-              <p className="mt-4 text-[1.0625rem] leading-7 text-blush-50/80">
+              <p className="mt-5 max-w-sm text-[1.0625rem] leading-7 text-blush-50/80">
                 organizando a agenda — o equivalente a{" "}
                 <strong className="font-semibold text-blush-50">
                   ~{daysPerYear} dias de trabalho por ano
                 </strong>
                 .
               </p>
-              <p className="mt-3 text-xs leading-5 text-blush-50/45">
+              <p className="time-label mt-3 max-w-sm leading-5 text-blush-50/55">
                 Estimativa a partir dos números que você informou:{" "}
                 {values.bookings} atendimentos × {values.perBooking + values.perConfirm} min,
                 em jornadas de {HOURS_PER_WORKDAY}h.
               </p>
 
-              <p className="mt-7 border-t border-white/10 pt-6 text-[1.0625rem] font-medium">
+              <p className="mt-9 text-lg font-semibold">
                 Imagine recuperar esse tempo.
               </p>
-              <Button
-                size="lg"
-                nativeButton={false}
-                className="mt-5 w-full bg-blush-50 text-plum-900 hover:bg-white sm:w-auto"
-                onClick={() => track("hero_cta_click", { target: "conhecer", from: "custo" })}
-                render={<a href="#conhecer" />}
-              >
-                Quero esse tempo de volta <ArrowRight className="size-4" />
-              </Button>
+              <SignupButton from="custo" tone="light" className="mt-5 w-full sm:w-auto">
+                Quero esse tempo de volta
+              </SignupButton>
             </div>
           </Reveal>
         </div>

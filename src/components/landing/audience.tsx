@@ -1,200 +1,179 @@
-"use client";
-
 import { Clock3 } from "lucide-react";
 import { Reveal } from "@/components/landing/reveal";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { track } from "@/lib/analytics";
+import { SectionHeading } from "@/components/landing/section-heading";
+import { SignupButton } from "@/components/landing/signup-cta";
 
 /**
- * "Para quem é" — e, ao trocar de perfil, a demonstração troca junto.
+ * "Para quem é" — quatro perfis lado a lado.
  *
- * A versão anterior era uma fila de onze chips: informava, mas não mostrava
- * nada. Aqui cada perfil abre a MESMA tela do produto configurada como aquele
- * negócio configuraria — os procedimentos, as durações e os valores mudam,
- * porque é isso que muda de verdade entre uma barbearia e um studio de cílios.
+ * Eram abas: um perfil por vez, com a demonstração trocando junto. Viraram
+ * quatro cartões porque a pergunta que a seção responde é "isso é para mim?",
+ * e ela se responde de relance quando a pessoa ACHA o próprio negócio na
+ * fileira — com abas, três dos quatro perfis ficavam escondidos atrás de um
+ * clique que ninguém dava.
  *
- * O que NÃO muda é o argumento: a duração de cada procedimento é o que
- * permite ao sistema calcular o encaixe (ver `lib/availability.ts`), e a
- * última linha de cada painel mostra exatamente isso acontecendo.
+ * Cada cartão abre com a cor de um procedimento (as mesmas quatro das
+ * prévias) em tom baixo, e fecha com a configuração daquele negócio: é a
+ * duração de cada procedimento que muda de verdade entre uma barbearia e um
+ * studio de cílios, e é ela que o sistema usa para calcular o encaixe (ver
+ * `lib/availability.ts`) — a última linha de cada cartão mostra isso.
  *
- * Os valores são EXEMPLOS de configuração, e estão rotulados como tal. Não
- * são preço médio de mercado, nem pesquisa: seria número inventado, e a
- * página inteira perde crédito por um dado desses.
+ * Os valores são EXEMPLOS de configuração, rotulados como tal. Não são preço
+ * médio de mercado nem pesquisa.
  *
  * "Equipe" ficou DE FORA de propósito: hoje o Timely trabalha com uma agenda
- * por conta (não há tabela de staff no banco), e uma aba prometendo divisão
- * entre profissionais viraria cadastro frustrado no primeiro dia. A seção de
- * dúvidas diz isso com todas as letras.
+ * por conta (não há tabela de staff no banco). A nota no pé da seção diz isso
+ * com todas as letras.
  */
+
+/** Clínicas entram como "de estética": é o procedimento com horário marcado
+ *  que o produto atende — não prontuário nem convênio. */
+const SEGMENTS = ["Salões de beleza", "Barbearias", "Clínicas de estética", "Studios", "Profissionais autônomos"];
 
 const PROFILES = [
   {
-    value: "autonoma",
     tab: "Autônoma(o)",
+    color: "var(--violet-600)",
     title: "Você, sozinha, atendendo onde faz sentido",
-    text: "Em casa, em espaço compartilhado ou atendendo a domicílio — uma agenda, os seus procedimentos, o seu link.",
+    text: "Em casa, em espaço compartilhado ou a domicílio: uma agenda, os seus procedimentos, o seu link.",
     services: [
-      ["Design de sobrancelhas", "40 min", "R$ 60,00", "var(--violet-600)"],
-      ["Design com henna", "50 min", "R$ 85,00", "var(--magenta)"],
-      ["Manicure", "60 min", "R$ 45,00", "#0f766e"],
-      ["Pé e mão", "90 min", "R$ 70,00", "#b45309"],
+      ["Design de sobrancelhas", "40 min", "R$ 60,00"],
+      ["Manicure", "60 min", "R$ 45,00"],
+      ["Pé e mão", "90 min", "R$ 70,00"],
     ],
-    gap: ["16:20", "Design de sobrancelhas", "40 min"],
+    gap: ["16:20", "Design de sobrancelhas"],
   },
   {
-    value: "salao",
     tab: "Salão de beleza",
+    color: "var(--magenta)",
     title: "Procedimentos longos, sem buraco na agenda",
-    text: "Uma coloração de duas horas não pode ser tratada como uma escova de quarenta minutos — e não é.",
+    text: "Uma coloração de duas horas não é tratada como uma escova de quarenta minutos.",
     services: [
-      ["Escova", "45 min", "R$ 55,00", "var(--violet-600)"],
-      ["Corte + finalização", "60 min", "R$ 90,00", "var(--magenta)"],
-      ["Hidratação", "60 min", "R$ 120,00", "#0f766e"],
-      ["Coloração", "120 min", "R$ 180,00", "#b45309"],
+      ["Escova", "45 min", "R$ 55,00"],
+      ["Hidratação", "60 min", "R$ 120,00"],
+      ["Coloração", "120 min", "R$ 180,00"],
     ],
-    gap: ["15:00", "Escova", "45 min"],
+    gap: ["15:00", "Escova"],
   },
   {
-    value: "barbearia",
     tab: "Barbearia",
+    color: "#0f766e",
     title: "Muito atendimento curto, um atrás do outro",
-    text: "Quando o dia é feito de encaixes de trinta minutos, cada horário mal aproveitado aparece no fim do mês.",
+    text: "Quando o dia é feito de encaixes de trinta minutos, cada horário mal aproveitado pesa no fim do mês.",
     services: [
-      ["Pezinho", "15 min", "R$ 20,00", "var(--violet-600)"],
-      ["Barba", "30 min", "R$ 35,00", "var(--magenta)"],
-      ["Corte", "40 min", "R$ 50,00", "#0f766e"],
-      ["Corte + barba", "70 min", "R$ 75,00", "#b45309"],
+      ["Pezinho", "15 min", "R$ 20,00"],
+      ["Barba", "30 min", "R$ 35,00"],
+      ["Corte + barba", "70 min", "R$ 75,00"],
     ],
-    gap: ["17:30", "Barba", "30 min"],
+    gap: ["17:30", "Barba"],
   },
   {
-    value: "studio",
     tab: "Studio",
+    color: "#b45309",
     title: "Sessões longas e retorno marcado na hora",
-    text: "Cílios, estética, micropigmentação: procedimento demorado, manutenção com data — e o histórico da cliente sempre à mão.",
+    text: "Cílios, estética, micropigmentação: procedimento demorado e o histórico da cliente sempre à mão.",
     services: [
-      ["Limpeza de pele", "60 min", "R$ 140,00", "var(--violet-600)"],
-      ["Manutenção de cílios", "90 min", "R$ 120,00", "var(--magenta)"],
-      ["Extensão de cílios", "120 min", "R$ 180,00", "#0f766e"],
-      ["Micropigmentação", "150 min", "R$ 450,00", "#b45309"],
+      ["Limpeza de pele", "60 min", "R$ 140,00"],
+      ["Extensão de cílios", "120 min", "R$ 180,00"],
+      ["Micropigmentação", "150 min", "R$ 450,00"],
     ],
-    gap: ["14:00", "Limpeza de pele", "60 min"],
+    gap: ["14:00", "Limpeza de pele"],
   },
 ];
 
 export function Audience() {
   return (
-    <section id="para-quem" className="scroll-mt-16 border-b border-border bg-muted/40 py-20 sm:py-24">
-      <div className="mx-auto w-full max-w-5xl px-4 sm:px-6">
-        <Reveal sectionName="para_quem" className="max-w-2xl">
-          <p className="section-label text-primary">Para quem é</p>
-          <h2 className="mt-3 text-[2rem] leading-[1.12] font-semibold text-balance text-foreground sm:text-[2.5rem]">
-            Feito para quem vive de horários.
-          </h2>
+    <section id="para-quem" className="scroll-mt-16 border-b border-foreground/15 bg-muted py-24 sm:py-32">
+      <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
+        <Reveal sectionName="para_quem" className="max-w-3xl">
+          <SectionHeading
+            time="15:00"
+            eyebrow="Para quem é"
+            lead="Feito para profissionais e pequenos negócios"
+            trail="que trabalham com agendamento."
+          />
+          {/* Os segmentos por extenso, antes dos perfis: é a linha em que a
+              pessoa procura o próprio negócio e pensa "é para mim". Texto
+              corrido com barras, não pílulas — lê como frase, não como filtro. */}
+          <ul
+            className="mt-7 flex flex-wrap gap-x-3 gap-y-1 text-[1.0625rem] text-foreground"
+            aria-label="Segmentos atendidos"
+          >
+            {SEGMENTS.map((segment, i) => (
+              <li key={segment} className="flex items-center gap-3">
+                {i > 0 && (
+                  <span aria-hidden className="text-[var(--mark)]">
+                    /
+                  </span>
+                )}
+                {segment}
+              </li>
+            ))}
+          </ul>
         </Reveal>
 
-        <Reveal delay={80} className="mt-10">
-          <Tabs
-            defaultValue={PROFILES[0].value}
-            onValueChange={(value) => track("product_demo_interaction", { profile: value })}
-          >
-            {/* Rolagem horizontal no celular em vez de quebra em duas linhas:
-                quatro abas empilhadas roubariam a altura da demonstração, que
-                é o que a seção veio mostrar. */}
-            {/* `flex-wrap`, e NÃO uma faixa rolável: o indicador da aba ativa
-                é um `after` posicionado em `bottom-[-5px]`, e declarar
-                `overflow-x` faria o eixo Y deixar de ser `visible` (regra do
-                CSS) — o navegador então cortava o sublinhado e ainda punha
-                uma barra de rolagem vertical de 10px ao lado das abas.
-                Com quatro rótulos curtos, quebrar em duas linhas no celular
-                custa menos que uma rolagem lateral que ninguém descobre.
-                `pb-2` reserva a faixa onde o sublinhado é desenhado. */}
-            <TabsList
-              variant="line"
-              // `h-auto!` com `!`: a altura fixa do componente vem de
-              // `group-data-horizontal/tabs:h-8`, uma variante que ganha de um
-              // `h-auto` simples por especificidade — e com as abas em duas
-              // linhas no celular a caixa continuava com 32px, deixando a
-              // segunda linha por cima do título da demonstração.
-              className="h-auto! w-full max-w-full flex-wrap justify-start gap-x-1 gap-y-1.5 px-0 pt-0 pb-2"
-            >
-              {PROFILES.map((profile) => (
-                <TabsTrigger
-                  key={profile.value}
-                  value={profile.value}
-                  className="h-auto flex-none px-4 py-2.5 text-[0.9375rem]"
-                >
-                  {profile.tab}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-
-            {PROFILES.map((profile) => (
-              <TabsContent key={profile.value} value={profile.value} className="pt-8">
-                <div className="grid gap-7 lg:grid-cols-[1fr_1.1fr] lg:items-center lg:gap-12">
-                  <div>
-                    <h3 className="text-[1.375rem] leading-snug font-semibold tracking-tight text-balance text-foreground sm:text-[1.5rem]">
+        {/* No celular os quatro perfis viram uma faixa de deslizar, com o
+            próximo aparecendo na borda para mostrar que há mais; a partir de
+            `sm` voltam a ser grade. O `pb` no celular é a folga da sombra, que
+            o `overflow-x-auto` cortaria rente ao cartão. */}
+        <ul className="-mx-4 mt-14 flex snap-x snap-mandatory scroll-px-4 gap-4 overflow-x-auto px-4 pt-2 pb-10 [scrollbar-width:none] sm:mx-0 sm:grid sm:snap-none sm:grid-cols-2 sm:gap-5 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-4 [&::-webkit-scrollbar]:hidden">
+          {PROFILES.map((profile, i) => (
+            <li key={profile.tab} className="w-[82%] shrink-0 snap-start sm:w-auto">
+              <Reveal delay={i * 70} className="h-full">
+                {/* Cartão elevado: faixa na cor do procedimento no topo (a
+                    mesma marcação da agenda), o perfil, e embaixo a
+                    configuração de exemplo num bloco à parte. */}
+                <div className="card-elevated flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card">
+                  <span aria-hidden className="h-1 shrink-0" style={{ backgroundColor: profile.color }} />
+                  <div className="flex flex-1 flex-col p-5">
+                    <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.06em] text-foreground">
+                      <span aria-hidden className="size-2 rounded-full" style={{ backgroundColor: profile.color }} />
+                      {profile.tab}
+                    </p>
+                    <h3 className="mt-3 text-[1.1875rem] leading-snug font-semibold tracking-[-0.01em] text-balance text-foreground">
                       {profile.title}
                     </h3>
-                    <p className="mt-3 text-[1.0625rem] leading-7 text-muted-foreground">
-                      {profile.text}
-                    </p>
-                  </div>
+                    <p className="mt-3 text-sm leading-6 text-muted-foreground">{profile.text}</p>
 
-                  <div className="panel overflow-hidden">
-                    <header className="flex items-baseline justify-between gap-3 border-b border-border px-4 py-3">
-                      <p className="section-label text-muted-foreground">
-                        Exemplo de configuração
+                    <div className="mt-auto pt-5">
+                      <p className="time-label">Exemplo de configuração</p>
+                      <ol className="mt-2 rounded-lg border border-border bg-background/60 px-3">
+                        {profile.services.map(([name, duration, price]) => (
+                          <li key={name} className="flex items-start justify-between gap-3 border-b border-border py-2 text-sm last:border-b-0">
+                            <span className="min-w-0 leading-snug text-foreground">{name}</span>
+                            <span className="shrink-0 text-right leading-snug">
+                              <span className="block tabular-nums text-foreground">{price}</span>
+                              <span className="block tabular-nums text-xs text-muted-foreground">{duration}</span>
+                            </span>
+                          </li>
+                        ))}
+                      </ol>
+                      {/* É aqui que a duração deixa de ser enfeite: ela é o que o
+                          sistema usa para dizer o que cabe no buraco. */}
+                      <p className="mt-3 flex items-start gap-1.5 text-xs leading-5 text-muted-foreground">
+                        <Clock3 className="mt-0.5 size-3.5 shrink-0 text-[var(--mark)]" aria-hidden />
+                        <span>
+                          Livre às <span className="tabular-nums text-foreground">{profile.gap[0]}</span>: cabe{" "}
+                          <span className="text-foreground">{profile.gap[1]}</span>
+                        </span>
                       </p>
-                      <span className="tabular-nums text-xs text-muted-foreground">
-                        duração · valor
-                      </span>
-                    </header>
-
-                    <ol className="divide-y divide-border">
-                      {profile.services.map(([name, duration, price, color]) => (
-                        <li key={name} className="flex items-center gap-3 px-4 py-3">
-                          <span
-                            aria-hidden
-                            className="size-2.5 shrink-0 rounded-full"
-                            style={{ backgroundColor: color }}
-                          />
-                          <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
-                            {name}
-                          </span>
-                          <span className="shrink-0 tabular-nums text-xs text-muted-foreground">
-                            {duration}
-                          </span>
-                          <span className="w-20 shrink-0 text-right tabular-nums text-sm text-foreground">
-                            {price}
-                          </span>
-                        </li>
-                      ))}
-                    </ol>
-
-                    {/* É aqui que a duração deixa de ser enfeite: ela é o que
-                        o sistema usa para dizer o que cabe no buraco. */}
-                    <footer className="flex items-center gap-2.5 border-t border-border bg-muted/50 px-4 py-3">
-                      <Clock3 className="size-4 shrink-0 text-primary" aria-hidden />
-                      <p className="text-sm text-muted-foreground">
-                        Livre às{" "}
-                        <span className="tabular-nums text-foreground">{profile.gap[0]}</span> — cabe{" "}
-                        <span className="text-foreground">{profile.gap[1]}</span> ({profile.gap[2]})
-                      </p>
-                    </footer>
+                    </div>
                   </div>
                 </div>
-              </TabsContent>
-            ))}
-          </Tabs>
-        </Reveal>
+              </Reveal>
+            </li>
+          ))}
+        </ul>
 
-        <Reveal delay={140}>
-          <p className="mt-8 text-sm leading-6 text-muted-foreground">
-            Hoje o Timely trabalha com uma agenda por conta. Se o seu espaço
-            tem várias pessoas atendendo em paralelo, essa divisão ainda não
-            existe no sistema.
+        <Reveal delay={140} className="mt-14 flex flex-col gap-6 border-t border-foreground/80 pt-8 sm:flex-row sm:items-center sm:justify-between">
+          <p className="max-w-xl text-sm leading-6 text-muted-foreground">
+            Hoje o Timely trabalha com uma agenda por conta. Se o seu espaço tem
+            várias pessoas atendendo em paralelo, essa divisão ainda não existe
+            no sistema.
           </p>
+          <SignupButton from="para_quem" className="self-start sm:self-auto">
+            Começar grátis
+          </SignupButton>
         </Reveal>
       </div>
     </section>

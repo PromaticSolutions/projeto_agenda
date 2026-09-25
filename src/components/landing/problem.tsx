@@ -1,44 +1,52 @@
-import { CalendarX2, Clock3, MessageSquareDashed, NotebookPen, Repeat2, Wallet } from "lucide-react";
 import { Reveal } from "@/components/landing/reveal";
+import { SectionHeading } from "@/components/landing/section-heading";
 
 /**
  * O problema, em seis frases curtas.
  *
- * A versão anterior tinha uma animação de mensagens chegando mais três cards
- * explicativos — bonito, e longo demais para o segundo bloco da página. Aqui
- * cada item é uma frase que a pessoa reconhece em menos de um segundo. O
- * reconhecimento não precisa de parágrafo; precisa de precisão.
+ * Cada item é uma frase que a pessoa reconhece em menos de um segundo — o
+ * reconhecimento não precisa de parágrafo, precisa de precisão.
+ *
+ * Linhas de caderno, não cartões: é literalmente o caderno que ela usa hoje.
+ * Número na margem, a frase, um fio embaixo. Sem ícone —
+ * um ícone genérico ao lado de cada frase era o que fazia a lista parecer
+ * gerada.
  */
 
 const SITUATIONS = [
-  { Icon: MessageSquareDashed, text: "“Tem horário amanhã?” às onze da noite" },
-  { Icon: Repeat2, text: "A mesma pergunta, cinco vezes por dia" },
-  { Icon: NotebookPen, text: "Horários no caderno, no print e na memória" },
-  { Icon: CalendarX2, text: "Faltou e não avisou — o horário ficou vazio" },
-  { Icon: Clock3, text: "Encaixe que você só descobre que dá quando já passou" },
-  { Icon: Wallet, text: "Fechar o mês contando na mão" },
+  "“Tem horário amanhã?” às onze da noite",
+  "A mesma pergunta, cinco vezes por dia",
+  "Horários no caderno, no print e na memória",
+  "Faltou e não avisou — o horário ficou vazio",
+  "Encaixe que você só descobre que dá quando já passou",
+  "Não lembrar o que a cliente fez da última vez",
 ];
 
 export function Problem() {
   return (
-    <section id="rotina" className="scroll-mt-16 border-b border-border bg-background py-20 sm:py-24">
-      <div className="mx-auto w-full max-w-5xl px-4 sm:px-6">
-        <Reveal sectionName="rotina">
-          <h2 className="max-w-2xl text-[2rem] leading-[1.12] font-semibold text-balance text-foreground sm:text-[2.5rem]">
-            Sua agenda não deveria dar tanto trabalho.
-          </h2>
+    <section id="rotina" className="scroll-mt-16 border-b border-foreground/15 bg-background py-24 sm:py-32">
+      <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
+        <Reveal sectionName="rotina" className="max-w-3xl">
+          <SectionHeading
+            time="08:30"
+            eyebrow="A rotina"
+            lead="Você ainda gerencia seus atendimentos"
+            trail="assim?"
+          />
         </Reveal>
 
-        <ul className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {SITUATIONS.map(({ Icon, text }, i) => (
-            <Reveal key={text} delay={i * 60} className="h-full">
-              <li className="panel card-lift flex h-full items-start gap-3 p-4">
-                <Icon className="mt-0.5 size-4.5 shrink-0 text-muted-foreground" aria-hidden />
-                <span className="text-[0.9375rem] leading-6 text-foreground">{text}</span>
-              </li>
-            </Reveal>
+        <ol className="mt-14 grid border-t border-foreground/80 md:grid-cols-2 md:gap-x-12">
+          {SITUATIONS.map((text, i) => (
+            <li key={text} className="border-b border-border">
+              <Reveal delay={(i % 2) * 60} className="flex items-baseline gap-5 py-5">
+                <span className="time-label w-6 shrink-0 tabular-nums">{String(i + 1).padStart(2, "0")}</span>
+                <span className="text-[1.0625rem] leading-snug font-medium text-foreground sm:text-[1.1875rem]">
+                  {text}
+                </span>
+              </Reveal>
+            </li>
           ))}
-        </ul>
+        </ol>
       </div>
     </section>
   );

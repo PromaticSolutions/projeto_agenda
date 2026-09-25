@@ -204,7 +204,7 @@ export function ContactForm() {
   if (done) return <Confirmation />;
 
   return (
-    <section id="conhecer" className="scroll-mt-16 border-b border-border bg-muted/40 py-20 sm:py-24">
+    <section id="conhecer" className="scroll-mt-16 border-b border-border bg-background py-16 sm:py-20">
       <div className="mx-auto w-full max-w-3xl px-4 sm:px-6">
         <div className="panel overflow-hidden">
           {/* A barra só existe depois da abertura: mostrar "etapa 0 de 6"
@@ -248,12 +248,12 @@ export function ContactForm() {
             >
               {screen === 0 && (
                 <div>
-                  <p className="section-label text-primary">Conhecer o Timely</p>
-                  <Heading ref={headingRef}>Vamos conhecer o seu negócio?</Heading>
+                  <p className="section-label">Prefere conversar antes?</p>
+                  <Heading ref={headingRef}>Fale com o time do Timely.</Heading>
                   <p className="mt-4 text-[1.0625rem] leading-7 text-muted-foreground">
-                    Queremos entender sua rotina para mostrar como o Timely pode
-                    fazer parte dela. São seis perguntas rápidas — e só duas
-                    delas precisam de resposta.
+                    Se quiser tirar dúvidas antes de criar a conta, conte um
+                    pouco da sua rotina e a gente entra em contato. São seis
+                    perguntas rápidas, e só duas precisam de resposta.
                   </p>
                 </div>
               )}
@@ -442,9 +442,14 @@ export function ContactForm() {
                 type="button"
                 size="lg"
                 onClick={goNext}
-                className="bg-cta text-white hover:opacity-90"
+                // Na abertura o botão é contornado: a ação principal da página
+                // é criar a conta, e este convite fica como alternativa — não
+                // pode ter o mesmo peso do "Começar grátis". Dentro das etapas
+                // ele volta a ser sólido, porque ali é a ação da vez.
+                variant={screen === 0 ? "outline" : "default"}
+                className={screen === 0 ? undefined : "bg-cta text-primary-foreground hover:opacity-90"}
               >
-                {screen === 0 ? "Começar" : "Continuar"}
+                {screen === 0 ? "Falar com o time" : "Continuar"}
                 <ArrowRight className="size-4" />
               </Button>
             ) : (
@@ -453,7 +458,7 @@ export function ContactForm() {
                 size="lg"
                 onClick={submit}
                 disabled={sending}
-                className="bg-cta text-white hover:opacity-90"
+                className="bg-cta text-primary-foreground hover:opacity-90"
               >
                 {sending && <Loader2 className="size-4 animate-spin" />}
                 Quero conhecer o Timely
@@ -478,7 +483,7 @@ function Confirmation() {
   }, []);
 
   return (
-    <section id="conhecer" className="scroll-mt-16 border-b border-border bg-muted/40 py-20 sm:py-24">
+    <section id="conhecer" className="scroll-mt-16 border-b border-border bg-background py-16 sm:py-20">
       <div className="mx-auto w-full max-w-2xl px-4 sm:px-6">
         <div className="panel p-7 sm:p-9">
           <span className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -499,11 +504,11 @@ function Confirmation() {
           <div className="mt-8 flex flex-col gap-3 border-t border-border pt-7 sm:flex-row">
             <Button
               nativeButton={false}
-              className="bg-cta text-white hover:opacity-90"
+              className="bg-cta text-primary-foreground hover:opacity-90"
               render={<Link href="/signup" />}
               onClick={() => track("signup_click", { from: "pos_envio" })}
             >
-              Conhecer o Timely <ArrowRight className="size-4" />
+              Começar grátis <ArrowRight className="size-4" />
             </Button>
             <Button variant="ghost" nativeButton={false} render={<a href="#topo" />}>
               Voltar ao início

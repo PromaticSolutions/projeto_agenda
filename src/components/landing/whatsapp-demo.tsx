@@ -2,11 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BellRing, Check, CheckCheck, RotateCcw, Smartphone } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Reveal } from "@/components/landing/reveal";
+import { SectionHeading } from "@/components/landing/section-heading";
 import { cn } from "@/lib/utils";
 import { track } from "@/lib/analytics";
-import { GlassKnotBackdrop } from "@/components/auth/glass-knot";
 
 /**
  * Demonstração do WhatsApp.
@@ -43,11 +42,12 @@ const THREAD: Bubble[] = [
   { side: "us", text: "Perfeito, Ana. Te espero!", time: "18:06" },
 ];
 
+/** `time` é o horário do relógio da cena — o mesmo das bolhas ao lado. */
 const STAGES = [
-  { label: "Horário marcado na agenda", detail: "A cliente marcou pelo seu link às 14:22." },
-  { label: "Timely programa o lembrete", detail: "Na antecedência que você configurou." },
-  { label: "WhatsApp envia pelo seu número", detail: "Com o seu nome, do seu WhatsApp." },
-  { label: "A cliente responde para você", detail: "A conversa é sua — o Timely só dispara." },
+  { time: "14:22", label: "Horário marcado na agenda", detail: "A cliente marcou pelo seu link." },
+  { time: "14:22", label: "Timely programa o lembrete", detail: "Na antecedência que você configurou." },
+  { time: "18:00", label: "WhatsApp envia pelo seu número", detail: "Com o seu nome, do seu WhatsApp." },
+  { time: "18:04", label: "A cliente responde para você", detail: "A conversa é sua — o Timely só dispara." },
 ];
 
 export function WhatsAppDemo() {
@@ -108,95 +108,80 @@ export function WhatsAppDemo() {
   return (
     <section
       id="whatsapp"
-      className="relative scroll-mt-16 overflow-hidden border-b border-border bg-plum-900 py-20 text-blush-50 sm:py-28"
+      className="band-dark relative scroll-mt-16 overflow-hidden bg-plum-900 py-24 text-blush-50 sm:py-32"
     >
-      {/* Ver a nota em `cost-interaction.tsx`: toda superfície plum leva a peça,
-          menor e fora do caminho do texto. Aqui o vazio é o alto à direita,
-          acima do painel da conversa. */}
-      <GlassKnotBackdrop scale={0.7} focusX={0.78} focusY={0.2} portraitX={0.72} portraitY={0.985} />
-
-      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 sm:px-6">
+      <div className="relative mx-auto w-full max-w-6xl px-4 sm:px-6">
         <Reveal sectionName="whatsapp" className="max-w-2xl">
-          <h2 className="text-[2rem] leading-[1.12] font-semibold text-balance sm:text-[2.5rem]">
-            O lembrete que você nunca mais precisa mandar.
-          </h2>
-          <p className="mt-4 text-[1.0625rem] leading-7 text-blush-50/75">
+          <SectionHeading
+            tone="dark"
+            time="10:00"
+            eyebrow="O lembrete"
+            lead="O lembrete que você"
+            trail="nunca mais precisa mandar."
+          />
+          <p className="mt-5 text-[1.0625rem] leading-7 text-blush-50/75">
             Do seu número, com o seu nome, na hora certa.
           </p>
         </Reveal>
 
         <div ref={ref} className="mt-14 grid gap-10 lg:grid-cols-[1fr_1.05fr] lg:items-center lg:gap-14">
-          {/* Os estágios */}
-          <div className="flex flex-col gap-3">
-            {STAGES.map((s, i) => {
-              const done = step > i;
-              // `active` só faz sentido enquanto o contador está dentro da
-              // faixa dos estágios; depois disso ele segue revelando bolhas.
-              const active = step === i + 1 && step <= STAGES.length;
-              return (
-                <div
-                  key={s.label}
-                  className={cn(
-                    "flex items-start gap-3.5 rounded-lg border p-4 transition-colors duration-500",
-                    done
-                      ? "border-white/20 bg-white/[0.07]"
-                      : "border-white/10 bg-transparent",
-                    active && "border-[var(--wa)]/50"
-                  )}
-                >
-                  <span
-                    aria-hidden
-                    className={cn(
-                      "mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border transition-colors duration-500",
-                      done
-                        ? "border-transparent bg-[var(--wa)] text-white"
-                        : "border-white/25 text-blush-50/40"
-                    )}
-                  >
-                    {done ? (
-                      <Check className="size-3.5" />
-                    ) : (
-                      <span className="tabular-nums text-[0.625rem]">{i + 1}</span>
-                    )}
-                  </span>
-                  <div className="min-w-0">
+          {/* Os estágios, como uma linha do tempo: o fio vertical à esquerda é
+              a hora passando, e cada ponto acende quando o passo acontece. */}
+          <div className="flex flex-col">
+            <ol className="relative border-l border-white/20 pl-8">
+              {STAGES.map((s, i) => {
+                const done = step > i;
+                // `active` só faz sentido enquanto o contador está dentro da
+                // faixa dos estágios; depois disso ele segue revelando bolhas.
+                const active = step === i + 1 && step <= STAGES.length;
+                return (
+                  <li key={s.label} className="relative pb-7 last:pb-0">
+                    <span
+                      aria-hidden
+                      className={cn(
+                        "absolute top-1.5 -left-8 size-2.5 -translate-x-1/2 rounded-full border transition-colors duration-500",
+                        done ? "border-[#4ade80] bg-[#4ade80]" : "border-white/35 bg-plum-900",
+                        active && "ring-4 ring-[#4ade80]/20"
+                      )}
+                    />
+                    <p className="time-label tabular-nums text-blush-50/55">{s.time}</p>
                     <p
                       className={cn(
-                        "text-[0.9375rem] font-medium transition-colors duration-500",
-                        done ? "text-blush-50" : "text-blush-50/50"
+                        "mt-1 text-[1.0625rem] leading-snug font-semibold transition-colors duration-500",
+                        done ? "text-blush-50" : "text-blush-50/40"
                       )}
                     >
                       {s.label}
+                      {done && <Check className="ml-2 inline size-4 align-baseline text-[#4ade80]" aria-hidden />}
                     </p>
-                    <p className="mt-0.5 text-sm text-blush-50/55">{s.detail}</p>
-                  </div>
-                </div>
-              );
-            })}
+                    <p className="mt-0.5 text-sm text-blush-50/60">{s.detail}</p>
+                  </li>
+                );
+              })}
+            </ol>
 
-            <Button
-              variant="outline"
-              size="sm"
-              className="mt-2 self-start border-white/25 bg-transparent text-blush-50 hover:bg-white/10 hover:text-blush-50"
+            <button
+              type="button"
+              className="mt-9 inline-flex items-center gap-1.5 self-start rounded-sm text-sm font-medium text-blush-50/80 underline decoration-white/30 underline-offset-[6px] transition-colors outline-none hover:text-blush-50 focus-visible:ring-3 focus-visible:ring-white/40"
               onClick={() => {
                 track("whatsapp_demo_interaction", { action: "replay" });
                 play();
               }}
             >
-              <RotateCcw className="size-4" /> Ver de novo
-            </Button>
+              <RotateCcw className="size-3.5" aria-hidden /> Ver de novo
+            </button>
           </div>
 
           {/* A conversa */}
           <div className="relative mx-auto w-full max-w-sm">
-            <div className="overflow-hidden rounded-2xl border border-white/15 bg-[#0b141a] shadow-2xl shadow-black/50">
+            <div className="overflow-hidden rounded-xl border border-white/15 bg-[#0b141a]">
               <header className="flex items-center gap-3 border-b border-white/10 bg-[#1f2c33] px-4 py-3">
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--wa)]/20 text-sm font-semibold text-[var(--wa)]">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--wa)]/20 text-sm font-semibold text-emerald-300">
                   A
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-white">Ana Beatriz</p>
-                  <p className="text-xs text-white/45">online</p>
+                  <p className="text-xs text-white/65">online</p>
                 </div>
                 <Smartphone className="size-4 shrink-0 text-white/35" aria-hidden />
               </header>
@@ -222,12 +207,12 @@ export function WhatsAppDemo() {
                       )}
                     >
                       {b.automatic && (
-                        <p className="mb-1 flex items-center gap-1 text-[0.6875rem] font-medium text-white/55">
+                        <p className="mb-1 flex items-center gap-1 text-[0.6875rem] font-medium text-white/75">
                           <BellRing className="size-3" aria-hidden /> enviado pelo Timely
                         </p>
                       )}
                       <p>{b.text}</p>
-                      <p className="mt-1 flex items-center justify-end gap-1 text-[0.625rem] text-white/45">
+                      <p className="mt-1 flex items-center justify-end gap-1 text-[0.625rem] text-white/75">
                         {b.time}
                         {b.side === "us" && <CheckCheck className="size-3 text-sky-400" />}
                       </p>
@@ -237,7 +222,7 @@ export function WhatsAppDemo() {
               </div>
             </div>
 
-            <p className="mt-3 text-center text-xs text-blush-50/45">
+            <p className="time-label mt-3 text-center text-blush-50/60">
               Conversa demonstrativa, criada para esta página.
             </p>
           </div>

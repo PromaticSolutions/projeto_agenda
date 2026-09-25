@@ -111,8 +111,13 @@ async function mountGlassKnot({
      parte a cada quadro — o custo cresce com o quadrado da densidade. Teto em
      1.5 em vez de 2: num objeto sem aresta viva a diferença não aparece, e
      num celular mediano é o que separa 60 quadros de um login que esquenta. */
+  /* A versão transparente também serve de fundo grande sobre superfície
+     clara (o hero da landing, ver `GlassKnotGhost`). Ali o 3× da marca
+     multiplicaria por nove um canvas de centenas de pixels; acima do tamanho
+     de ícone ela cai para o mesmo teto do fundo. */
+  const isIcon = canvas.clientWidth <= 120;
   renderer.setPixelRatio(
-    fullscreen ? Math.min(window.devicePixelRatio, 1.5) : 3
+    fullscreen || !isIcon ? Math.min(window.devicePixelRatio, 1.5) : 3
   );
 
   const scene = new THREE.Scene();
@@ -192,8 +197,10 @@ async function mountGlassKnot({
     scene.add(backdropPlane);
   } else {
     // Sem plano atrás, a marca fica só com o nó — grande dentro do próprio
-    // quadro, com uma folga que a rotação nunca chega a estourar.
-    knot.scale.setScalar(1.3);
+    // quadro. Em 1.3 a rotação encosta na borda, o que num ícone de 40px não
+    // se vê; o fundo transparente (`GlassKnotGhost`) passa um `scale` menor,
+    // porque ali o corte reto na borda do canvas apareceria.
+    knot.scale.setScalar(1.3 * scale);
   }
 
   function drawBackdrop(width: number, height: number) {
@@ -579,6 +586,27 @@ export function GlassKnotBackdrop({
       ref={ref}
       aria-hidden
       className={cn("pointer-events-none absolute inset-0 block size-full", className)}
+    />
+  );
+}
+
+/**
+ * O nó transparente em tamanho de fundo, para superfície CLARA.
+ *
+ * O {@link GlassKnotBackdrop} pinta o próprio plum atrás do vidro — é dele que
+ * a refração tira cor — e por isso só funciona sobre as faixas escuras. Sobre
+ * o papel da landing ele viraria um retângulo roxo. Este usa a montagem da
+ * marca (sem plano, vidro tingido de violeta, girando) no tamanho que o
+ * layout der; a opacidade de "marca d'água" fica com quem usa.
+ */
+export function GlassKnotGhost({ className }: { className?: string }) {
+  // 0.72: o nó inteiro cabe no quadro em qualquer ângulo da rotação.
+  const ref = useGlassKnot(false, 0.72, 0.5, 0.5, 0.5, 0.5);
+  return (
+    <canvas
+      ref={ref}
+      aria-hidden
+      className={cn("pointer-events-none block", className)}
     />
   );
 }

@@ -23,10 +23,10 @@ import { track } from "@/lib/analytics";
  */
 
 const SECTIONS = [
-  { href: "#rotina", label: "A rotina" },
   { href: "#como-funciona", label: "Como funciona" },
-  { href: "#whatsapp", label: "WhatsApp" },
+  { href: "#produto", label: "Produto" },
   { href: "#para-quem", label: "Para quem é" },
+  { href: "#preco", label: "Preço" },
   { href: "#duvidas", label: "Dúvidas" },
 ];
 
@@ -64,26 +64,18 @@ export function SiteHeader() {
   return (
     <header
       className={cn(
-        "sticky top-0 z-50 w-full bg-plum-900 transition-colors duration-300",
-        // O fundo é o MESMO do hero, e por isso a barra não aparece como
-        // barra no topo: as duas superfícies se encostam e a composição
-        // continua inteira. Deixar o header transparente aqui — que era o
-        // desenho anterior — só funcionaria se ele estivesse SOBRE o hero;
-        // sendo `sticky`, ele ocupa a faixa acima dele, sobre o fundo claro
-        // da página, e o texto em blush-50 sumia contra o branco.
-        //
-        // Depois do topo, o que muda é a separação: translucidez, desfoque e
-        // uma borda, para o conteúdo claro que passa por baixo não encostar
-        // no menu.
-        scrolled
-          ? "border-b border-white/10 bg-plum-900/80 backdrop-blur-md"
-          : "border-b border-transparent"
+        "sticky top-0 z-50 w-full bg-background transition-colors duration-300",
+        // O fundo é o MESMO papel do hero, então no topo a barra não aparece
+        // como barra. Depois de rolar, ela ganha o fio de baixo — a linha de
+        // cabeçalho de uma página de agenda — e fica opaca: desfoque sobre as
+        // faixas escuras deixava o menu cinza e sem contraste.
+        scrolled ? "border-b border-foreground/15" : "border-b border-transparent"
       )}
     >
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
         <Link
           href="/"
-          className="flex items-center gap-2.5 rounded-lg text-blush-50 outline-none focus-visible:ring-3 focus-visible:ring-white/40"
+          className="flex items-center gap-2.5 rounded-lg text-foreground outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
         >
           <SystemLogo className="size-9" size={72} />
           <span className="text-lg font-semibold tracking-tight">Timely</span>
@@ -94,7 +86,7 @@ export function SiteHeader() {
             <a
               key={s.href}
               href={s.href}
-              className="rounded-lg px-3 py-2 text-sm text-blush-50/70 transition-colors hover:text-blush-50 focus-visible:ring-3 focus-visible:ring-white/40 focus-visible:outline-none"
+              className="rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
             >
               {s.label}
             </a>
@@ -104,7 +96,7 @@ export function SiteHeader() {
         <div className="flex items-center gap-2">
           <Button
             variant="ghost"
-            className="hidden text-blush-50 hover:bg-white/10 hover:text-blush-50 sm:inline-flex"
+            className="hidden text-foreground hover:bg-foreground/5 sm:inline-flex"
             onClick={() => track("login_click", { from: "header" })}
             nativeButton={false}
             render={<Link href="/login" />}
@@ -112,12 +104,12 @@ export function SiteHeader() {
             Entrar
           </Button>
           <Button
-            className="bg-blush-50 text-plum-900 hover:bg-white"
+            className="h-9 rounded-md bg-foreground px-3.5 text-background hover:bg-[var(--violet-600)] hover:text-white"
             onClick={() => track("signup_click", { from: "header" })}
             nativeButton={false}
             render={<Link href="/signup" />}
           >
-            Criar conta
+            Começar grátis
           </Button>
 
           <button
@@ -125,7 +117,7 @@ export function SiteHeader() {
             aria-label={open ? "Fechar menu" : "Abrir menu"}
             aria-expanded={open}
             onClick={() => setOpen((v) => !v)}
-            className="rounded-lg p-2 text-blush-50 transition-colors hover:bg-white/10 focus-visible:ring-3 focus-visible:ring-white/40 focus-visible:outline-none lg:hidden"
+            className="rounded-md p-2 text-foreground transition-colors hover:bg-foreground/5 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none lg:hidden"
           >
             {open ? <X className="size-5" /> : <Menu className="size-5" />}
           </button>
@@ -136,21 +128,21 @@ export function SiteHeader() {
           é sticky com z-50 — um portal exigiria repetir o controle de foco
           sem ganhar nada. */}
       {open && (
-        <div className="border-t border-white/10 bg-plum-900/95 backdrop-blur-md lg:hidden">
-          <nav className="mx-auto flex w-full max-w-6xl flex-col gap-1 px-4 py-4 sm:px-6" aria-label="Seções">
+        <div className="border-t border-foreground/15 bg-background lg:hidden">
+          <nav className="mx-auto flex w-full max-w-6xl flex-col px-4 py-3 sm:px-6" aria-label="Seções">
             {SECTIONS.map((s) => (
               <a
                 key={s.href}
                 href={s.href}
                 onClick={() => setOpen(false)}
-                className="rounded-lg px-3 py-3 text-base text-blush-50/80 transition-colors hover:bg-white/10 hover:text-blush-50"
+                className="border-b border-border px-1 py-3.5 text-base text-foreground last-of-type:border-b-0"
               >
                 {s.label}
               </a>
             ))}
             <Button
               variant="outline"
-              className="mt-2 border-white/25 bg-transparent text-blush-50 hover:bg-white/10 hover:text-blush-50 sm:hidden"
+              className="mt-2 h-11 rounded-md border-foreground/25 bg-transparent text-foreground hover:bg-foreground/5 sm:hidden"
               onClick={() => {
                 track("login_click", { from: "menu_mobile" });
                 setOpen(false);

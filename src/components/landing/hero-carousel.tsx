@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { AgendaPreview } from "@/components/landing/agenda-preview";
 import { PhonePreview } from "@/components/landing/phone-preview";
 import { DayPanelPreview } from "@/components/landing/day-panel-preview";
@@ -13,19 +14,18 @@ import { cn } from "@/lib/utils";
  * ganhou companhia. Os outros dois respondem as duas perguntas que ela deixava
  * abertas: "funciona no meu celular?" e "como eu acompanho o dia?".
  *
- * TROCA POR OPACIDADE, não por deslocamento. Uma trilha que desliza precisa de
- * `overflow-hidden`, e os selos flutuantes de cada slide vivem FORA da caixa
- * do cartão — seriam decepados na borda. Empilhando os três na mesma célula da
- * grade a transição é só `opacity`, que o compositor resolve sozinho, e a
- * altura da composição passa a ser a do slide mais alto: nada salta na troca,
- * que num hero seria o pior lugar possível para um pulo de layout.
+ * TROCA POR OPACIDADE, não por deslocamento. Empilhando os três na mesma
+ * célula da grade a transição é só `opacity`, que o compositor resolve
+ * sozinho, e a altura da composição passa a ser a do slide mais alto: nada
+ * salta na troca, que num hero seria o pior lugar possível para um pulo de
+ * layout.
  *
  * O que PAUSA o avanço automático: ponteiro em cima, foco do teclado dentro,
  * seção fora da tela, aba escondida, e a preferência por menos movimento —
  * nesse último caso o carrossel vira um seletor manual, com os três slides
- * ainda acessíveis pelos pontos.
+ * ainda acessíveis pelas abas.
  *
- * Semântica de abas em vez de "carrossel" no ARIA: os pontos são um seletor de
+ * Semântica de abas em vez de "carrossel" no ARIA: as abas são um seletor de
  * três vistas do mesmo assunto, com setas do teclado, que é exatamente o que
  * `tablist` descreve — e o leitor de tela anuncia "2 de 3" sem precisar de
  * região viva.
@@ -121,9 +121,13 @@ export function HeroCarousel() {
     list.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus();
   }
 
+  function go(delta: number) {
+    setIndex((current) => (current + delta + SLIDES.length) % SLIDES.length);
+  }
+
   return (
-    <div ref={containerRef} className="flex flex-col gap-6">
-      <div className="grid">
+    <div ref={containerRef} className="flex flex-col gap-5">
+      <div className="relative grid">
         {SLIDES.map((slide, i) => {
           const active = i === index;
           return (
@@ -145,44 +149,73 @@ export function HeroCarousel() {
             </div>
           );
         })}
+
       </div>
 
-      <div
-        role="tablist"
-        aria-label="Vistas do Timely"
-        onKeyDown={handleKeyDown}
-        className="flex items-center justify-center gap-2 lg:justify-start"
-      >
-        {SLIDES.map((slide, i) => {
-          const active = i === index;
-          return (
-            <button
-              key={slide.id}
-              type="button"
-              id={`hero-tab-${slide.id}`}
-              role="tab"
-              aria-selected={active}
-              aria-controls={`hero-slide-${slide.id}`}
-              // Um só ponto de parada no Tab: entra no selecionado e as setas
-              // andam entre eles, como manda o padrão de abas.
-              tabIndex={active ? 0 : -1}
-              onClick={() => setIndex(i)}
-              className="group rounded-lg px-1 py-2 outline-none focus-visible:ring-3 focus-visible:ring-white/40"
-            >
-              <span className="sr-only">{slide.label}</span>
-              <span
-                aria-hidden
+      {/* Controles embaixo da composição, nunca por cima dela: as abas com o
+          NOME de cada vista (ponto sem rótulo não diz o que vem) e as setas no
+          fim da linha. O traço sob a aba ativa é o mesmo fio da pauta. */}
+      <div className="flex items-center gap-4 border-t border-foreground/15">
+        <div
+          role="tablist"
+          aria-label="Vistas do Timely"
+          onKeyDown={handleKeyDown}
+          className="-mt-px flex min-w-0 flex-1 gap-5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {SLIDES.map((slide, i) => {
+            const active = i === index;
+            return (
+              <button
+                key={slide.id}
+                type="button"
+                id={`hero-tab-${slide.id}`}
+                role="tab"
+                aria-selected={active}
+                aria-controls={`hero-slide-${slide.id}`}
+                // Um só ponto de parada no Tab: entra no selecionado e as setas
+                // andam entre eles, como manda o padrão de abas.
+                tabIndex={active ? 0 : -1}
+                onClick={() => setIndex(i)}
                 className={cn(
-                  "block h-1.5 rounded-full transition-[width,background-color] duration-300",
+                  "shrink-0 border-t-2 pt-3 text-sm whitespace-nowrap transition-colors duration-200 outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
                   active
-                    ? "w-7 bg-blush-50"
-                    : "w-1.5 bg-white/30 group-hover:bg-white/60"
+                    ? "border-foreground text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
                 )}
-              />
-            </button>
-          );
-        })}
+              >
+                <span className="time-label mr-1.5 tabular-nums">{String(i + 1).padStart(2, "0")}</span>
+                {slide.label}
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex shrink-0 gap-1 pt-3">
+          <CarouselArrow side="left" label="Vista anterior" onClick={() => go(-1)} />
+          <CarouselArrow side="right" label="Próxima vista" onClick={() => go(1)} />
+        </div>
       </div>
     </div>
+  );
+}
+
+function CarouselArrow({
+  side,
+  label,
+  onClick,
+}: {
+  side: "left" | "right";
+  label: string;
+  onClick: () => void;
+}) {
+  const Icon = side === "left" ? ChevronLeft : ChevronRight;
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      onClick={onClick}
+      className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors duration-200 outline-none hover:bg-foreground/5 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+    >
+      <Icon className="size-4" aria-hidden />
+    </button>
   );
 }

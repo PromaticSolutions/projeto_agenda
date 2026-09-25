@@ -2,14 +2,18 @@ import type { Metadata } from "next";
 import { SiteHeader } from "@/components/landing/site-header";
 import { Hero } from "@/components/landing/hero";
 import { Problem } from "@/components/landing/problem";
-import { CostInteraction } from "@/components/landing/cost-interaction";
-import { Transformation } from "@/components/landing/transformation";
-import { Product } from "@/components/landing/product";
+import { Solution } from "@/components/landing/solution";
 import { WhatsAppDemo } from "@/components/landing/whatsapp-demo";
+import { Features } from "@/components/landing/features";
+import { Benefits } from "@/components/landing/benefits";
+import { CostInteraction } from "@/components/landing/cost-interaction";
+import { FeatureList } from "@/components/landing/feature-list";
 import { Audience } from "@/components/landing/audience";
+import { Pricing } from "@/components/landing/pricing";
 import { Objections } from "@/components/landing/objections";
 import { ContactForm } from "@/components/landing/contact-form";
-import { SiteFooter } from "@/components/landing/site-footer";
+import { FinalCta } from "@/components/landing/final-cta";
+import { LandingFooter } from "@/components/landing/landing-footer";
 
 /**
  * Landing page do Timely.
@@ -24,15 +28,30 @@ import { SiteFooter } from "@/components/landing/site-footer";
  * carousel e formulário — as demais chegam como HTML, o que mantém o
  * JavaScript da rota proporcional ao que de fato é interativo.
  *
- * A ordem segue a narrativa de conversão: atenção (hero) → identificação
- * (problema) → desejo (o custo em dias por ano) → transformação → o produto
- * de verdade → o WhatsApp funcionando → contexto (para quem) → objeções →
- * ação (falar com o time).
+ * UM objetivo: visitante → "Começar grátis" → cadastro. Toda chamada da
+ * página leva a /signup (ver `signup-cta.tsx`); o resto existe para ajudar a
+ * pessoa a tomar essa decisão.
  *
- * O CTA final NÃO é uma pesquisa. São cinco campos comerciais; o que o time
+ * A ordem é a de uma landing de conversão: o que é e para quem (hero) → o
+ * problema → como o Timely resolve → o produto de verdade (WhatsApp rodando e
+ * as telas) → benefícios → o tempo que ela perde hoje (calculadora) → a
+ * lista de funcionalidades → para quem é → preço → objeções → fecho.
+ *
+ * Prova social ficou DE FORA: ainda não há depoimento, número de uso ou
+ * cliente real para mostrar, e inventar seria pior do que não ter. A seção
+ * entra entre "para quem é" e "preço" quando houver material de verdade.
+ *
+ * Chamadas para o cadastro: hero, depois do produto, depois dos benefícios,
+ * na calculadora, em "para quem é", nos dois cartões de preço e no fecho.
+ *
+ * O formulário "falar com o time" continua, discreto, depois das dúvidas:
+ * alternativa para quem quer conversar antes de criar a conta, com botão
+ * contornado para não disputar com o cadastro. Ele NÃO é uma pesquisa. São
+ * cinco campos comerciais; o que o time
  * gostaria de saber sobre o mercado é oferecido depois do envio, opcional, na
  * tela de confirmação — a conversão nunca fica atrás de um questionário.
  */
+
 
 const DESCRIPTION =
   "Sua agenda funcionando enquanto você atende: as clientes marcam pelo seu link e o lembrete sai sozinho no WhatsApp. Agenda, clientes, procedimentos e valores em um só lugar.";
@@ -85,7 +104,9 @@ export const metadata: Metadata = {
 
 export default function LandingPage() {
   return (
-    <>
+    // `.landing` escopa a paleta de papel (ver o bloco "Landing" no
+    // globals.css): nada disso vaza para o painel.
+    <div className="landing">
       {/* As seções entram com `opacity-0` e sobem para 1 quando o
           IntersectionObserver dispara. Sem JavaScript, esse estado inicial
           deixaria a página em branco — e é justamente o cenário de um
@@ -100,16 +121,20 @@ export default function LandingPage() {
       <main>
         <Hero />
         <Problem />
-        <CostInteraction />
-        <Transformation />
-        <Product />
+        <Solution />
         <WhatsAppDemo />
+        <Features />
+        <Benefits />
+        <CostInteraction />
+        <FeatureList />
         <Audience />
+        <Pricing />
         <Objections />
         <ContactForm />
+        <FinalCta />
       </main>
 
-      <SiteFooter />
+      <LandingFooter />
 
       {/* Dados estruturados. `SoftwareApplication` é o tipo que descreve o
           produto; nenhum campo aqui afirma nota, número de avaliações ou
@@ -132,6 +157,6 @@ export default function LandingPage() {
           }),
         }}
       />
-    </>
+    </div>
   );
 }

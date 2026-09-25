@@ -139,11 +139,11 @@ export function AgendaPreview() {
       aria-label="Exemplo da agenda do Timely: um horário livre às 14:00 recebe um agendamento de coloração, é confirmado e a cliente recebe a confirmação no WhatsApp."
     >
       {/* A prévia inteira usa o tema CLARO, independente do tema do visitante:
-          ela representa o painel, que é uma superfície clara — e sobre o
-          plum-900 do hero isso cria a separação "isto é o produto, aquilo é a
+          ela representa o painel, que é uma superfície clara — e o branco
+          sobre o papel do hero separa "isto é o produto, aquilo é a
           página". `text-foreground` dentro dela resolve para o token claro
           porque o wrapper não herda `.dark`. */}
-      <div className="panel overflow-hidden bg-white text-[#1c1b22] shadow-2xl shadow-black/30">
+      <div className="panel overflow-hidden bg-white text-[#1c1b22]">
         <header className="flex items-center justify-between gap-3 border-b border-[#dcdee4] px-4 py-3">
           <div>
             <p className="text-[0.6875rem] font-semibold tracking-[0.04em] text-[#61616e] uppercase">
@@ -212,7 +212,7 @@ export function AgendaPreview() {
               <div className="grid">
                 <p
                   className={cn(
-                    "col-start-1 row-start-1 text-sm text-[#8a8a96] transition-opacity duration-400",
+                    "col-start-1 row-start-1 text-sm text-[#6b6b76] transition-opacity duration-400",
                     hasClient ? "opacity-0" : "opacity-100"
                   )}
                 >
@@ -266,23 +266,14 @@ export function AgendaPreview() {
         </ol>
       </div>
 
-      {/* Os selos entram JUNTO com o passo que anunciam — não flutuam soltos
-          desde o começo. `hidden sm:flex` porque no celular eles cobririam o
-          cartão em vez de decorar a composição. */}
-      <Seal
-        shown={confirmed}
-        className="float-soft -top-7 -left-5 hidden border-white/15 bg-plum-900/90 text-blush-50 sm:flex"
-      >
-        <Check className="size-3.5 shrink-0 text-emerald-400" aria-hidden />
+      {/* As notas entram JUNTO com o passo que anunciam. */}
+      <Seal shown={confirmed}>
+        <Check aria-hidden />
         Agendamento confirmado
       </Seal>
 
-      <Seal
-        shown={notified}
-        className="float-soft -right-3 -bottom-4 hidden border-white/15 bg-[var(--wa)]/95 font-medium text-white sm:flex"
-        style={{ animationDelay: "1.4s" }}
-      >
-        <BellRing className="size-3.5 shrink-0" aria-hidden />
+      <Seal shown={notified}>
+        <BellRing aria-hidden />
         WhatsApp — confirmação enviada
       </Seal>
     </div>

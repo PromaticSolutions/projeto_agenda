@@ -1,39 +1,38 @@
 import { cn } from "@/lib/utils";
 
 /**
- * Selo flutuante das composições do hero.
+ * Nota de margem das composições do hero.
  *
- * Sempre montado, nunca desmontado: aparecer é `opacity` + `translate`, as
- * duas propriedades que o compositor resolve sozinho. Trocar isso por
- * montagem condicional faria o navegador recalcular layout a cada passo.
+ * Era um selo flutuante, pendurado no canto do cartão e balançando — o
+ * elemento que mais denunciava a página como "feita no molde". Virou o que
+ * uma agenda de papel tem de verdade: a anotação ao pé da página, em linha,
+ * sem sombra e sem movimento contínuo.
  *
- * Mora num arquivo próprio porque os três slides do carrossel usam o mesmo
- * objeto — e é ele que dá unidade visual entre a agenda, o celular e o painel
- * de números, que por dentro não têm nada em comum.
+ * Sempre montada: aparecer é só `opacity`, que o compositor resolve sozinho.
+ * O espaço fica reservado mesmo invisível, então a nota que chega no fim da
+ * sequência não empurra nada.
  */
 export function Seal({
   shown,
   className,
-  style,
   children,
 }: {
   shown: boolean;
   className?: string;
-  style?: React.CSSProperties;
   children: React.ReactNode;
 }) {
   return (
-    <div
+    <p
       aria-hidden
-      style={style}
       className={cn(
-        "absolute items-center gap-2 rounded-lg border px-3 py-2 text-xs shadow-lg backdrop-blur-sm",
-        "transition-[opacity,transform] duration-500 ease-out motion-reduce:transition-none",
-        shown ? "translate-y-0 opacity-100" : "translate-y-1.5 opacity-0",
+        "mt-3 mr-5 inline-flex items-center gap-1.5 text-[0.8125rem] text-muted-foreground",
+        "transition-opacity duration-500 ease-out motion-reduce:transition-none",
+        "[&_svg]:size-3.5 [&_svg]:shrink-0 [&_svg]:text-[var(--mark)]",
+        shown ? "opacity-100" : "opacity-0",
         className
       )}
     >
       {children}
-    </div>
+    </p>
   );
 }
