@@ -1,12 +1,16 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
-import { ArrowLeft, CheckCheck } from "lucide-react";
 import { ConversationsShell } from "@/app/app/(dashboard)/conversations/conversations-shell";
 import { ConversationsHeader } from "@/app/app/(dashboard)/conversations/conversations-header";
 import { ConversationComposer, type ComposerBlock } from "@/components/app/conversation-composer";
 import { MarkConversationRead, ThreadViewport } from "@/components/app/conversation-live";
-import { ConversationAvatar, MESSAGE_TYPE_ICONS } from "@/components/app/conversation-parts";
-import { Button } from "@/components/ui/button";
+import { MESSAGE_TYPE_ICONS } from "@/components/app/conversation-parts";
+import { MessageMedia } from "@/components/app/conversation-media";
+import { ContactAvatar } from "@/components/app/contact-avatar";
+import { CheckCheck } from "lucide-react";
+import {
+  ConversationWorkspace,
+  type ConversationContact,
+} from "@/components/app/conversation-workspace";
 import { getMyStudio } from "@/lib/data/studios";
 import { getMyClientByPhone } from "@/lib/data/clients";
 import {
@@ -85,159 +89,206 @@ export default async function ConversationPage({
   const now = new Date();
   const last = messages[messages.length - 1];
 
+  const contact: ConversationContact = {
+    chatId: chat.chatId,
+    name: title,
+    phone: chat.isGroup ? null : (phone ?? null),
+    phoneLabel: chat.isGroup
+      ? "Conversa em grupo"
+      : phone
+        ? formatPhoneDisplay(phone)
+        : "Sem número",
+    isGroup: chat.isGroup,
+    clientId,
+  };
+
   return (
     <div className="flex flex-col gap-6">
       <ConversationsHeader hasConversations />
 
       <ConversationsShell activeChatId={chat.chatId}>
-        <MarkConversationRead chatId={chat.chatId} unreadCount={unreadCount} />
-
-        <div className="flex items-center gap-3 border-b border-border px-3 py-2.5 sm:px-4">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="md:hidden"
-            aria-label="Voltar para a lista"
-            render={<Link href="/app/conversations" />}
-          >
-            <ArrowLeft className="size-4" />
-          </Button>
-
-          <ConversationAvatar name={title} size="sm" />
-
-          <div className="min-w-0 flex-1">
-            <p className="truncate font-medium text-foreground">{title}</p>
-            <p className="truncate text-xs text-muted-foreground">
-              {chat.isGroup
-                ? "Conversa em grupo"
-                : phone
-                  ? formatPhoneDisplay(phone)
-                  : "Sem número"}
-              {!chat.isGroup && !clientId && " · não é cliente cadastrada"}
-            </p>
-          </div>
-
-          {/* Quem não está no cadastro tem o caminho de entrar nele; quem está
-              tem o caminho para a ficha. */}
-          {clientId ? (
-            <Button variant="outline" size="sm" render={<Link href={`/app/clients/${clientId}`} />}>
-              Ver ficha
-            </Button>
-          ) : (
-            !chat.isGroup &&
-            phone && (
-              <Button
-                variant="outline"
-                size="sm"
-                render={<Link href="/app/clients" />}
-              >
-                Cadastrar
-              </Button>
-            )
-          )}
-        </div>
-
-        <ThreadViewport lastMessageKey={last?.id ?? null}>
-          {messages.length === 0 ? (
-            <p className="py-10 text-center text-sm text-muted-foreground">
-              Nenhuma mensagem ainda. Escreva abaixo para começar a conversa.
-            </p>
-          ) : (
-            <>
-              {truncated && (
-                <p className="pb-4 text-center text-xs text-muted-foreground">
-                  Mostrando as {THREAD_MESSAGE_LIMIT} mensagens mais recentes.
-                </p>
+        <ConversationWorkspace
+          contact={contact}
+          connected={connection.status === "conectado"}
+          sendBlockedReason={blocked && !chat.isGroup ? blocked.message : null}
+          thread={
+            <ThreadViewport lastMessageKey={last?.id ?? null}>
+              {messages.length === 0 ? (
+                <div className="flex h-full flex-col items-center justify-center gap-2 py-10 text-center">
+                  <p className="rounded-full border border-border bg-card px-4 py-2 text-sm text-muted-foreground">
+                    Nenhuma mensagem ainda. Escreva abaixo para começar a conversa.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {truncated && (
+                    <p className="pb-4 text-center text-xs text-muted-foreground">
+                      Mostrando as {THREAD_MESSAGE_LIMIT} mensagens mais recentes.
+                    </p>
+                  )}
+                  <ol className="flex flex-col">
+                    {messages.map((message, index) => (
+                      <MessageItem
+                        key={message.id}
+                        message={message}
+                        previous={messages[index - 1]}
+                        now={now}
+                        studioName={studio.name}
+                        contactName={title}
+                        contactChatId={chat.isGroup ? null : chat.chatId}
+                      />
+                    ))}
+                  </ol>
+                </>
               )}
-              <ol className="flex flex-col gap-1.5">
-                {messages.map((message, index) => (
-                  <MessageItem
-                    key={message.id}
-                    message={message}
-                    previous={messages[index - 1]}
-                    now={now}
-                    showSender={chat.isGroup}
-                  />
-                ))}
-              </ol>
-            </>
-          )}
-        </ThreadViewport>
-
-        <ConversationComposer chatId={chat.chatId} blocked={blocked} />
+            </ThreadViewport>
+          }
+          composer={
+            <ConversationComposer
+              chatId={chat.chatId}
+              blocked={blocked}
+              recipientLabel={contact.phoneLabel}
+            />
+          }
+        >
+          <MarkConversationRead chatId={chat.chatId} unreadCount={unreadCount} />
+        </ConversationWorkspace>
       </ConversationsShell>
     </div>
   );
 }
 
-/** Uma mensagem, precedida do separador de dia quando o dia vira. */
+/** Mensagens da mesma pessoa com menos disso de intervalo formam um bloco. */
+const GROUP_WINDOW_MS = 5 * 60_000;
+
+/**
+ * Uma mensagem, precedida do separador de dia quando o dia vira.
+ *
+ * Desenho de caixa de atendimento: o nome de quem falou em cima, o balão, e
+ * o horário embaixo, fora dele; a foto ao lado do balão. As suas ficam à
+ * direita em balão branco, as da cliente à esquerda em azul claro — duas
+ * cores que se distinguem sem depender do lado.
+ *
+ * Mensagens seguidas do mesmo lado formam um bloco: só a primeira repete
+ * nome e foto, e as outras alinham pelo espaço que a foto ocuparia.
+ */
 function MessageItem({
   message,
   previous,
   now,
-  showSender,
+  studioName,
+  contactName,
+  contactChatId,
 }: {
   message: WhatsAppMessage;
   previous: WhatsAppMessage | undefined;
   now: Date;
-  /** Em grupo, sem o nome de quem falou a conversa vira balão anônimo. */
-  showSender: boolean;
+  studioName: string;
+  contactName: string;
+  /** Nulo em grupo: cada mensagem é de uma pessoa diferente, sem foto. */
+  contactChatId: string | null;
 }) {
   const sentAt = new Date(message.sent_at);
   const dayChanged = !previous || localDayKey(new Date(previous.sent_at)) !== localDayKey(sentAt);
   const fromMe = message.direction === "enviada";
-  const Icon = MESSAGE_TYPE_ICONS[message.message_type];
+  const continued =
+    !dayChanged &&
+    previous !== undefined &&
+    previous.direction === message.direction &&
+    previous.sender_name === message.sender_name &&
+    sentAt.getTime() - new Date(previous.sent_at).getTime() < GROUP_WINDOW_MS;
+
+  const type = message.message_type;
+  const hasMedia = MEDIA_TYPES.has(type);
+  const Icon = MESSAGE_TYPE_ICONS[type];
+  // Documento: o corpo é o nome do arquivo (ou a legenda), mostrado no cartão.
+  const caption = type === "documento" ? null : message.body;
+  const author = fromMe ? studioName : (message.sender_name ?? contactName);
 
   return (
     <>
       {dayChanged && (
-        <li className="my-3 flex justify-center">
-          <span className="rounded-full bg-background px-3 py-1 text-xs text-muted-foreground shadow-sm">
-            {formatConversationDay(sentAt, now)}
-          </span>
+        <li className="my-4 flex items-center gap-3 first:mt-0" aria-label={formatConversationDay(sentAt, now)}>
+          <span aria-hidden className="h-px flex-1 bg-border" />
+          <span className="text-xs font-medium text-muted-foreground">{formatConversationDay(sentAt, now)}</span>
+          <span aria-hidden className="h-px flex-1 bg-border" />
         </li>
       )}
 
-      <li className={cn("flex", fromMe ? "justify-end" : "justify-start")}>
-        <div
-          className={cn(
-            "max-w-[85%] rounded-2xl px-3 py-2 text-sm shadow-sm sm:max-w-[70%]",
-            fromMe
-              ? "rounded-br-sm bg-primary text-primary-foreground"
-              : "rounded-bl-sm bg-background text-foreground"
+      <li className={cn("flex items-start gap-2.5", fromMe && "flex-row-reverse", continued ? "mt-1.5" : "mt-5")}>
+        {/* A foto só na primeira do bloco; nas outras, o mesmo espaço vazio
+            mantém os balões alinhados. */}
+        <span className="w-9 shrink-0">
+          {!continued && (
+            <ContactAvatar
+              name={author}
+              chatId={fromMe ? null : contactChatId}
+              size="sm"
+              className={cn("size-9", fromMe && "bg-[var(--plum-900)] text-white dark:bg-primary/25 dark:text-violet-200")}
+            />
           )}
-        >
-          {showSender && !fromMe && message.sender_name && (
-            <p className="mb-0.5 text-xs font-medium text-primary">{message.sender_name}</p>
-          )}
+        </span>
 
-          {/* Mídia não é guardada (ver 0019): a tela diz o que era e, quando
-              havia legenda, mostra a legenda. */}
-          {message.message_type !== "texto" && (
+        <div className={cn("flex min-w-0 max-w-[80%] flex-col sm:max-w-[68%]", fromMe ? "items-end" : "items-start")}>
+          {!continued && (
             <p
               className={cn(
-                "mb-0.5 flex items-center gap-1.5 text-xs font-medium",
-                fromMe ? "text-primary-foreground/80" : "text-muted-foreground"
+                "mb-1 text-xs font-medium",
+                fromMe ? "text-muted-foreground" : "text-primary dark:text-violet-300"
               )}
             >
-              {Icon && <Icon className="size-3.5" aria-hidden />}
-              {MESSAGE_TYPE_LABELS[message.message_type]}
+              {author}
             </p>
           )}
 
-          {message.body && <p className="whitespace-pre-wrap break-words">{message.body}</p>}
-
-          <p
+          <div
             className={cn(
-              "mt-0.5 flex items-center justify-end gap-1 text-[0.6875rem] tabular-nums",
-              fromMe ? "text-primary-foreground/70" : "text-muted-foreground"
+              "rounded-xl text-[0.9375rem] leading-[1.45]",
+              hasMedia ? "p-1.5" : "px-3.5 py-2.5",
+              fromMe
+                ? "border border-border bg-card text-foreground shadow-[0_1px_2px_rgb(16_24_40/0.06)]"
+                : "bg-[#d6e7fc] text-[#12263f] dark:bg-sky-900/45 dark:text-sky-50"
             )}
           >
-            {formatMessageTime(sentAt)}
-            {!fromMe && message.read_at && <CheckCheck className="size-3" aria-hidden />}
+            {hasMedia ? (
+              // `fromMe` na mídia escolhe as cores de balão ESCURO; os dois
+              // balões aqui são claros.
+              <MessageMedia
+                messageId={message.id}
+                type={type}
+                fromMe={false}
+                fileLabel={type === "documento" ? message.body : null}
+              />
+            ) : (
+              type !== "texto" && (
+                // Localização, contato e o que só abre no celular: o app não tem
+                // como mostrar, então diz o que é.
+                <p className="mb-0.5 flex items-center gap-1.5 text-xs font-medium opacity-75">
+                  {Icon && <Icon className="size-3.5" aria-hidden />}
+                  {MESSAGE_TYPE_LABELS[type]}
+                </p>
+              )
+            )}
+
+            {caption && (
+              <p className={cn("whitespace-pre-wrap break-words", hasMedia && "px-1.5 pt-1.5")}>{caption}</p>
+            )}
+          </div>
+
+          <p className="mt-1 flex items-center gap-1 text-[0.6875rem] text-muted-foreground italic tabular-nums">
+            <time dateTime={message.sent_at}>{formatMessageTime(sentAt)}</time>
+            {fromMe && <CheckCheck className="size-3.5 not-italic" aria-label="Enviada" />}
           </p>
         </div>
       </li>
     </>
   );
 }
+
+const MEDIA_TYPES = new Set<WhatsAppMessage["message_type"]>([
+  "imagem",
+  "figurinha",
+  "audio",
+  "video",
+  "documento",
+]);

@@ -414,6 +414,11 @@ export interface Database {
           sent_at: string;
           read_at: string | null;
           created_at: string;
+          /** 0022 — objeto no bucket conversation-media; nulo = não guardado. */
+          media_path: string | null;
+          media_mime: string | null;
+          /** 0022 — nulo = não tentado; "salva"; "indisponivel". */
+          media_status: "salva" | "indisponivel" | null;
         };
         Insert: {
           id?: string;
@@ -431,6 +436,9 @@ export interface Database {
           sent_at: string;
           read_at?: string | null;
           created_at?: string;
+          media_path?: string | null;
+          media_mime?: string | null;
+          media_status?: "salva" | "indisponivel" | null;
         };
         Update: Partial<Database["public"]["Tables"]["whatsapp_messages"]["Insert"]>;
         Relationships: [];

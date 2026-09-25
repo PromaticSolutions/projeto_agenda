@@ -83,7 +83,7 @@ export function ThreadViewport({
       }}
       role="log"
       aria-label="Mensagens"
-      className="min-h-0 flex-1 overflow-y-auto bg-muted/30 px-3 py-4 sm:px-6"
+      className="min-h-0 flex-1 overflow-y-auto bg-muted/40 px-3 py-5 sm:px-6 dark:bg-background/60"
     >
       {children}
     </div>

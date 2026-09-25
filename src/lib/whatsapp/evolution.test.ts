@@ -304,6 +304,33 @@ describe("setWebhook", () => {
   });
 });
 
+describe("fetchMedia (0022)", () => {
+  it("manda o conteúdo da mensagem quando o webhook o tem, para não depender do banco do gateway", async () => {
+    enqueue(200, { base64: "AAEC", mimetype: "image/jpeg", fileName: null });
+    const p = await provider();
+    const content = { imageMessage: { mediaKey: "chave", directPath: "/v/t62/abc", mimetype: "image/jpeg" } };
+
+    const media = await p.fetchMedia("promatic_x", "3A5991A9EA", content);
+
+    expect(calls[0].url).toBe("http://gateway.test:8080/chat/getBase64FromMediaMessage/promatic_x");
+    expect(calls[0].body).toEqual({
+      message: { key: { id: "3A5991A9EA" }, message: content },
+      convertToMp4: false,
+    });
+    expect(media).toEqual({ base64: "AAEC", mimeType: "image/jpeg", fileName: null });
+  });
+
+  it("sem o conteúdo, pede só pela chave — e 400 vira null (arquivo que não existe mais)", async () => {
+    enqueue(400, { message: "not found" });
+    const p = await provider();
+
+    const media = await p.fetchMedia("promatic_x", "3A0F5F6EEA");
+
+    expect(calls[0].body).toEqual({ message: { key: { id: "3A0F5F6EEA" } }, convertToMp4: false });
+    expect(media).toBeNull();
+  });
+});
+
 describe("checkNumbers", () => {
   it("indexa o resultado pelo número consultado e pelo jid devolvido", async () => {
     // A Evolution normaliza o número (nono dígito) e pode devolver diferente

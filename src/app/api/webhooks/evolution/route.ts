@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, after, type NextRequest } from "next/server";
 import {
   findWhatsAppConnectionByInstanceName,
   saveWhatsAppConnection,
@@ -9,8 +9,9 @@ import {
   savePlatformWhatsApp,
 } from "@/lib/data/platform-whatsapp";
 import { recordInboundMessage } from "@/lib/data/conversations";
+import { captureInboundMedia } from "@/lib/data/conversationMedia";
 import { mapState } from "@/lib/whatsapp/evolution";
-import { parseEvolutionMessage } from "@/lib/whatsapp/inbound";
+import { parseEvolutionMessage, type InboundWhatsAppMessage } from "@/lib/whatsapp/inbound";
 import {
   WEBHOOK_SECRET_HEADER,
   evolutionWebhookSecret,
@@ -46,9 +47,10 @@ import { isSupabaseServiceConfigured } from "@/lib/supabase/env";
  * despejaria a chave que controla todas as instâncias nos logs da plataforma.
  */
 
-// Handler curto de propósito: a Evolution tem timeout de 30s por entrega e
-// repete o que falha. Trabalho longo aqui viraria evento duplicado.
-export const maxDuration = 15;
+// A RESPOSTA é curta de propósito: a Evolution tem timeout de 30s por entrega
+// e repete o que falha. O teto é maior que isso só por causa do download de
+// mídia, que roda em `after` (depois da resposta) e conta neste mesmo tempo.
+export const maxDuration = 60;
 
 /** Corpo maior que isto é descartado sem parse. */
 const MAX_BODY_BYTES = 256 * 1024;
@@ -251,9 +253,20 @@ async function handleEvent(
       // centenas de consultas numa rota que tem 15s.
       const items = Array.isArray(data) ? data.slice(0, 50) : [data];
       let handled = false;
+      const recorded: InboundWhatsAppMessage[] = [];
       for (const item of items) {
         const message = parseEvolutionMessage(item);
-        if (message && (await recordInboundMessage(studioId, message))) handled = true;
+        if (message && (await recordInboundMessage(studioId, message))) {
+          handled = true;
+          recorded.push(message);
+        }
+      }
+      // Foto, áudio e vídeo são guardados AGORA, com a mensagem inteira na mão
+      // (0022) — depois só sobra o id, e o gateway não guarda a mensagem. Fica
+      // para depois da resposta: a Evolution não espera o download, e uma
+      // falha aqui não vira reentrega do evento.
+      if (recorded.some((message) => message.mediaContent)) {
+        after(() => captureInboundMedia(studioId, instanceName, recorded));
       }
       return handled;
     }

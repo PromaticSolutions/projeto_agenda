@@ -53,6 +53,9 @@ function seed(): WhatsAppMessage[] {
       sent_at: at,
       read_at: direction === "recebida" && read ? at : null,
       created_at: at,
+      media_path: null,
+      media_mime: null,
+      media_status: null,
     });
   }
 
@@ -142,4 +145,49 @@ export function mockMarkConversationRead(studioId: string, chatId: string): numb
     }
   }
   return changed;
+}
+
+export function mockGetConversationMessage(studioId: string, id: string): WhatsAppMessage | null {
+  return messages().find((message) => message.studio_id === studioId && message.id === id) ?? null;
+}
+
+/**
+ * Arquivo de mentira para a mídia do modo sem Supabase: sem gateway não há
+ * foto nem áudio de verdade, e sem isto não daria para ver o balão de mídia
+ * funcionando localmente. Foto vira um desenho; áudio, um tom curto.
+ */
+export function mockMessageMedia(type: WhatsAppMessage["message_type"]): {
+  mimeType: string;
+  bytes: Uint8Array;
+} | null {
+  if (type === "imagem" || type === "figurinha") {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360" viewBox="0 0 480 360"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#c4b5fd"/><stop offset="1" stop-color="#f0abfc"/></linearGradient></defs><rect width="480" height="360" fill="url(#g)"/><circle cx="170" cy="150" r="46" fill="#fff" opacity=".7"/><path d="M0 300 L150 190 L260 270 L340 210 L480 300 V360 H0Z" fill="#fff" opacity=".55"/></svg>`;
+    return { mimeType: "image/svg+xml", bytes: new TextEncoder().encode(svg) };
+  }
+  if (type === "audio") {
+    // 3 s de um tom de 440 Hz, WAV PCM 8 kHz mono.
+    const rate = 8000;
+    const samples = rate * 3;
+    const buffer = new ArrayBuffer(44 + samples);
+    const view = new DataView(buffer);
+    const write = (offset: number, text: string) =>
+      [...text].forEach((char, i) => view.setUint8(offset + i, char.charCodeAt(0)));
+    write(0, "RIFF");
+    view.setUint32(4, 36 + samples, true);
+    write(8, "WAVEfmt ");
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
+    view.setUint32(24, rate, true);
+    view.setUint32(28, rate, true);
+    view.setUint16(32, 1, true);
+    view.setUint16(34, 8, true);
+    write(36, "data");
+    view.setUint32(40, samples, true);
+    for (let i = 0; i < samples; i++) {
+      view.setUint8(44 + i, 128 + Math.round(40 * Math.sin((2 * Math.PI * 440 * i) / rate)));
+    }
+    return { mimeType: "audio/wav", bytes: new Uint8Array(buffer) };
+  }
+  return null;
 }

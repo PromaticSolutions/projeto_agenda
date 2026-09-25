@@ -53,12 +53,12 @@ export async function ConversationsShell({
   }));
 
   return (
-    <div className="flex h-[calc(100dvh-11rem)] min-h-[26rem] overflow-hidden rounded-xl border border-border bg-card">
+    <div className="panel shadow-float flex h-[calc(100dvh-10rem)] min-h-[34rem] overflow-hidden rounded-2xl bg-muted/50 dark:bg-background">
       <ConversationsAutoRefresh />
 
       <div
         className={cn(
-          "w-full min-w-0 flex-col border-border md:flex md:w-80 md:shrink-0 md:border-r lg:w-96",
+          "w-full min-w-0 flex-col border-border bg-card md:flex md:w-80 md:shrink-0 md:border-r xl:w-72 2xl:w-80",
           activeChatId ? "hidden" : "flex"
         )}
       >

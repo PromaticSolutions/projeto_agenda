@@ -2,7 +2,12 @@ import "server-only";
 import { getMyStudio } from "@/lib/data/studios";
 import { getMyClientByPhone } from "@/lib/data/clients";
 import { getConversation, recordSentReply } from "@/lib/data/conversations";
-import { sendManualWhatsAppMessage, type SendResult } from "@/lib/data/whatsappSend";
+import {
+  sendManualWhatsAppMessage,
+  type ManualMedia,
+  type SendResult,
+} from "@/lib/data/whatsappSend";
+import { downloadServiceImage } from "@/lib/data/storage";
 import { chatFromJid } from "@/lib/whatsapp/inbound";
 
 /**
@@ -22,6 +27,72 @@ export async function sendConversationReply(
   chatId: string,
   message: unknown
 ): Promise<SendResult> {
+  const target = await resolveReplyTarget(chatId);
+  if (!target.ok) return target;
+
+  const result = await sendManualWhatsAppMessage({ phone: target.phone, message });
+  if (!result.ok) return result;
+
+  await recordReply(target, {
+    body: String(message).trim(),
+    providerMessageId: result.providerMessageId,
+  });
+  return result;
+}
+
+/**
+ * Envia na conversa uma das fotos cadastradas nos serviços.
+ *
+ * O navegador manda só o ID do anexo. O arquivo é lido aqui, pelo servidor, e
+ * só se o anexo for do estúdio da sessão E for imagem: sem isso, qualquer
+ * caminho do bucket privado viraria algo que dá para mandar para fora.
+ */
+export async function sendConversationImage(
+  chatId: string,
+  attachmentId: unknown,
+  caption: unknown
+): Promise<SendResult> {
+  const target = await resolveReplyTarget(chatId);
+  if (!target.ok) return target;
+
+  if (typeof attachmentId !== "string" || !UUID_RE.test(attachmentId)) {
+    return { ok: false, code: "dados_invalidos", error: "Foto não encontrada." };
+  }
+
+  let media: ManualMedia | null;
+  try {
+    media = await downloadServiceImage(target.studioId, attachmentId);
+  } catch (cause) {
+    console.error("[conversations/send] downloadServiceImage", cause);
+    return { ok: false, code: "erro_interno", error: "Não foi possível ler a foto. Tente de novo." };
+  }
+  if (!media) {
+    return { ok: false, code: "dados_invalidos", error: "Foto não encontrada." };
+  }
+
+  const text = typeof caption === "string" ? caption.trim() : "";
+  const result = await sendManualWhatsAppMessage({ phone: target.phone, message: text, media });
+  if (!result.ok) return result;
+
+  await recordReply(target, {
+    body: text || null,
+    providerMessageId: result.providerMessageId,
+    messageType: "imagem",
+  });
+  return result;
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+type ReplyTarget =
+  | { ok: true; studioId: string; chatId: string; phone: string; clientId: string | null }
+  | { ok: false; code: "dados_invalidos" | "sem_estudio"; error: string };
+
+/**
+ * Para quem vai a resposta — sempre a partir da CONVERSA, nunca de um número
+ * que o navegador mande.
+ */
+async function resolveReplyTarget(chatId: string): Promise<ReplyTarget> {
   const chat = chatFromJid(chatId);
   if (!chat) {
     return { ok: false, code: "dados_invalidos", error: "Conversa não encontrada." };
@@ -63,17 +134,32 @@ export async function sendConversationReply(
     return { ok: false, code: "dados_invalidos", error: "Conversa sem número para responder." };
   }
 
-  const result = await sendManualWhatsAppMessage({ phone, message });
-  if (!result.ok) return result;
+  return {
+    ok: true,
+    studioId: studio.id,
+    chatId: chat.chatId,
+    phone,
+    clientId: conversation?.client_id ?? client?.id ?? null,
+  };
+}
 
+async function recordReply(
+  target: Extract<ReplyTarget, { ok: true }>,
+  sent: {
+    body: string | null;
+    providerMessageId: string | null;
+    messageType?: "imagem";
+  }
+): Promise<void> {
   try {
     await recordSentReply({
-      studioId: studio.id,
-      chatId: chat.chatId,
-      chatPhone: phone,
-      clientId: conversation?.client_id ?? client?.id ?? null,
-      body: String(message).trim(),
-      providerMessageId: result.providerMessageId,
+      studioId: target.studioId,
+      chatId: target.chatId,
+      chatPhone: target.phone,
+      clientId: target.clientId,
+      body: sent.body,
+      providerMessageId: sent.providerMessageId,
+      ...(sent.messageType ? { messageType: sent.messageType } : {}),
     });
   } catch (cause) {
     // A mensagem SAIU. Falhar aqui não pode virar "erro ao enviar" na tela: o
@@ -81,5 +167,4 @@ export async function sendConversationReply(
     // do webhook ainda traz a cópia para a conversa.
     console.error("[conversations/send] recordSentReply", cause);
   }
-  return result;
 }

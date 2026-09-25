@@ -156,3 +156,40 @@ export async function removeAttachmentObjects(paths: string[]): Promise<void> {
   const { error } = await supabase.storage.from(SERVICE_ATTACHMENTS_BUCKET).remove(paths);
   if (error) console.error(error);
 }
+
+/**
+ * Lê uma FOTO de serviço para enviar pelo WhatsApp.
+ *
+ * A linha é buscada pelo id E pelo estúdio: o id vem do navegador, e sem o
+ * filtro de estúdio daria para mandar a foto de outro salão. PDF e outros
+ * anexos internos ficam de fora — "Enviar fotos dos procedimentos" manda foto.
+ * `null` quando o anexo não existe, não é deste estúdio ou não é imagem.
+ */
+export async function downloadServiceImage(
+  studioId: string,
+  attachmentId: string
+): Promise<{ mimeType: string; fileName: string; base64: string } | null> {
+  if (!isSupabaseConfigured) return null;
+
+  const supabase = createServiceRoleSupabaseClient();
+  const { data: row, error } = await supabase
+    .from("service_attachments")
+    .select("storage_path, file_name, mime_type")
+    .eq("id", attachmentId)
+    .eq("studio_id", studioId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!row || !isImageMime(row.mime_type)) return null;
+
+  const { data: blob, error: downloadError } = await supabase.storage
+    .from(SERVICE_ATTACHMENTS_BUCKET)
+    .download(row.storage_path);
+  if (downloadError) throw downloadError;
+
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  return {
+    mimeType: row.mime_type,
+    fileName: row.file_name,
+    base64: Buffer.from(bytes).toString("base64"),
+  };
+}

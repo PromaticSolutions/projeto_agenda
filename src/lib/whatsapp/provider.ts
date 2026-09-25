@@ -42,6 +42,26 @@ export interface SendTextInput {
   body: string;
 }
 
+export interface SendMediaInput {
+  instanceName: string;
+  /** E.164 sem "+", como está gravado no banco. */
+  toPhone: string;
+  /** Só imagem por enquanto: é o que a tela de Conversas envia (fotos dos serviços). */
+  mediaType: "image";
+  mimeType: string;
+  fileName: string;
+  /** O arquivo em base64 puro, sem o prefixo `data:`. */
+  base64: string;
+  caption: string | null;
+}
+
+/** Arquivo de uma mensagem, baixado do WhatsApp pelo gateway. */
+export interface ProviderMedia {
+  mimeType: string;
+  fileName: string | null;
+  base64: string;
+}
+
 export interface SetWebhookInput {
   instanceName: string;
   url: string;
@@ -74,6 +94,23 @@ export interface WhatsAppProvider {
    */
   checkNumbers(instanceName: string, numbers: string[]): Promise<Map<string, boolean>>;
   sendText(input: SendTextInput): Promise<{ providerMessageId: string | null }>;
+  sendMedia(input: SendMediaInput): Promise<{ providerMessageId: string | null }>;
+  /**
+   * O arquivo (foto, áudio, vídeo, documento) de uma mensagem já recebida ou
+   * enviada. `null` quando o gateway não tem mais a mensagem.
+   *
+   * `rawMessage` é o objeto `message` do evento, com a chave de mídia. Com ele
+   * o gateway baixa o arquivo direto do WhatsApp, sem precisar ter guardado a
+   * mensagem — é o caminho do webhook (0022). Sem ele, o gateway procura a
+   * mensagem no banco dele pelo id, o que só funciona se ela foi guardada.
+   */
+  fetchMedia(
+    instanceName: string,
+    providerMessageId: string,
+    rawMessage?: Record<string, unknown> | null
+  ): Promise<ProviderMedia | null>;
+  /** URL temporária da foto de perfil do contato, ou `null` quando é privada ou não existe. */
+  fetchProfilePictureUrl(instanceName: string, phone: string): Promise<string | null>;
   /** Conversas que o gateway guarda para esta instância. */
   fetchChats(instanceName: string): Promise<ProviderChat[]>;
   /**

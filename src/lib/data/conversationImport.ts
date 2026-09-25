@@ -1,6 +1,8 @@
 import "server-only";
 import { getWhatsAppConnection } from "@/lib/data/whatsapp";
+import { after } from "next/server";
 import { listConversations, recordInboundMessages } from "@/lib/data/conversations";
+import { captureInboundMedia } from "@/lib/data/conversationMedia";
 import { getWhatsAppProvider, WhatsAppProviderError } from "@/lib/whatsapp/provider";
 import { parseEvolutionMessage, phoneVariants } from "@/lib/whatsapp/inbound";
 
@@ -97,6 +99,12 @@ export async function importConversationHistory(studioId: string): Promise<Impor
       }
 
       await recordInboundMessages(studioId, parsed);
+      // O registro do gateway traz a mensagem inteira, com a chave de mídia:
+      // é a hora de guardar foto e áudio (0022). Depois da resposta, para a
+      // importação não esperar os downloads.
+      if (parsed.some((message) => message.mediaContent)) {
+        after(() => captureInboundMedia(studioId, instanceName, parsed));
+      }
       messages += parsed.length;
       chatsImported += 1;
     }

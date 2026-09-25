@@ -13,6 +13,7 @@ import {
   mockUpsertClient,
 } from "@/lib/mock/store";
 import { phoneVariants } from "@/lib/whatsapp/inbound";
+import { deleteConversationMediaObjects, listClientMediaPaths } from "@/lib/data/conversationMedia";
 import type { Client } from "@/lib/types";
 
 export interface ClientWithStats extends Client {
@@ -243,6 +244,13 @@ export async function deleteClient(studioId: string, id: string): Promise<void> 
   if (!isSupabaseConfigured) return mockDeleteClient(id);
 
   const supabase = await createServerSupabaseClient();
+  // As mensagens da cliente somem em cascata, mas os ARQUIVOS delas (0022)
+  // vivem no bucket, fora do alcance do `on delete cascade`. Os caminhos são
+  // lidos antes, e os objetos removidos depois que a linha saiu.
+  const mediaPaths = await listClientMediaPaths(studioId, id);
+
   const { error } = await supabase.from("clients").delete().eq("id", id).eq("studio_id", studioId);
   if (error) throw error;
+
+  await deleteConversationMediaObjects(mediaPaths);
 }

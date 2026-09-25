@@ -22,12 +22,18 @@ const countRecentManualSends = vi.fn<() => Promise<number>>();
 // telefone normalizado e o que foi gravado no histórico.
 interface ManualRecord {
   studioId: string;
+  body?: string;
   outcome: string;
   error?: string | null;
 }
 const recordManualMessage = vi.fn<(input: ManualRecord) => Promise<ManualRecord>>();
 const sendText = vi.fn<
   (input: { instanceName: string; toPhone: string; body: string }) => Promise<{
+    providerMessageId: string | null;
+  }>
+>();
+const sendMedia = vi.fn<
+  (input: { instanceName: string; toPhone: string; caption: string | null; base64: string }) => Promise<{
     providerMessageId: string | null;
   }>
 >();
@@ -59,6 +65,7 @@ vi.mock("@/lib/whatsapp/provider", async (importOriginal) => {
       setWebhook: vi.fn(),
       checkNumbers,
       sendText,
+      sendMedia,
     }),
   };
 });
@@ -96,6 +103,7 @@ beforeEach(() => {
   countRecentManualSends.mockResolvedValue(0);
   checkNumbers.mockResolvedValue(new Map());
   sendText.mockResolvedValue({ providerMessageId: "MSG-1" });
+  sendMedia.mockResolvedValue({ providerMessageId: "MSG-FOTO" });
   recordManualMessage.mockImplementation(async (input) => input);
 });
 
@@ -205,5 +213,35 @@ describe("falha no gateway (seção 28)", () => {
     const gravado = recordManualMessage.mock.calls[0]![0];
     expect(gravado.outcome).toBe("falhou");
     expect(gravado.error).toContain("203.0.113.10");
+  });
+});
+
+describe("foto (fotos dos serviços, pela tela de Conversas)", () => {
+  const media = { mimeType: "image/jpeg", fileName: "volume.jpg", base64: "AAAA" };
+
+  it("vai pelo envio de mídia, com a legenda, pela instância da sessão", async () => {
+    const result = await send({ phone: "11934476935", message: " Olha só ", media });
+
+    expect(result).toMatchObject({ ok: true, providerMessageId: "MSG-FOTO" });
+    expect(sendText).not.toHaveBeenCalled();
+    const arg = sendMedia.mock.calls[0]![0];
+    expect(arg.instanceName).toBe(`promatic_${ESTUDIO_A}`);
+    expect(arg.caption).toBe("Olha só");
+    expect(arg.base64).toBe("AAAA");
+    expect(recordManualMessage.mock.calls[0]![0].body).toBe("[Foto] Olha só");
+  });
+
+  it("legenda é opcional; o histórico registra o arquivo", async () => {
+    const result = await send({ phone: "11934476935", message: "", media });
+    expect(result.ok).toBe(true);
+    expect(sendMedia.mock.calls[0]![0].caption).toBeNull();
+    expect(recordManualMessage.mock.calls[0]![0].body).toBe("[Foto] volume.jpg");
+  });
+
+  it("passa pelo mesmo teto de envio do texto", async () => {
+    countRecentManualSends.mockResolvedValue(20);
+    const result = await send({ phone: "11934476935", message: "", media });
+    expect(result).toMatchObject({ ok: false, code: "limite" });
+    expect(sendMedia).not.toHaveBeenCalled();
   });
 });

@@ -28,6 +28,20 @@ function evento(overrides: Record<string, unknown> = {}, key: Record<string, unk
 }
 
 describe("parseEvolutionMessage", () => {
+  it("entrega o conteúdo da mídia, sem envelope, para o download do webhook (0022)", () => {
+    const imagem = { imageMessage: { mediaKey: "chave", directPath: "/v/t62/abc", mimetype: "image/jpeg" } };
+    const parsed = parseEvolutionMessage(
+      evento({ message: { viewOnceMessageV2: { message: imagem } }, messageType: "viewOnceMessageV2" }),
+      AGORA
+    );
+    expect(parsed?.type).toBe("imagem");
+    expect(parsed?.mediaContent).toEqual(imagem);
+  });
+
+  it("texto não carrega conteúdo de mídia", () => {
+    expect(parseEvolutionMessage(evento(), AGORA)).not.toHaveProperty("mediaContent");
+  });
+
   it("lê o texto que a cliente mandou", () => {
     expect(parseEvolutionMessage(evento(), AGORA)).toEqual({
       providerMessageId: "3EB0A1B2C3",

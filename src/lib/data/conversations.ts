@@ -210,8 +210,11 @@ export interface SentReplyRecord {
   chatId: string;
   chatPhone: string | null;
   clientId: string | null;
-  body: string;
+  /** Texto, ou a legenda da foto (nula quando não houver). */
+  body: string | null;
   providerMessageId: string | null;
+  /** Padrão "texto". */
+  messageType?: "texto" | "imagem";
   now?: Date;
 }
 
@@ -234,7 +237,7 @@ export async function recordSentReply(input: SentReplyRecord): Promise<void> {
       chat_phone: input.chatPhone,
       is_group: false,
       direction: "enviada",
-      message_type: "texto",
+      message_type: input.messageType ?? "texto",
       body: input.body,
       // Sem id do gateway não há como deduplicar com o webhook; um id local
       // ao menos mantém a linha única. Na 2.3.7 o `sendText` sempre devolve

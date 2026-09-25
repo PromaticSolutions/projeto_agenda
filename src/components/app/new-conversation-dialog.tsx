@@ -63,7 +63,7 @@ export function NewConversationDialog() {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger
-        render={<Button variant="ghost" size="icon-sm" aria-label="Nova conversa" title="Nova conversa" />}
+        render={<Button variant="outline" size="icon-sm" className="size-8" aria-label="Nova conversa" title="Nova conversa" />}
       >
         <SquarePen className="size-4" />
       </DialogTrigger>

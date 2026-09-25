@@ -44,7 +44,22 @@ export interface InboundWhatsAppMessage {
   /** Texto, legenda ou nome do arquivo. Nulo quando a mídia não tem nenhum. */
   body: string | null;
   sentAt: string;
+  /**
+   * O conteúdo da mensagem como veio (já sem envelope), só quando é mídia. Leva
+   * a `mediaKey` e o `directPath` que permitem baixar o arquivo do WhatsApp
+   * (0022). NÃO é gravado no banco: vale só durante o webhook.
+   */
+  mediaContent?: Record<string, unknown> | null;
 }
+
+/** Os tipos que têm arquivo para baixar. */
+export const MEDIA_MESSAGE_TYPES: ReadonlySet<WhatsAppMessageType> = new Set<WhatsAppMessageType>([
+  "imagem",
+  "figurinha",
+  "audio",
+  "video",
+  "documento",
+]);
 
 /** Mesmo teto da coluna `body` em 0019. */
 export const MAX_MESSAGE_BODY = 8192;
@@ -117,6 +132,7 @@ export function parseEvolutionMessage(
     type: content.type,
     body: content.body,
     sentAt: timestampToIso(data.messageTimestamp, now),
+    ...(MEDIA_MESSAGE_TYPES.has(content.type) ? { mediaContent: message } : {}),
   };
 }
 

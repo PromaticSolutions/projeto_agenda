@@ -30,6 +30,9 @@ const getConversation =
   vi.fn<(studioId: string, chatId: string) => Promise<WhatsAppConversation | null>>();
 const sendManual = vi.fn<(input: { phone: unknown; message: unknown }) => Promise<SendResult>>();
 const recordSentReply = vi.fn<(input: ReplyRecord) => Promise<void>>();
+type ImageFile = { mimeType: string; fileName: string; base64: string };
+const downloadServiceImage =
+  vi.fn<(studioId: string, attachmentId: string) => Promise<ImageFile | null>>();
 
 vi.mock("@/lib/data/studios", () => ({ getMyStudio: () => getMyStudio() }));
 vi.mock("@/lib/data/clients", () => ({
@@ -37,6 +40,10 @@ vi.mock("@/lib/data/clients", () => ({
 }));
 vi.mock("@/lib/data/whatsappSend", () => ({
   sendManualWhatsAppMessage: (input: { phone: unknown; message: unknown }) => sendManual(input),
+}));
+vi.mock("@/lib/data/storage", () => ({
+  downloadServiceImage: (studioId: string, attachmentId: string) =>
+    downloadServiceImage(studioId, attachmentId),
 }));
 vi.mock("@/lib/data/conversations", () => ({
   recordSentReply: (input: ReplyRecord) => recordSentReply(input),
@@ -89,6 +96,8 @@ beforeEach(() => {
   sendManual.mockResolvedValue({ ok: true, to: "5511987654321", providerMessageId: "3EB0" });
   recordSentReply.mockReset();
   recordSentReply.mockResolvedValue();
+  downloadServiceImage.mockReset();
+  downloadServiceImage.mockResolvedValue({ mimeType: "image/jpeg", fileName: "volume.jpg", base64: "AAAA" });
 });
 
 describe("sendConversationReply", () => {
@@ -193,5 +202,57 @@ describe("sendConversationReply", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const result = await responder(CHAT_A, "oi");
     expect(result.ok).toBe(true);
+  });
+});
+
+const FOTO_A = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+
+async function enviarFoto(chatId: string, attachmentId: unknown, caption: unknown) {
+  const { sendConversationImage } = await import("@/lib/data/conversationSend");
+  return sendConversationImage(chatId, attachmentId, caption);
+}
+
+describe("sendConversationImage", () => {
+  it("lê a foto DENTRO do estúdio da sessão e envia para o telefone da conversa", async () => {
+    const result = await enviarFoto(CHAT_A, FOTO_A, "  Olha o resultado  ");
+
+    expect(result.ok).toBe(true);
+    expect(downloadServiceImage).toHaveBeenCalledWith(ESTUDIO_A, FOTO_A);
+    expect(sendManual).toHaveBeenCalledWith({
+      phone: "5511987654321",
+      message: "Olha o resultado",
+      media: { mimeType: "image/jpeg", fileName: "volume.jpg", base64: "AAAA" },
+    });
+    expect(recordSentReply).toHaveBeenCalledWith(
+      expect.objectContaining({ messageType: "imagem", body: "Olha o resultado", providerMessageId: "3EB0" })
+    );
+  });
+
+  it("sem legenda, a mensagem gravada fica sem texto", async () => {
+    await enviarFoto(CHAT_A, FOTO_A, "");
+    expect(recordSentReply).toHaveBeenCalledWith(expect.objectContaining({ body: null }));
+  });
+
+  it("anexo de outro estúdio (ou que não é foto) não sai", async () => {
+    // `downloadServiceImage` filtra por estúdio e por tipo; aqui ele não achou.
+    downloadServiceImage.mockResolvedValue(null);
+    const result = await enviarFoto(CHAT_A, FOTO_A, "");
+
+    expect(result).toMatchObject({ ok: false, code: "dados_invalidos" });
+    expect(sendManual).not.toHaveBeenCalled();
+  });
+
+  it("id que não é UUID nem chega ao Storage", async () => {
+    const result = await enviarFoto(CHAT_A, "../outro-estudio/foto.jpg", "");
+    expect(result.ok).toBe(false);
+    expect(downloadServiceImage).not.toHaveBeenCalled();
+  });
+
+  it("vale a mesma regra de destino do texto: número sem conversa não recebe", async () => {
+    getConversation.mockResolvedValue(null);
+    const result = await enviarFoto("5511999998888@s.whatsapp.net", FOTO_A, "");
+    expect(result.ok).toBe(false);
+    expect(downloadServiceImage).not.toHaveBeenCalled();
+    expect(sendManual).not.toHaveBeenCalled();
   });
 });

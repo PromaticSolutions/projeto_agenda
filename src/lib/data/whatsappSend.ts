@@ -8,7 +8,7 @@ import {
   recordManualMessage,
 } from "@/lib/data/outbox";
 import { getWhatsAppProvider, friendlyProviderError } from "@/lib/whatsapp/provider";
-import { manualWhatsAppMessageSchema } from "@/lib/validation";
+import { clientPhoneSchema, manualWhatsAppMessageSchema } from "@/lib/validation";
 import { isSupabaseServiceConfigured } from "@/lib/supabase/env";
 
 /**
@@ -50,8 +50,20 @@ export type SendErrorCode =
 
 export interface SendManualInput {
   phone: unknown;
+  /** Texto; com `media`, é a legenda da foto e pode vir vazio. */
   message: unknown;
+  /** Foto a enviar no lugar de texto (fotos dos serviços, na tela de Conversas). */
+  media?: ManualMedia;
 }
+
+export interface ManualMedia {
+  mimeType: string;
+  fileName: string;
+  base64: string;
+}
+
+/** Legenda de foto: o WhatsApp corta em 1024. */
+const MAX_CAPTION = 1024;
 
 export async function sendManualWhatsAppMessage(input: SendManualInput): Promise<SendResult> {
   // 1. Propriedade. O estúdio vem da sessão do Supabase Auth; nada no corpo da
@@ -70,18 +82,48 @@ export async function sendManualWhatsAppMessage(input: SendManualInput): Promise
     };
   }
 
-  const parsed = manualWhatsAppMessageSchema.safeParse({
-    phone: input.phone,
-    message: input.message,
-  });
-  if (!parsed.success) {
-    return {
-      ok: false,
-      code: "dados_invalidos",
-      error: parsed.error.issues[0]?.message ?? "Dados inválidos.",
-    };
+  let phone: string;
+  let message: string;
+  if (input.media) {
+    // Foto: a legenda é opcional, então o esquema do texto (que exige
+    // conteúdo) não serve. O telefone passa pela mesma regra de sempre.
+    const parsedPhone = clientPhoneSchema.safeParse(input.phone);
+    if (!parsedPhone.success) {
+      return {
+        ok: false,
+        code: "dados_invalidos",
+        error: parsedPhone.error.issues[0]?.message ?? "Dados inválidos.",
+      };
+    }
+    phone = parsedPhone.data;
+    message = typeof input.message === "string" ? input.message.trim() : "";
+    if (message.length > MAX_CAPTION) {
+      return {
+        ok: false,
+        code: "dados_invalidos",
+        error: `A legenda passou de ${MAX_CAPTION} caracteres.`,
+      };
+    }
+  } else {
+    const parsed = manualWhatsAppMessageSchema.safeParse({
+      phone: input.phone,
+      message: input.message,
+    });
+    if (!parsed.success) {
+      return {
+        ok: false,
+        code: "dados_invalidos",
+        error: parsed.error.issues[0]?.message ?? "Dados inválidos.",
+      };
+    }
+    ({ phone, message } = parsed.data);
   }
-  const { phone, message } = parsed.data;
+  // O histórico (outbox) guarda texto: a foto entra como uma linha legível.
+  const historyBody = input.media
+    ? message
+      ? `[Foto] ${message}`
+      : `[Foto] ${input.media.fileName}`
+    : message;
 
   // 2. Teto de envio, antes de tocar no gateway.
   const recent = await countRecentManualSends(studio.id);
@@ -143,15 +185,25 @@ export async function sendManualWhatsAppMessage(input: SendManualInput): Promise
 
   // 5. Envio, com o resultado gravado no histórico dos dois jeitos.
   try {
-    const { providerMessageId } = await provider.sendText({
-      instanceName,
-      toPhone: phone,
-      body: message,
-    });
+    const { providerMessageId } = input.media
+      ? await provider.sendMedia({
+          instanceName,
+          toPhone: phone,
+          mediaType: "image",
+          mimeType: input.media.mimeType,
+          fileName: input.media.fileName,
+          base64: input.media.base64,
+          caption: message || null,
+        })
+      : await provider.sendText({
+          instanceName,
+          toPhone: phone,
+          body: message,
+        });
     await recordManualMessage({
       studioId: studio.id,
       toPhone: phone,
-      body: message,
+      body: historyBody,
       outcome: "enviado",
       providerMessageId,
     });
@@ -159,13 +211,13 @@ export async function sendManualWhatsAppMessage(input: SendManualInput): Promise
   } catch (cause) {
     // O detalhe técnico vai para o log do servidor e para a coluna de erro do
     // histórico (que só o dono lê); para a tela vai a versão amigável.
-    console.error("[whatsapp/send] sendText", cause);
+    console.error("[whatsapp/send] envio", cause);
     const technical = cause instanceof Error ? cause.message : "Falha desconhecida no envio";
     try {
       await recordManualMessage({
         studioId: studio.id,
         toPhone: phone,
-        body: message,
+        body: historyBody,
         outcome: "falhou",
         error: technical,
       });

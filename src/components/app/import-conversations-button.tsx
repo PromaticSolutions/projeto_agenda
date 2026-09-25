@@ -103,7 +103,7 @@ export function ImportConversationsButton({ hasConversations }: { hasConversatio
           <Button variant="ghost" onClick={() => setOpen(false)} disabled={pending}>
             Agora não
           </Button>
-          <Button onClick={runImport} disabled={pending} className="bg-cta text-white hover:opacity-90">
+          <Button onClick={runImport} disabled={pending} className="bg-cta text-primary-foreground hover:opacity-90">
             {pending ? <Loader2 className="size-4 animate-spin" /> : null}
             {pending ? "Importando..." : "Importar"}
           </Button>

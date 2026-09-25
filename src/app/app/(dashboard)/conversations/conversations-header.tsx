@@ -1,5 +1,6 @@
 import "server-only";
 import { ImportConversationsButton } from "@/components/app/import-conversations-button";
+import { ConversationMediaBackfill } from "@/components/app/conversation-media-backfill";
 
 /** Cabeçalho comum às duas rotas de Conversas (a lista e a conversa aberta). */
 export function ConversationsHeader({ hasConversations }: { hasConversations: boolean }) {
@@ -11,7 +12,10 @@ export function ConversationsHeader({ hasConversations }: { hasConversations: bo
           As mensagens do WhatsApp do estúdio, de clientes cadastradas ou não.
         </p>
       </div>
-      <ImportConversationsButton hasConversations={hasConversations} />
+      <div className="flex flex-wrap items-center gap-2">
+        {hasConversations && <ConversationMediaBackfill />}
+        <ImportConversationsButton hasConversations={hasConversations} />
+      </div>
     </header>
   );
 }

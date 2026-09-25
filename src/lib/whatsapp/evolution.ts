@@ -8,8 +8,10 @@ import {
   evolutionApiUrl,
   type FetchMessagesInput,
   type ProviderChat,
+  type ProviderMedia,
   type ProviderPairing,
   type ProviderStatus,
+  type SendMediaInput,
   type SendTextInput,
   type SetWebhookInput,
   type WhatsAppProvider,
@@ -369,6 +371,82 @@ export function createEvolutionProvider(): WhatsAppProvider {
 
       const id = pick(data, "key", "id");
       return { providerMessageId: typeof id === "string" ? id : null };
+    },
+
+    async sendMedia({ instanceName, toPhone, mimeType, fileName, base64, caption }: SendMediaInput) {
+      // SendMediaDto na 2.3.7: `{ number, mediatype, mimetype, caption, fileName,
+      // media }`, com `media` sendo URL OU base64 puro (sendMessage.controller.ts
+      // recusa o resto). Base64 e não URL assinada: assim o gateway não precisa
+      // alcançar o nosso Storage, e o link não fica registrado no banco dele.
+      const { data } = await callEvolution({
+        path: `/message/sendMedia/${encodeURIComponent(instanceName)}`,
+        method: "POST",
+        body: {
+          number: toPhone,
+          mediatype: "image",
+          mimetype: mimeType,
+          fileName,
+          media: base64,
+          ...(caption ? { caption } : {}),
+        },
+        userMessage: "O WhatsApp não aceitou a foto. Tente de novo em alguns instantes.",
+      });
+
+      const id = pick(data, "key", "id");
+      return { providerMessageId: typeof id === "string" ? id : null };
+    },
+
+    /**
+     * `POST /chat/getBase64FromMediaMessage/{nome}`.
+     *
+     * Sem `message.message` no corpo, a 2.3.7 procura a mensagem no banco DELA
+     * pelo `key.id` (getMessage em whatsapp.baileys.service.ts) e baixa o
+     * arquivo do WhatsApp. Mensagem que o gateway não guardou, ou cuja mídia
+     * expirou no WhatsApp, volta 400 — aqui isso é `null`, não erro: a tela
+     * diz que o arquivo não está mais disponível.
+     */
+    async fetchMedia(
+      instanceName: string,
+      providerMessageId: string,
+      rawMessage?: Record<string, unknown> | null
+    ): Promise<ProviderMedia | null> {
+      // Com `message.message` (o conteúdo, com `mediaKey` e `directPath`) a
+      // 2.3.7 descriptografa direto do WhatsApp e NÃO consulta o banco dela —
+      // funciona com DATABASE_SAVE_DATA_NEW_MESSAGE=false.
+      const message = rawMessage
+        ? { key: { id: providerMessageId }, message: rawMessage }
+        : { key: { id: providerMessageId } };
+      const { status, data } = await callEvolution({
+        path: `/chat/getBase64FromMediaMessage/${encodeURIComponent(instanceName)}`,
+        method: "POST",
+        body: { message, convertToMp4: false },
+        tolerate: [400],
+        userMessage: "Não foi possível baixar o arquivo do WhatsApp.",
+      });
+      if (status === 400) return null;
+
+      const base64 = pick(data, "base64");
+      if (typeof base64 !== "string" || base64.length === 0) return null;
+      const mimeType = pick(data, "mimetype");
+      const fileName = pick(data, "fileName");
+      return {
+        base64,
+        // O WhatsApp manda "audio/ogg; codecs=opus"; o navegador aceita assim.
+        mimeType: typeof mimeType === "string" && mimeType ? mimeType : "application/octet-stream",
+        fileName: typeof fileName === "string" && fileName ? fileName : null,
+      };
+    },
+
+    /** `POST /chat/fetchProfilePictureUrl/{nome}` — `{ wuid, profilePictureUrl }`. */
+    async fetchProfilePictureUrl(instanceName: string, phone: string): Promise<string | null> {
+      const { data } = await callEvolution({
+        path: `/chat/fetchProfilePictureUrl/${encodeURIComponent(instanceName)}`,
+        method: "POST",
+        body: { number: phone },
+        tolerate: [400],
+      });
+      const url = pick(data, "profilePictureUrl");
+      return typeof url === "string" && /^https:\/\//.test(url) ? url : null;
     },
 
     /**
