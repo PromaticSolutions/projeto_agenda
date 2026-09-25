@@ -14,6 +14,7 @@ import {
   filterBookings,
   groupBookingsByDay,
   isDescendingPeriod,
+  parseBookingDate,
   parseBookingPeriod,
   parseBookingStatusFilter,
   parseBookingView,
@@ -41,6 +42,7 @@ export const metadata = { title: "Agendamentos — Timely" };
 interface BookingsPageProps {
   searchParams: Promise<{
     periodo?: string;
+    data?: string;
     status?: string;
     servico?: string;
     q?: string;
@@ -54,13 +56,15 @@ export default async function BookingsPage({ searchParams }: BookingsPageProps) 
 
   const params = await searchParams;
   const period = parseBookingPeriod(params.periodo);
+  const date = parseBookingDate(params.data);
   const status = parseBookingStatusFilter(params.status);
   const serviceId = params.servico ?? "todos";
   const query = params.q?.trim() ?? "";
   const view = parseBookingView(params.view);
 
   const today = utcToLocalDate(new Date());
-  const range = bookingPeriodRange(period, today);
+  // Um dia escolhido no calendário manda sobre o período (ver `parseBookingDate`).
+  const range = date ? { from: date, to: date } : bookingPeriodRange(period, today);
 
   const [services, clients, bookingsInRange] = await Promise.all([
     listMyServices(studio.id),
@@ -72,7 +76,7 @@ export default async function BookingsPage({ searchParams }: BookingsPageProps) 
   const filtered = filterBookings(bookingsInRange, { status, serviceId, query });
   // A consulta já devolve em ordem crescente de horário; o histórico lê ao
   // contrário, do mais recente para o mais antigo.
-  const ordered = isDescendingPeriod(period) ? [...filtered].reverse() : filtered;
+  const ordered = !date && isDescendingPeriod(period) ? [...filtered].reverse() : filtered;
   const groups = groupBookingsByDay(ordered);
 
   const counters = BOOKING_STATUS_ORDER.map((s) => ({
@@ -96,6 +100,8 @@ export default async function BookingsPage({ searchParams }: BookingsPageProps) 
 
       <BookingsToolbar
         period={period}
+        date={date}
+        today={today}
         status={status}
         serviceId={serviceId}
         query={query}
@@ -121,7 +127,7 @@ export default async function BookingsPage({ searchParams }: BookingsPageProps) 
       )}
 
       {groups.length === 0 ? (
-        <EmptyState hasBookingsInRange={bookingsInRange.length > 0} />
+        <EmptyState hasBookingsInRange={bookingsInRange.length > 0} singleDay={date !== null} />
       ) : (
         <div className="flex flex-col gap-6">
           {groups.map((group) => (
@@ -241,17 +247,25 @@ function BookingRow({
   );
 }
 
-function EmptyState({ hasBookingsInRange }: { hasBookingsInRange: boolean }) {
+function EmptyState({
+  hasBookingsInRange,
+  singleDay,
+}: {
+  hasBookingsInRange: boolean;
+  singleDay: boolean;
+}) {
   return (
     <div className="panel flex flex-col items-center gap-3 border-dashed p-10 text-center">
       <p className="font-medium text-foreground">
         {hasBookingsInRange
           ? "Nenhum agendamento com esses filtros"
-          : "Nenhum agendamento neste período"}
+          : singleDay
+            ? "Nenhum agendamento neste dia"
+            : "Nenhum agendamento neste período"}
       </p>
       <p className="max-w-sm text-sm text-muted-foreground">
         {hasBookingsInRange
-          ? "Existem atendimentos no período, mas nenhum passa pelos filtros escolhidos."
+          ? `Existem atendimentos ${singleDay ? "neste dia" : "no período"}, mas nenhum passa pelos filtros escolhidos.`
           : "Marque um atendimento pelo botão acima ou divulgue o link público do estúdio."}
       </p>
       {!hasBookingsInRange && (

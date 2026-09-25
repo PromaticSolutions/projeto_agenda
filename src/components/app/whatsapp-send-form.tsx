@@ -127,7 +127,7 @@ function ComposeFields({
       </div>
 
       <div className="flex justify-end">
-        <Button type="submit" disabled={disabled} className="bg-cta text-white hover:opacity-90">
+        <Button type="submit" disabled={disabled} className="bg-cta text-primary-foreground hover:opacity-90">
           {pending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
           Enviar mensagem
         </Button>

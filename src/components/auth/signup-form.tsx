@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { Check, ShieldCheck } from "lucide-react";
+import { ArrowRight, Loader2, Mail, ShieldCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { authErrorMessage } from "@/lib/auth-errors";
@@ -9,6 +9,9 @@ import { EmailConfirmationDialog } from "@/components/auth/email-confirmation-di
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AUTH_INPUT_CLASS, PasswordInput } from "@/components/auth/password-input";
+import { AuthError } from "@/components/auth/auth-error";
+import { cn } from "@/lib/utils";
 
 export function SignupForm() {
   const router = useRouter();
@@ -68,42 +71,75 @@ export function SignupForm() {
       />
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-        <div className="rounded-2xl border border-violet-500/20 bg-violet-950/85 px-4 py-3 text-sm text-violet-100">
-          <span className="flex items-center gap-2 text-sm text-violet-100"><ShieldCheck className="size-4 text-violet-300" /> Seus dados são protegidos e você pode editar tudo depois.</span>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="email">E-mail</Label>
+          <div className="relative">
+            <Mail className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+            <Input
+              id="email"
+              type="email"
+              autoComplete="email"
+              placeholder="voce@exemplo.com"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className={AUTH_INPUT_CLASS}
+            />
+          </div>
         </div>
-        <div className="flex flex-col gap-2.5">
-          <Label htmlFor="email" className="text-sm font-medium text-violet-100">E-mail</Label>
-          <Input
-            id="email"
-            type="email"
-            autoComplete="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="h-12 rounded-2xl border border-violet-500/20 bg-white/5 px-3 text-white focus-visible:border-white/30 focus-visible:ring-3 focus-visible:ring-white/10"
-          />
-        </div>
-        <div className="flex flex-col gap-2.5">
-          <Label htmlFor="password" className="text-sm font-medium text-violet-100">Senha</Label>
-          <Input
+
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="password">Crie uma senha</Label>
+          <PasswordInput
             id="password"
-            type="password"
+            value={password}
+            onChange={setPassword}
             autoComplete="new-password"
             minLength={6}
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="h-12 rounded-2xl border border-violet-500/20 bg-white/5 px-3 text-white focus-visible:border-white/30 focus-visible:ring-3 focus-visible:ring-white/10"
+            describedBy="password-hint"
           />
-          <div className="flex items-center gap-1.5" aria-label="Força da senha">
-            {[1, 2, 3].map((level) => <span key={level} className={`h-1 flex-1 rounded-full transition-colors ${level <= passwordStrength ? passwordStrength === 1 ? "bg-magenta" : passwordStrength === 2 ? "bg-violet-500" : "bg-violet-600" : "bg-border"}`} />)}
+          {/* A barra acompanha a digitação; o texto embaixo diz a regra que
+              ela mede, para a cor não ser o único jeito de entender. */}
+          <div className="mt-1 flex items-center gap-1.5" aria-hidden>
+            {[1, 2, 3].map((level) => (
+              <span
+                key={level}
+                className={cn(
+                  "h-1 flex-1 rounded-full transition-colors duration-200",
+                  level <= passwordStrength
+                    ? passwordStrength === 1
+                      ? "bg-destructive"
+                      : passwordStrength === 2
+                        ? "bg-amber-500"
+                        : "bg-wa"
+                    : "bg-border"
+                )}
+              />
+            ))}
           </div>
-          <p className="text-xs text-violet-200/75">Use pelo menos 6 caracteres. Quanto maior, mais segura.</p>
+          <p id="password-hint" className="text-xs text-muted-foreground">
+            Use pelo menos 6 caracteres. Quanto maior, mais segura.
+          </p>
         </div>
-        {error && <p className="rounded-xl border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
-        <Button type="submit" className="mt-1 h-11 bg-cta text-white hover:opacity-90" disabled={loading}>
-          {loading ? "Criando conta..." : <><Check className="size-4" /> Criar minha conta</>}
+
+        {error && <AuthError>{error}</AuthError>}
+
+        <Button type="submit" size="lg" className="mt-1 h-11 w-full" disabled={loading}>
+          {loading ? (
+            <>
+              <Loader2 className="size-4 animate-spin" aria-hidden /> Criando sua conta...
+            </>
+          ) : (
+            <>
+              Criar minha conta grátis <ArrowRight className="size-4" aria-hidden />
+            </>
+          )}
         </Button>
+
+        <p className="flex items-start justify-center gap-1.5 text-center text-xs leading-5 text-muted-foreground">
+          <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-primary dark:text-violet-300" aria-hidden />
+          Seus dados ficam protegidos, e você pode editar tudo depois.
+        </p>
       </form>
     </>
   );

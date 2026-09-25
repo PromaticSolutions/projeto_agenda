@@ -1,52 +1,63 @@
 import Link from "next/link";
 import { Check } from "lucide-react";
 import { SystemLogo } from "@/components/system-logo";
+import { AuthParticles } from "@/components/auth/auth-particles";
+import { GlassKnotBackdrop } from "@/components/auth/glass-knot";
+import { DayPanelPreview } from "@/components/landing/day-panel-preview";
 import { cn } from "@/lib/utils";
 
+/** Os mesmos benefícios da landing, na mesma voz — e só o que o produto faz. */
 const SHOWCASE_BENEFITS = [
-  "Clientes marcam direto pelo link, sem precisar te chamar",
-  "Confirmação automática no WhatsApp — sem mensagem perdida",
-  "Você não perde tempo respondendo 'tem horário na quinta?'",
+  "Suas clientes marcam sozinhas pelo seu link",
+  "O lembrete sai pelo seu WhatsApp, sem você digitar",
+  "Histórico e anotações de cada cliente à mão",
 ];
 
 /**
- * Coluna de apresentação das telas de autenticação (só em telas largas).
+ * Painel da marca nas telas de entrada (só em tela larga).
  *
- * A marca aqui em cima é o PNG estático, não o nó em WebGL: com o nó grande
- * girando ao fundo, uma segunda cópia girando no canto disputava atenção com
- * ele e com o formulário. Uma peça em movimento por tela é o suficiente.
+ * É o hero da landing em miniatura: mesma superfície plum, mesmo nó de vidro
+ * girando, mesmas partículas, mesma fonte de título — quem clicou em
+ * "Começar grátis" chega aqui sem sensação de ter trocado de site. Embaixo, o
+ * painel do dia do próprio produto flutuando: a tela de entrada também é
+ * lugar de lembrar o que a pessoa vai encontrar do outro lado.
+ *
+ * O nó e as partículas moram AQUI, e não na moldura inteira: o formulário
+ * fica sobre o fundo claro do tema, e vidro girando atrás de campo de senha
+ * só atrapalhava a leitura.
  */
 export function AuthShowcasePanel({ className }: { className?: string }) {
   return (
-    <div
+    <aside
       className={cn(
-        // Sem fundo próprio: o escuro vem do AuthShell, e as partículas
-        // atravessam esta coluna em vez de pararem na divisa.
-        "relative flex-col justify-between border-r border-white/10 px-10 py-12",
+        "relative flex-col overflow-hidden bg-plum-900 px-12 pt-8 text-blush-50 lg:sticky lg:top-0 lg:h-dvh",
         className
       )}
     >
-      <div className="flex items-center gap-2.5">
+      {/* Ordem importa: o nó pinta o próprio plum (é opaco, para o vidro ter o
+          que refratar), então vem ANTES das partículas. */}
+      <GlassKnotBackdrop scale={0.8} focusX={0.78} focusY={0.3} />
+      <AuthParticles count={45} />
+
+      <Link
+        href="/"
+        className="relative z-10 flex items-center gap-2.5 self-start rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-white/40"
+      >
         <SystemLogo className="size-10" size={80} />
-        <span className="text-[1.25rem] font-semibold">Timely</span>
-      </div>
+        <span className="text-[1.25rem] font-semibold tracking-tight">Timely</span>
+      </Link>
 
-      <div className="mx-auto flex w-full max-w-md flex-col items-center">
-        {/* `text-balance` distribui as linhas em vez de deixar uma palavra
-            sozinha na última — o que aparece com frase centralizada e some
-            com frase alinhada à esquerda. */}
-        <h2 className="text-center text-[2.25rem] leading-[1.15] font-semibold tracking-normal text-balance sm:text-[2.6rem]">
-          Sua agenda, sempre aberta — mesmo enquanto você atende.
+      <div className="relative z-10 mt-10 max-w-md">
+        <h2 className="text-[2.25rem] leading-[1.08] font-semibold text-balance xl:text-[2.5rem]">
+          Sua agenda funcionando enquanto você atende.
         </h2>
-
-        {/* A lista continua alinhada à esquerda mesmo com o bloco centralizado:
-            item de lista centralizado não tem eixo de leitura, e o olho perde
-            o começo de cada linha. */}
-        <ul className="mt-8 flex flex-col gap-4 self-stretch text-[0.9375rem] leading-6 text-blush-50/80">
+        {/* Alinhada à esquerda: item de lista centralizado não tem eixo de
+            leitura, e o olho perde o começo de cada linha. */}
+        <ul className="mt-6 flex flex-col gap-3 text-[0.9375rem] leading-6 text-blush-50/85">
           {SHOWCASE_BENEFITS.map((benefit) => (
             <li key={benefit} className="flex items-start gap-3">
-              <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-white/10">
-                <Check className="size-3" />
+              <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-white/12">
+                <Check className="size-3" strokeWidth={3} aria-hidden />
               </span>
               {benefit}
             </li>
@@ -54,15 +65,16 @@ export function AuthShowcasePanel({ className }: { className?: string }) {
         </ul>
       </div>
 
-      <footer className="border-t border-white/10 pt-5">
-        <p className="text-[0.6875rem] font-semibold tracking-[0.08em] text-blush-50/45 uppercase">
-          Promatic Solutions
-        </p>
-        <p className="mt-1 text-sm text-blush-50/60">
-          Sistema de agendamento para estúdios de beleza, barbearias e clínicas.
-        </p>
-      </footer>
-    </div>
+      {/* A prévia assenta no pé do painel e passa da borda de baixo, cortada
+          pelo `overflow-hidden`: o painel tem a altura exata da janela, e em
+          vez de empurrar a página para rolar, o produto "continua" para fora
+          do quadro. */}
+      <div className="relative z-10 mt-auto -mb-10 pt-10">
+        <div className="float-card mx-auto w-full max-w-md">
+          <DayPanelPreview />
+        </div>
+      </div>
+    </aside>
   );
 }
 

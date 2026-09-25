@@ -76,7 +76,7 @@ function PasswordPanel() {
         </div>
         <div className="flex items-center justify-between gap-3 sm:col-span-2">
           <p className="text-xs text-muted-foreground">Use ao menos 6 caracteres.</p>
-          <Button type="submit" disabled={pending} className="bg-cta text-white hover:opacity-90">
+          <Button type="submit" disabled={pending} className="bg-cta text-primary-foreground hover:opacity-90">
             {pending ? (
               <LoaderCircle className="size-4 animate-spin" />
             ) : success ? (
@@ -220,7 +220,7 @@ export function AccountSettings({ studio }: { studio: Studio }) {
           >
             <ExternalLink className="size-4" /> Abrir página pública
           </a>
-          <Button type="submit" disabled={pending} className="bg-cta text-white hover:opacity-90">
+          <Button type="submit" disabled={pending} className="bg-cta text-primary-foreground hover:opacity-90">
             {pending ? <LoaderCircle className="size-4 animate-spin" /> : <Save className="size-4" />}
             {pending ? "Salvando..." : "Salvar alterações"}
           </Button>

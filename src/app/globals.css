@@ -7,18 +7,13 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-nunito-sans);
+  --font-sans: var(--font-jakarta);
   --font-mono: var(--font-ibm-plex-mono);
-  /* Headings agora têm voz PRÓPRIA: uma serifa editorial contra a sans do
-     corpo. A regra antiga era a oposta — uma família só, hierarquia por peso e
-     corpo — e existia para o sistema soar sóbrio. Soou técnico demais para o
-     público, e a segunda voz é justamente o que dá à página o ar de vitrine em
-     vez de painel de controle.
-
-     Só entra em título GRANDE. `font-heading` está aplicado onde o texto tem
-     corpo para sustentar a serifa; rótulo, tabela, botão e dado seguem na sans,
-     onde a Playfair perderia legibilidade em vez de ganhar charme. */
-  --font-heading: var(--font-playfair-display);
+  /* `font-heading` continua existindo como nome (é usado em ~15 lugares),
+     mas aponta para a MESMA família do corpo — ver src/app/layout.tsx. A
+     hierarquia dos títulos vem de peso, tamanho e tracking, não de uma
+     segunda família. */
+  --font-heading: var(--font-jakarta);
   --color-plum-900: var(--plum-900);
   --color-violet-600: var(--violet-600);
   --color-violet-500: var(--violet-500);
@@ -195,18 +190,14 @@
   html {
     @apply font-sans;
   }
-  /* Só h1 e h2 recebem a serifa. A regra antiga ia até h4, o que com uma sans
-     era inofensivo e com uma display de alto contraste não é: h3/h4 sem classe
-     de tamanho caem em 1rem, e a Playfair a 16px perde as hastes finas e vira
-     ruído numa tela densa. A régua do sistema é ~1.25rem para baixo, sans.
-     Título pequeno que ainda queira a serifa pede `font-heading` na mão. */
+  /* Títulos com tracking fechado: um grotesco em corpo grande pede letras
+     mais juntas, ou a palavra se desmancha em letras soltas. h3/h4 ficam num
+     aperto menor porque vivem em corpo pequeno, onde fechar demais prejudica
+     a leitura. */
   h1,
   h2 {
     @apply font-heading;
-    /* Tracking NEUTRO. O -0.011em anterior existia para apertar um grotesco;
-       aplicado a uma serifa de alto contraste ele fecha os brancos internos e
-       come justamente o desenho pelo qual a fonte foi escolhida. */
-    letter-spacing: normal;
+    letter-spacing: -0.022em;
   }
   h3,
   h4 {
@@ -390,5 +381,238 @@
 
   @media (prefers-reduced-motion: reduce) {
     animation: none;
+  }
+}
+
+/* Barra de progresso do carrossel de funções (landing): enche da esquerda
+   para a direita no tempo do avanço automático. A duração vem inline, do
+   mesmo número que o componente usa no timer. */
+@keyframes feature-progress {
+  from { width: 0; }
+  to { width: 100%; }
+}
+
+.feature-progress {
+  animation: feature-progress linear forwards;
+}
+
+/* ---------------------------------------------------------------------------
+   Cartões da landing: sombra leve e flutuação.
+
+   `shadow-float` é a sombra de repouso dos cartões de destaque — mais aberta
+   e mais difusa que a `--shadow-panel` do sistema, que foi feita para tela
+   densa de painel. Fica em token porque o escuro precisa de outra opacidade.
+
+   `float-card` é o balanço contínuo: 6px em 7s, lento o bastante para ser
+   percebido como "vivo" e não como movimento. Cada cartão recebe um atraso
+   NEGATIVO diferente (`--float-delay`), então vizinhos nunca sobem juntos — em
+   fase, a grade inteira balançaria como um bloco.
+
+   A flutuação vai no INVÓLUCRO do cartão, nunca no próprio cartão: o
+   `card-lift` do hover também anima `transform`, e os dois no mesmo elemento
+   se anulariam. Com `prefers-reduced-motion`, nada se move.
+--------------------------------------------------------------------------- */
+:root {
+  --shadow-float: 0 1px 2px rgb(74 44 60 / 0.04), 0 14px 34px -16px rgb(74 44 60 / 0.2);
+}
+
+.dark {
+  --shadow-float: 0 1px 2px rgb(0 0 0 / 0.35), 0 16px 36px -18px rgb(0 0 0 / 0.7);
+}
+
+@utility shadow-float {
+  box-shadow: var(--shadow-float);
+}
+
+@keyframes float-card {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -6px, 0); }
+}
+
+@utility float-card {
+  animation: float-card 7s ease-in-out infinite;
+  animation-delay: var(--float-delay, 0s);
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+/* Barra de progresso do áudio nas Conversas (conversation-media.tsx).
+   O preenchimento vem de `--progress`; as duas variações contrastam com o
+   balão enviado (roxo) e com o recebido (cartão). */
+.audio-range {
+  background: linear-gradient(
+    to right,
+    var(--range-fill) var(--progress, 0%),
+    var(--range-track) var(--progress, 0%)
+  );
+}
+.audio-range-light {
+  --range-fill: #fff;
+  --range-track: rgb(255 255 255 / 0.35);
+}
+.audio-range-dark {
+  --range-fill: var(--primary);
+  --range-track: color-mix(in oklab, var(--muted-foreground) 30%, transparent);
+}
+.audio-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 9999px;
+  background: var(--range-fill);
+  box-shadow: 0 0 0 2px rgb(0 0 0 / 0.08);
+}
+.audio-range::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: 0;
+  border-radius: 9999px;
+  background: var(--range-fill);
+}
+
+/* Fundo da conversa: pontilhado bem leve sobre o tom de fundo, como o papel
+   de parede do WhatsApp — separa a área de mensagens dos balões brancos sem
+   precisar de cor forte. */
+.chat-wallpaper {
+  background-color: color-mix(in oklab, var(--muted) 55%, var(--background));
+  background-image: radial-gradient(
+    color-mix(in oklab, var(--muted-foreground) 14%, transparent) 1px,
+    transparent 1px
+  );
+  background-size: 18px 18px;
+}
+
+/* ---------------------------------------------------------------------------
+   Landing — papel de agenda.
+
+   A landing tinha todos os sinais de página gerada no automático: cartão
+   branco flutuando com sombra, ícone dentro de quadradinho lilás, estrelas no
+   fundo, título com a segunda metade em cinza. O desenho daqui parte do
+   objeto que o Timely substitui — a agenda de papel: fundo de papel, horário
+   na margem de cada seção, fio no lugar de caixa. Nada flutua.
+
+   Tudo escopado em `.landing` (o invólucro de src/app/page.tsx). Os tokens
+   são REDEFINIDOS aqui dentro, então os componentes que já usam
+   `bg-background`, `border-border` etc. pousam no papel sem mudar uma linha;
+   o painel não é tocado.
+--------------------------------------------------------------------------- */
+.landing {
+  --paper: #f4ede3;
+  --paper-deep: #ebe2d5;
+  --ink: #1d1419;
+  --rule: #dccfbf;
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --card: #fbf7f1;
+  --card-foreground: var(--ink);
+  --muted: var(--paper-deep);
+  --muted-foreground: #6a5a60;
+  --border: var(--rule);
+  --input: #cdbfae;
+  /* O destaque dos títulos e dos marcadores: o violeta da marca. */
+  --mark: #6d3ad4;
+  --shadow-panel: none;
+  --shadow-float: none;
+  --shadow-lift: none;
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+.dark .landing {
+  --paper: #17110f;
+  --paper-deep: #211916;
+  --ink: #f1e8dd;
+  --rule: #3a2e29;
+  --card: #1d1613;
+  --muted-foreground: #b3a499;
+  --input: #4a3b35;
+  --mark: #a98bf5;
+}
+
+/* Títulos na MESMA família do resto (Jakarta), como no painel: é produto
+   para empresa, e uma serifa com itálico de enfeite tirava a sobriedade. A
+   hierarquia vem de peso e tamanho; o destaque (`<em>`) é só a cor da marca,
+   sem itálico. */
+.landing :is(h1, h2) {
+  font-weight: 600;
+  letter-spacing: -0.028em;
+}
+
+.landing :is(h1, h2) em {
+  font-style: normal;
+  color: var(--mark);
+}
+
+/* Faixas escuras (plum) levam o destaque num violeta claro. */
+.landing .band-dark :is(h1, h2) em {
+  color: #c4b0fb;
+}
+
+/* A superfície de conteúdo no papel: contorno fino, canto curto, sem sombra.
+   Vale para as prévias do produto e o formulário, que usam `panel`. */
+.landing .panel {
+  border-radius: 0.5rem;
+  box-shadow: none;
+}
+
+/* Nada balança nem sobe no hover. */
+.landing :is(.float-card, .float-soft) {
+  animation: none;
+}
+.landing .card-lift:is(:hover, :focus-within) {
+  transform: none;
+  box-shadow: none;
+}
+
+/* Rótulo de horário das seções: o "08:30 — A rotina" de cada abertura. Em camada
+   `components` para uma classe de cor no próprio elemento poder vencê-lo
+   (as faixas escuras trocam a cor). */
+@layer components {
+  .landing .time-label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    color: var(--muted-foreground);
+  }
+}
+
+
+/* O papel também no `body` da landing: sem isto, o repique do scroll no fim
+   da página (e a faixa abaixo do rodapé em tela alta) mostra o marfim do
+   sistema, um tom diferente do papel. */
+body:has(.landing) {
+  background-color: #f4ede3;
+}
+.dark body:has(.landing) {
+  background-color: #17110f;
+}
+
+/* Cartão elevado da landing — preço e "para quem é". São as duas seções em
+   que a pessoa COMPARA opções lado a lado, e o cartão solto do fundo é o que
+   diz "escolha um destes". Sombra dupla (contato curto + difusa longa) e um
+   leve levantar no hover; nenhum balanço contínuo. */
+.landing {
+  --shadow-card: 0 1px 2px rgb(29 20 25 / 0.05), 0 22px 44px -22px rgb(29 20 25 / 0.3);
+  --shadow-card-hover: 0 2px 4px rgb(29 20 25 / 0.06), 0 30px 56px -24px rgb(29 20 25 / 0.38);
+}
+.dark .landing {
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 22px 44px -22px rgb(0 0 0 / 0.8);
+  --shadow-card-hover: 0 2px 4px rgb(0 0 0 / 0.45), 0 30px 56px -24px rgb(0 0 0 / 0.9);
+}
+.landing .card-elevated {
+  box-shadow: var(--shadow-card);
+  transition:
+    transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 260ms ease-out;
+}
+.landing .card-elevated:is(:hover, :focus-within) {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-card-hover);
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing .card-elevated:is(:hover, :focus-within) {
+    transform: none;
   }
 }

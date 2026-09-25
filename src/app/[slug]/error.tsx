@@ -21,7 +21,7 @@ export default function StudioError({ error, unstable_retry }: StudioErrorProps)
       <p className="max-w-sm text-muted-foreground">
         Algo deu errado ao buscar os horários. Tente novamente em instantes.
       </p>
-      <Button onClick={() => unstable_retry()} className="bg-cta text-white hover:opacity-90">
+      <Button onClick={() => unstable_retry()} className="bg-cta text-primary-foreground hover:opacity-90">
         Tentar de novo
       </Button>
     </div>

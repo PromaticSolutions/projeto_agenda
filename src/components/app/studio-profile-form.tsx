@@ -113,7 +113,7 @@ export function StudioProfileForm({ studio, email }: { studio: Studio; email: st
       {state && !state.ok && <p className="text-sm text-destructive">{state.error}</p>}
 
       <div className="flex justify-end">
-        <Button type="submit" disabled={pending} className="bg-cta text-white hover:opacity-90">
+        <Button type="submit" disabled={pending} className="bg-cta text-primary-foreground hover:opacity-90">
           {pending ? "Salvando..." : "Salvar alterações"}
         </Button>
       </div>

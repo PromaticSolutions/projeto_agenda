@@ -154,7 +154,7 @@ function ConfirmationBody({ email }: { email: string }) {
           // semânticas nativas de botão se perderam.
           nativeButton={false}
           size="lg"
-          className="bg-cta text-white hover:opacity-90"
+          className="bg-cta text-primary-foreground hover:opacity-90"
         >
           <LogIn className="size-4" /> Ir para o login
         </Button>

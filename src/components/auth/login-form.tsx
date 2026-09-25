@@ -3,12 +3,14 @@
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, LockKeyhole, Mail } from "lucide-react";
+import { ArrowRight, Loader2, Mail } from "lucide-react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { authErrorMessage } from "@/lib/auth-errors";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AUTH_INPUT_CLASS, PasswordInput } from "@/components/auth/password-input";
+import { AuthError } from "@/components/auth/auth-error";
 
 export function LoginForm() {
   const router = useRouter();
@@ -41,26 +43,48 @@ export function LoginForm() {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-      <div className="flex flex-col gap-2.5">
-        <Label htmlFor="email" className="text-sm font-medium text-foreground">E-mail</Label>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="email">E-mail</Label>
         <div className="relative">
-          <Mail className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input id="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="h-11 border border-white/12 bg-white/[0.06] px-3 pl-10 text-white shadow-sm transition-colors placeholder:text-blush-50/40 focus-visible:border-white/30 focus-visible:ring-3 focus-visible:ring-white/10" />
+          <Mail className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+          <Input
+            id="email"
+            type="email"
+            autoComplete="email"
+            placeholder="voce@exemplo.com"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className={AUTH_INPUT_CLASS}
+          />
         </div>
       </div>
-      <div className="flex flex-col gap-2.5">
+
+      <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-3">
-          <Label htmlFor="password" className="text-sm font-medium text-foreground">Senha</Label>
-          <Link href="/forgot-password" className="text-xs font-semibold text-blush-50/80 hover:text-white">Esqueci minha senha</Link>
+          <Label htmlFor="password">Senha</Label>
+          <Link
+            href="/forgot-password"
+            className="rounded text-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 dark:text-violet-300"
+          >
+            Esqueci minha senha
+          </Link>
         </div>
-        <div className="relative">
-          <LockKeyhole className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input id="password" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} className="h-11 border border-white/12 bg-white/[0.06] px-3 pl-10 text-white shadow-sm transition-colors placeholder:text-blush-50/40 focus-visible:border-white/30 focus-visible:ring-3 focus-visible:ring-white/10" />
-        </div>
+        <PasswordInput id="password" value={password} onChange={setPassword} autoComplete="current-password" />
       </div>
-      {error && <p className="rounded-xl border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
-      <Button type="submit" className="mt-1 h-11 bg-cta text-white hover:opacity-90" disabled={loading}>
-        {loading ? "Entrando..." : <>Entrar no painel <ArrowRight className="size-4" /></>}
+
+      {error && <AuthError>{error}</AuthError>}
+
+      <Button type="submit" size="lg" className="mt-1 h-11 w-full" disabled={loading}>
+        {loading ? (
+          <>
+            <Loader2 className="size-4 animate-spin" aria-hidden /> Entrando...
+          </>
+        ) : (
+          <>
+            Entrar <ArrowRight className="size-4" aria-hidden />
+          </>
+        )}
       </Button>
     </form>
   );

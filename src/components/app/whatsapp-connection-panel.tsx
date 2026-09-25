@@ -283,7 +283,7 @@ export function WhatsAppConnectionPanel({
               type="button"
               onClick={handleConnect}
               disabled={pending || status === "conectado"}
-              className="bg-cta text-white"
+              className="bg-cta text-primary-foreground"
             >
               {pending ? (
                 <Loader2 className="size-4 animate-spin" />

@@ -26,7 +26,7 @@ export default function RootError({ error, unstable_retry }: RootErrorProps) {
         <Button onClick={() => unstable_retry()} variant="outline">
           Tentar de novo
         </Button>
-        <Button render={<Link href="/" />} className="bg-cta text-white hover:opacity-90">
+        <Button render={<Link href="/" />} className="bg-cta text-primary-foreground hover:opacity-90">
           Início
         </Button>
       </div>

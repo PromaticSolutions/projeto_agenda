@@ -148,11 +148,11 @@ export function OnboardingForm() {
               <span />
             )}
             {step < STEPS.length - 1 ? (
-              <Button type="button" onClick={goNext} className="bg-cta text-white hover:opacity-90">
+              <Button type="button" onClick={goNext} className="bg-cta text-primary-foreground hover:opacity-90">
                 Continuar
               </Button>
             ) : (
-              <Button type="submit" disabled={pending} className="bg-cta text-white hover:opacity-90">
+              <Button type="submit" disabled={pending} className="bg-cta text-primary-foreground hover:opacity-90">
                 {pending ? "Criando..." : "Criar estúdio"}
               </Button>
             )}

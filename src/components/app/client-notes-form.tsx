@@ -21,7 +21,7 @@ export function ClientNotesForm({ clientId, notes }: { clientId: string; notes: 
       />
       {state && !state.ok && <p className="text-sm text-destructive">{state.error}</p>}
       {state?.ok && <p className="text-sm text-wa">Notas salvas.</p>}
-      <Button type="submit" size="sm" className="w-fit bg-cta text-white hover:opacity-90" disabled={pending}>
+      <Button type="submit" size="sm" className="w-fit bg-cta text-primary-foreground hover:opacity-90" disabled={pending}>
         {pending ? "Salvando..." : "Salvar notas"}
       </Button>
     </form>

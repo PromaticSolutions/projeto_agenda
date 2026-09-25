@@ -50,7 +50,7 @@ export function ClientFormDialog({ client }: { client?: Client }) {
           <Button
             variant={isEdit ? "ghost" : "default"}
             size={isEdit ? "icon-sm" : "default"}
-            className={isEdit ? "" : "gap-1.5 bg-cta text-white hover:opacity-90"}
+            className={isEdit ? "" : "gap-1.5 bg-cta text-primary-foreground hover:opacity-90"}
           />
         }
       >
@@ -96,7 +96,7 @@ export function ClientFormDialog({ client }: { client?: Client }) {
           {state && !state.ok && <p className="text-sm text-destructive">{state.error}</p>}
 
           <DialogFooter>
-            <Button type="submit" disabled={pending} className="bg-cta text-white hover:opacity-90">
+            <Button type="submit" disabled={pending} className="bg-cta text-primary-foreground hover:opacity-90">
               {pending ? "Salvando..." : "Salvar"}
             </Button>
           </DialogFooter>

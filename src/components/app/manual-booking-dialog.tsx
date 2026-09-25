@@ -207,7 +207,7 @@ export function ManualBookingDialog({
       }}
     >
       <DialogTrigger
-        render={<Button size="sm" className="gap-1.5 bg-cta text-white hover:opacity-90" />}
+        render={<Button size="sm" className="gap-1.5 bg-cta text-primary-foreground hover:opacity-90" />}
       >
         <CalendarPlus className="size-4" /> Novo agendamento
       </DialogTrigger>
@@ -398,7 +398,7 @@ export function ManualBookingDialog({
             <DialogFooter>
               <Button
                 type="submit"
-                className="bg-cta text-white hover:opacity-90"
+                className="bg-cta text-primary-foreground hover:opacity-90"
                 disabled={submitting}
               >
                 {submitting && <Loader2 className="size-4 animate-spin" />}

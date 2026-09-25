@@ -536,7 +536,7 @@ export function BookingFlow({ studio, services }: { studio: Studio; services: Se
                  logo acima, na própria caixa, então o botão inerte não vira
                  mistério. */
               disabled={submitting || !privacyAccepted}
-              className="shrink-0 bg-cta text-white hover:opacity-90"
+              className="shrink-0 bg-cta text-primary-foreground hover:opacity-90"
             >
               {submitting ? "Confirmando..." : "Confirmar agendamento"}
             </Button>

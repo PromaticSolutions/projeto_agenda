@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { updateBookingStatusAction } from "@/app/app/(dashboard)/actions";
-import { BOOKING_STATUS_DOT, BOOKING_STATUS_LABELS, BOOKING_STATUS_ORDER } from "@/lib/booking-status";
+import { BOOKING_STATUS_DOT, BOOKING_STATUS_SOLID, BOOKING_STATUS_LABELS, BOOKING_STATUS_ORDER } from "@/lib/booking-status";
 import type { BookingStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -42,7 +42,7 @@ export function BookingStatusSelect({
               onClick={() => handleChange(s)}
               className={cn(
                 "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-colors disabled:opacity-50",
-                active ? cn("text-white", BOOKING_STATUS_DOT[s]) : "text-muted-foreground hover:text-foreground"
+                active ? cn("text-white", BOOKING_STATUS_SOLID[s]) : "text-muted-foreground hover:text-foreground"
               )}
             >
               {!active && <span className={cn("size-1.5 rounded-full", BOOKING_STATUS_DOT[s])} />}

@@ -115,7 +115,7 @@ export function BookingFormDialog({ services, booking, clientName }: BookingForm
           {state && !state.ok && <p className="text-sm text-destructive">{state.error}</p>}
 
           <DialogFooter>
-            <Button type="submit" className="bg-cta text-white hover:opacity-90" disabled={pending}>
+            <Button type="submit" className="bg-cta text-primary-foreground hover:opacity-90" disabled={pending}>
               {pending ? "Salvando..." : "Salvar"}
             </Button>
           </DialogFooter>

@@ -10,7 +10,7 @@ export default function RootNotFound() {
       <p className="max-w-sm text-muted-foreground">
         O endereço que você tentou acessar não existe ou foi movido.
       </p>
-      <Button render={<Link href="/" />} className="bg-cta text-white hover:opacity-90">
+      <Button render={<Link href="/" />} className="bg-cta text-primary-foreground hover:opacity-90">
         Voltar para o início
       </Button>
     </div>

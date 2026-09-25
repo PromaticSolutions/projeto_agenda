@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
-import { ArrowLeft, CheckCircle2, Mail, Send } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Loader2, Mail, Send } from "lucide-react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { authErrorMessage } from "@/lib/auth-errors";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AUTH_INPUT_CLASS } from "@/components/auth/password-input";
+import { AuthError } from "@/components/auth/auth-error";
 
 export function PasswordRecoveryForm() {
   const [email, setEmail] = useState("");
@@ -33,29 +35,58 @@ export function PasswordRecoveryForm() {
 
   if (sent) {
     return (
-      <div className="rounded-2xl border border-violet-500/20 bg-violet-900/80 p-4 text-sm text-violet-100">
-        <CheckCircle2 className="mb-3 size-8 text-violet-300" />
-        <p>Se existe uma conta para <strong className="text-white">{email}</strong>, enviamos as instruções de redefinição.</p>
-        <Link href="/login" className="mt-4 inline-flex font-semibold text-white transition-colors hover:text-violet-200">Voltar para entrar</Link>
+      <div role="status" className="rounded-xl border border-border bg-card p-5 text-sm leading-6 text-muted-foreground shadow-float">
+        <CheckCircle2 className="mb-3 size-8 text-wa" aria-hidden />
+        <p>
+          Se existe uma conta para <strong className="font-semibold text-foreground break-all">{email}</strong>,
+          enviamos as instruções para criar uma nova senha. Confira também a caixa de spam.
+        </p>
+        <Link
+          href="/login"
+          className="mt-4 inline-flex items-center gap-1 font-semibold text-primary hover:underline dark:text-violet-300"
+        >
+          <ArrowLeft className="size-3.5" aria-hidden /> Voltar para entrar
+        </Link>
       </div>
     );
   }
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-      <div className="flex flex-col gap-2.5">
-        <Label htmlFor="recovery-email" className="text-sm font-medium text-violet-100">E-mail cadastrado</Label>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="recovery-email">E-mail cadastrado</Label>
         <div className="relative">
-          <Mail className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-violet-400/80" />
-          <Input id="recovery-email" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} className="h-11 border border-white/12 bg-white/[0.06] px-3 pl-10 text-white transition-colors placeholder:text-violet-300/60 focus-visible:border-white/30 focus-visible:ring-3 focus-visible:ring-white/10" />
+          <Mail className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+          <Input
+            id="recovery-email"
+            type="email"
+            autoComplete="email"
+            placeholder="voce@exemplo.com"
+            required
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            className={AUTH_INPUT_CLASS}
+          />
         </div>
       </div>
-      {error && <p className="rounded-xl border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
-      <Button type="submit" disabled={loading} className="h-11 bg-cta text-white hover:opacity-90">
-        {loading ? "Enviando..." : <>Enviar instruções <Send className="size-4" /></>}
+      {error && <AuthError>{error}</AuthError>}
+      <Button type="submit" size="lg" disabled={loading} className="h-11 w-full">
+        {loading ? (
+          <>
+            <Loader2 className="size-4 animate-spin" aria-hidden /> Enviando...
+          </>
+        ) : (
+          <>
+            Enviar instruções <Send className="size-4" aria-hidden />
+          </>
+        )}
       </Button>
-      <Link href="/login" className="mx-auto inline-flex items-center gap-1 text-sm font-medium text-violet-200 transition-colors hover:text-white">
-        <ArrowLeft className="size-3.5" /> Voltar para entrar
+      <Link
+        href="/login"
+        className="mx-auto inline-flex items-center gap-1 rounded text-sm font-medium text-muted-foreground hover:text-foreground"
+      >
+        <ArrowLeft className="size-3.5" aria-hidden /> Voltar para entrar
       </Link>
     </form>
-  );}
+  );
+}

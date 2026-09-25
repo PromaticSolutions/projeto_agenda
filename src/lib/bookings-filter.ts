@@ -58,6 +58,26 @@ export function isDescendingPeriod(period: BookingPeriod): boolean {
   return period === "passados";
 }
 
+// --- Data específica -------------------------------------------------------
+
+/**
+ * Um dia escolhido no calendário (`?data=AAAA-MM-DD`). Quando existe, ele
+ * MANDA sobre o período: a pergunta "o que tem no dia 12?" é mais específica
+ * que "próximos 7 dias", e os dois juntos não teriam leitura possível.
+ *
+ * Data que não existe no calendário ("2026-02-31") é descartada em vez de
+ * virar outro dia: um link digitado errado deve cair no padrão, não mostrar
+ * silenciosamente o 3 de março.
+ */
+export function parseBookingDate(value: string | undefined): string | null {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const [y, m, d] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  const valid =
+    date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
+  return valid ? value : null;
+}
+
 // --- Status ------------------------------------------------------------------
 
 export type BookingStatusFilter = BookingStatus | "todos";

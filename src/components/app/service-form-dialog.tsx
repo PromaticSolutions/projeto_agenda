@@ -57,7 +57,7 @@ export function ServiceFormDialog({ service }: { service?: ServiceWithAttachment
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
         render={
-          <Button variant={isEdit ? "ghost" : "default"} size={isEdit ? "icon-sm" : "default"} className={isEdit ? "" : "bg-cta text-white hover:opacity-90 gap-1.5"} />
+          <Button variant={isEdit ? "ghost" : "default"} size={isEdit ? "icon-sm" : "default"} className={isEdit ? "" : "bg-cta text-primary-foreground hover:opacity-90 gap-1.5"} />
         }
       >
         {isEdit ? (
@@ -175,7 +175,7 @@ export function ServiceFormDialog({ service }: { service?: ServiceWithAttachment
           {state && !state.ok && <p className="text-sm text-destructive">{state.error}</p>}
 
           <DialogFooter>
-            <Button type="submit" className="bg-cta text-white hover:opacity-90" disabled={pending || uploading}>
+            <Button type="submit" className="bg-cta text-primary-foreground hover:opacity-90" disabled={pending || uploading}>
               {pending ? "Salvando..." : uploading ? "Enviando arquivos..." : "Salvar"}
             </Button>
           </DialogFooter>

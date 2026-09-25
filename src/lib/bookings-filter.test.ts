@@ -3,6 +3,7 @@ import {
   bookingPeriodRange,
   filterBookings,
   groupBookingsByDay,
+  parseBookingDate,
   parseBookingPeriod,
   parseBookingStatusFilter,
   parseBookingView,
@@ -146,5 +147,17 @@ describe("groupBookingsByDay", () => {
     // instante cru jogaria esse atendimento para o dia errado.
     const groups = groupBookingsByDay([makeBooking({ date: "2026-08-19", time: "22:00" })]);
     expect(groups[0].date).toBe("2026-08-19");
+  });
+});
+
+describe("parseBookingDate", () => {
+  it("aceita uma data real", () => {
+    expect(parseBookingDate("2026-09-12")).toBe("2026-09-12");
+  });
+
+  it("descarta formato errado e data que não existe", () => {
+    expect(parseBookingDate(undefined)).toBeNull();
+    expect(parseBookingDate("12/09/2026")).toBeNull();
+    expect(parseBookingDate("2026-02-31")).toBeNull();
   });
 });

@@ -1,36 +1,27 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, Nunito_Sans, Playfair_Display } from "next/font/google";
+import { IBM_Plex_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
 import { CookieConsentBanner } from "@/components/cookie-consent-banner";
 import "./globals.css";
 
 /**
- * Par tipográfico do sistema.
+ * Tipografia do sistema: UMA família, Plus Jakarta Sans, em tudo — título,
+ * corpo, botão, tabela.
  *
- * Substituiu IBM Plex Sans, que era um grotesco corporativo escolhido para ler
- * como "software profissional de gestão". A leitura estava correta e era o
- * problema: quem contrata o Timely trabalha com estética, e a página inteira
- * soava como ferramenta de TI. A decisão anterior está no DECISIONS.md e foi
- * revertida de propósito.
+ * Já foram três vozes: Nunito Sans no corpo, Playfair Display (serifa de alto
+ * contraste) nos títulos e Jakarta só na landing. Lado a lado, o painel
+ * parecia montado com peças de lugares diferentes, e a Playfair em título
+ * grande virava ruído — hastes finíssimas e terminais cheios de desenho
+ * disputando atenção com o conteúdo. Uma família só deixa a hierarquia por
+ * conta de peso e tamanho, que é o que uma interface de trabalho precisa.
  *
- * Playfair Display nos títulos é a voz editorial que o setor reconhece — a
- * serifa de alto contraste de revista e de vitrine de salão. Só em corpo
- * grande: abaixo de ~1.25rem o contraste entre hastes finas e grossas começa a
- * quebrar, e por isso ela NÃO desce para rótulo, tabela ou botão.
- *
- * Nunito Sans no corpo é humanista de terminações arredondadas: mantém a
- * altura-x alta que uma interface densa precisa, sem a rigidez do grotesco.
- * As duas são variáveis no Google Fonts, então dispensam lista de pesos.
+ * Jakarta é um grotesco geométrico com altura-x generosa: segura título
+ * grande em semibold com tracking fechado e continua legível em 12px numa
+ * tabela. É variável no Google Fonts, então dispensa lista de pesos.
  */
-const nunitoSans = Nunito_Sans({
-  variable: "--font-nunito-sans",
-  subsets: ["latin", "latin-ext"],
-  display: "swap",
-});
-
-const playfairDisplay = Playfair_Display({
-  variable: "--font-playfair-display",
+const jakarta = Plus_Jakarta_Sans({
+  variable: "--font-jakarta",
   subsets: ["latin", "latin-ext"],
   display: "swap",
 });
@@ -61,7 +52,7 @@ export default function RootLayout({
   return (
     <html
       lang="pt-BR"
-      className={`${nunitoSans.variable} ${playfairDisplay.variable} ${ibmPlexMono.variable} h-full antialiased`}
+      className={`${jakarta.variable} ${ibmPlexMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">

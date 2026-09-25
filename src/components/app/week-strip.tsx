@@ -33,7 +33,7 @@ export function WeekStrip({ date, todayDate }: { date: string; todayDate: string
             className={cn(
               "flex min-w-11 flex-1 flex-col items-center gap-0.5 rounded-xl px-2 py-1.5 transition-colors",
               isSelected
-                ? "bg-cta text-white"
+                ? "bg-cta text-primary-foreground"
                 : isToday
                   ? "bg-violet-600/10 text-violet-700"
                   : "text-muted-foreground hover:bg-muted"

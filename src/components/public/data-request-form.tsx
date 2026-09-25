@@ -180,7 +180,7 @@ export function DataRequestForm({ slug, studioName }: { slug: string; studioName
         </p>
       )}
 
-      <Button type="submit" disabled={sending} className="bg-cta text-white hover:opacity-90">
+      <Button type="submit" disabled={sending} className="bg-cta text-primary-foreground hover:opacity-90">
         {sending ? "Enviando..." : "Enviar solicitação"}
       </Button>
     </form>

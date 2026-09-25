@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
-import { CheckCircle2, LockKeyhole } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { authErrorMessage } from "@/lib/auth-errors";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/auth/password-input";
+import { AuthError } from "@/components/auth/auth-error";
 
 /**
  * Nova senha, a partir do link enviado por e-mail.
@@ -63,10 +64,10 @@ export function ResetPasswordForm() {
 
   if (success) {
     return (
-      <div className="rounded-2xl border border-wa/20 bg-wa/8 p-4 text-sm text-muted-foreground">
-        <CheckCircle2 className="mb-3 size-8 text-wa" />
+      <div role="status" className="rounded-xl border border-border bg-card p-5 text-sm leading-6 text-muted-foreground shadow-float">
+        <CheckCircle2 className="mb-3 size-8 text-wa" aria-hidden />
         <p>Sua senha foi atualizada. Agora você já pode entrar.</p>
-        <Link href="/login" className="mt-4 inline-flex font-semibold text-violet-600">
+        <Link href="/login" className="mt-4 inline-flex font-semibold text-primary hover:underline dark:text-violet-300">
           Ir para o login
         </Link>
       </div>
@@ -74,7 +75,7 @@ export function ResetPasswordForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-5">
       <Campo
         id="new-password"
         label="Nova senha"
@@ -88,9 +89,9 @@ export function ResetPasswordForm() {
         onChange={setConfirmation}
       />
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && <AuthError>{error}</AuthError>}
 
-      <Button type="submit" disabled={loading} className="h-11 bg-cta text-white">
+      <Button type="submit" size="lg" disabled={loading} className="h-11 w-full">
         {loading ? "Atualizando..." : "Salvar nova senha"}
       </Button>
     </form>
@@ -111,18 +112,7 @@ function Campo({
   return (
     <div className="flex flex-col gap-2">
       <Label htmlFor={id}>{label}</Label>
-      <div className="relative">
-        <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          id={id}
-          type="password"
-          autoComplete="new-password"
-          required
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          className="h-11 pl-10"
-        />
-      </div>
+      <PasswordInput id={id} value={value} onChange={onChange} autoComplete="new-password" />
     </div>
   );
 }

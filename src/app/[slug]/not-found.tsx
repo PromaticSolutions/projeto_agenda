@@ -11,7 +11,7 @@ export default function StudioNotFound() {
         Verifique se o link está certo com quem te enviou, ou confirme com o estúdio se a
         página ainda está ativa.
       </p>
-      <Button render={<Link href="/" />} className="bg-cta text-white hover:opacity-90">
+      <Button render={<Link href="/" />} className="bg-cta text-primary-foreground hover:opacity-90">
         Voltar para o início
       </Button>
     </div>
