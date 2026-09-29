@@ -16,9 +16,8 @@ import { cn } from "@/lib/utils";
  * aceita hoje. O preço mensal fica visível e sem letra miúda, porque
  * esconder o valor é o que faz alguém sair para procurar em outro lugar.
  *
- * ATENÇÃO: o cadastro hoje não cria sozinho uma assinatura em teste — a
- * cobrança é lançada pelo /superadmin. A oferta daqui é a condição comercial;
- * se o fluxo de cobrança mudar, estes valores mudam junto.
+ * ATENÇÃO: estes valores repetem o plano `timely` da migração 0023 (preço e
+ * dias de teste) e o produto cadastrado na AbacatePay. Mudou um, mudam os três.
  */
 
 export const MONTHLY_PRICE = "R$ 39,90";

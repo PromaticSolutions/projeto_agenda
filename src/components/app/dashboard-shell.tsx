@@ -8,6 +8,7 @@ import {
   CalendarRange,
   CircleUserRound,
   Clock,
+  CreditCard,
   MessageCircle,
   MessagesSquare,
   Scissors,
@@ -22,6 +23,11 @@ import { CopyLinkButton } from "@/components/app/copy-link-button";
 import { CommandPalette } from "@/components/app/command-palette";
 import { ThemeToggle } from "@/components/app/theme-toggle";
 import type { Studio } from "@/lib/types";
+
+export interface BillingBanner {
+  tone: "info" | "warning";
+  text: string;
+}
 
 /**
  * Navegação agrupada por finalidade. Uma lista corrida de oito itens não
@@ -52,6 +58,7 @@ const NAV_GROUPS = [
     items: [
       { href: "/app/privacidade", label: "Privacidade", icon: ShieldCheck },
       { href: "/app/account", label: "Conta", icon: CircleUserRound },
+      { href: "/app/assinatura", label: "Assinatura", icon: CreditCard },
       { href: "/app/settings", label: "Configurações", icon: Settings },
     ],
   },
@@ -64,10 +71,12 @@ function isActive(pathname: string, href: string): boolean {
 export function DashboardShell({
   studio,
   publicUrl,
+  billingBanner = null,
   children,
 }: {
   studio: Studio;
   publicUrl: string;
+  billingBanner?: BillingBanner | null;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -140,6 +149,25 @@ export function DashboardShell({
             <SignOutButton />
           </div>
         </header>
+
+        {/* Faixa fina, não modal: o dono precisa saber do prazo sem ser
+            interrompido no meio do atendimento. Some na própria tela de
+            assinatura, onde a mesma informação já é o conteúdo principal. */}
+        {billingBanner && !isActive(pathname, "/app/assinatura") && (
+          <div
+            className={cn(
+              "flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b px-4 py-2 text-sm md:px-8",
+              billingBanner.tone === "warning"
+                ? "border-amber-500/30 bg-amber-500/10 text-foreground"
+                : "border-border bg-muted/40 text-muted-foreground"
+            )}
+          >
+            <span>{billingBanner.text}</span>
+            <Link href="/app/assinatura" className="font-medium text-foreground underline-offset-4 hover:underline">
+              Ver assinatura
+            </Link>
+          </div>
+        )}
 
         <main className="flex-1 px-4 py-6 md:px-8 md:py-8">{children}</main>
       </div>

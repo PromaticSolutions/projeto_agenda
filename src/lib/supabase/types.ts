@@ -89,6 +89,7 @@ export type PaymentStatus =
 
 /** Gateways previstos. `manual` = baixa dada à mão pelo admin (TED, cortesia). */
 export type BillingGateway =
+  | "abacatepay"
   | "mercadopago"
   | "asaas"
   | "stripe"

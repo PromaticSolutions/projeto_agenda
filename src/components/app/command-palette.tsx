@@ -8,6 +8,7 @@ import {
   CalendarDays,
   CalendarRange,
   CircleUserRound,
+  CreditCard,
   Clock,
   MessageCircle,
   MessagesSquare,
@@ -33,6 +34,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Lembretes", href: "/app/reminders", icon: BellRing },
   { label: "WhatsApp", href: "/app/whatsapp", icon: MessageCircle },
   { label: "Conta", href: "/app/account", icon: CircleUserRound },
+  { label: "Assinatura", href: "/app/assinatura", icon: CreditCard },
   { label: "Configurações", href: "/app/settings", icon: Settings },
 ];
 
