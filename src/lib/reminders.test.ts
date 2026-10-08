@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   REMINDER_PLAN_HORIZON_MINUTES,
+  REMINDER_TEMPLATE_PRESETS,
+  REMINDER_TOKENS,
+  exampleReminderData,
   planReminders,
   reminderScheduledFor,
   renderReminderMessage,
@@ -71,6 +74,35 @@ describe("renderReminderMessage", () => {
       { clientName: "Ana", serviceName: "X", studioName: "Y", startAt }
     );
     expect(body.includes("\n\n")).toBe(false);
+  });
+});
+
+describe("tabela de marcadores", () => {
+  const example = exampleReminderData(startAt);
+
+  it("troca todo marcador que a tela oferece", () => {
+    const body = renderReminderMessage(
+      { ...settings, message_template: REMINDER_TOKENS.map((t) => t.marker).join(" ") },
+      example
+    );
+    // Um marcador com botão na tela e sem troca no envio sairia literalmente
+    // para a cliente — é a falha que a tabela única existe para impedir.
+    expect(body).not.toMatch(/[{}]/);
+  });
+
+  it("não reprocessa o valor que acabou de inserir", () => {
+    const body = renderReminderMessage(
+      { ...settings, message_template: "Oi {cliente}" },
+      { ...example, clientName: "{salao}" }
+    );
+    expect(body).toBe("Oi {salao}");
+  });
+
+  it.each(REMINDER_TEMPLATE_PRESETS)("o modelo $id só usa marcador conhecido", (preset) => {
+    const known = new Set(REMINDER_TOKENS.map((t) => t.marker));
+    for (const found of preset.template.match(/\{[^}]*\}/g) ?? []) {
+      expect(known).toContain(found);
+    }
   });
 });
 

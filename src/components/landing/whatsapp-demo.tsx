@@ -13,8 +13,8 @@ import { track } from "@/lib/analytics";
  * A conversa é DEMONSTRATIVA e está rotulada como tal na tela — não é print
  * de conversa real de ninguém. O que ela mostra corresponde ao que o sistema
  * faz: o lembrete sai do número do estúdio, com a mensagem renderizada a
- * partir do template de /app/reminders (os marcadores {cliente}, {servico},
- * {data}, {hora}, {salao} são os que existem em src/lib/reminders.ts).
+ * partir do template de /app/reminders (os pedaços que o lembrete sabe citar
+ * estão em REMINDER_TOKENS, src/lib/reminders.ts).
  *
  * O que a demo NÃO promete: que o Timely responde a cliente. O produto envia;
  * não há caixa de entrada nem resposta automática (ver DECISIONS.md). Por

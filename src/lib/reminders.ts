@@ -8,10 +8,6 @@ import type { BookingStatus, ReminderSettings } from "@/lib/types";
  * chega por parâmetro) — é o que permite testar "quem deveria receber lembrete
  * às 14h03 de terça" sem subir nada. A camada que fala com o Postgres e com o
  * gateway fica em src/lib/data/outbox.ts e src/lib/data/dispatch.ts.
- *
- * A lista canônica de marcadores é REMINDER_PLACEHOLDERS, em
- * src/lib/validation.ts — a interface a usa para montar os botões de inserir
- * marcador, e a substituição abaixo tem que cobrir exatamente a mesma lista.
  */
 
 export interface ReminderTemplateData {
@@ -21,22 +17,100 @@ export interface ReminderTemplateData {
   startAt: Date;
 }
 
+/**
+ * Um pedaço do agendamento que a mensagem pode citar.
+ *
+ * O `marker` é o que fica GRAVADO no template (`{cliente}`) e o `label` é a
+ * única coisa que a dona do salão vê na tela ("nome da cliente"). Essa
+ * separação é o ponto da estrutura: o formato gravado não muda — disparador,
+ * migração e linhas já salvas continuam valendo — e ainda assim ninguém
+ * precisa entender chave nem colchete para escrever a mensagem.
+ *
+ * A tabela é a ÚNICA lista de marcadores do sistema: a substituição do envio e
+ * os botões da tela saem daqui. Um marcador novo nasce com o rótulo e o valor
+ * juntos, sem a chance de existir botão que o envio não sabe trocar.
+ */
+export interface ReminderToken {
+  marker: string;
+  label: string;
+  /** Valor que o marcador assume no envio — e, com dados de exemplo, na prévia. */
+  read: (data: ReminderTemplateData) => string;
+}
+
+export const REMINDER_TOKENS: readonly ReminderToken[] = [
+  { marker: "{cliente}", label: "nome da cliente", read: (d) => d.clientName },
+  { marker: "{servico}", label: "serviço", read: (d) => d.serviceName },
+  { marker: "{data}", label: "data", read: (d) => formatFullDateLocal(d.startAt) },
+  { marker: "{hora}", label: "horário", read: (d) => formatTimeLocal(d.startAt) },
+  { marker: "{salao}", label: "nome do seu negócio", read: (d) => d.studioName },
+];
+
+/**
+ * Uma passada só, de propósito: trocar marcador por marcador em sequência
+ * deixaria uma cliente chamada "{salao}" ter o próprio nome substituído pela
+ * rodada seguinte.
+ */
+const MARKER_PATTERN = new RegExp(
+  REMINDER_TOKENS.map((token) => token.marker.replace(/[{}]/g, "\\$&")).join("|"),
+  "g"
+);
+
+/** Mensagens prontas oferecidas na tela. Escrever do zero continua possível. */
+export const REMINDER_TEMPLATE_PRESETS: readonly {
+  id: string;
+  label: string;
+  description: string;
+  template: string;
+}[] = [
+  {
+    id: "lembrete",
+    label: "Lembrete simpático",
+    description: "Avisa do horário sem pedir resposta.",
+    template:
+      "Oi {cliente}, tudo bem? Passando para lembrar do seu horário de {servico} em {data} às {hora}. Te espero! — {salao}",
+  },
+  {
+    id: "confirmacao",
+    label: "Pedido de confirmação",
+    description: "Pede um sim e reduz falta.",
+    template:
+      "Olá {cliente}! Seu {servico} está marcado para {data} às {hora}. Consegue confirmar que vem? É só responder esta mensagem. — {salao}",
+  },
+  {
+    id: "direta",
+    label: "Curta e direta",
+    description: "Só o essencial, sem rodeio.",
+    template:
+      "{cliente}, seu horário de {servico} é {data} às {hora}. Qualquer imprevisto, me avise por aqui. — {salao}",
+  },
+];
+
+/**
+ * Agendamento fictício da pré-visualização.
+ *
+ * Vive aqui, e não na tela, porque a prévia chama `renderReminderMessage` — a
+ * MESMA função do envio. Uma tabela de exemplos própria no componente era o
+ * desenho anterior, e ela podia divergir da substituição real sem ninguém
+ * perceber até a primeira cliente receber a mensagem errada.
+ */
+export function exampleReminderData(startAt: Date): ReminderTemplateData {
+  return {
+    clientName: "Marina",
+    serviceName: "Design de sobrancelhas",
+    studioName: "Bella Studio",
+    startAt,
+  };
+}
+
 /** Substitui os marcadores do template. Marcador desconhecido fica como está. */
 export function renderReminderMessage(
   settings: Pick<ReminderSettings, "message_template" | "include_link" | "link_url">,
   data: ReminderTemplateData
 ): string {
-  const values: Record<string, string> = {
-    "{cliente}": data.clientName,
-    "{servico}": data.serviceName,
-    "{data}": formatFullDateLocal(data.startAt),
-    "{hora}": formatTimeLocal(data.startAt),
-    "{salao}": data.studioName,
-  };
+  const values = new Map(REMINDER_TOKENS.map((token) => [token.marker, token.read(data)]));
 
-  const body = settings.message_template.replace(
-    /\{cliente\}|\{servico\}|\{data\}|\{hora\}|\{salao\}/g,
-    (marker) => values[marker] ?? marker
+  const body = settings.message_template.replace(MARKER_PATTERN, (marker) =>
+    values.get(marker) ?? marker
   );
 
   // O link entra em linha própria: colado no fim do parágrafo, o WhatsApp às

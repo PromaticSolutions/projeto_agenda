@@ -462,19 +462,19 @@ function BookingLinkVisual() {
 /* ------------------------------------------------------------------------ */
 
 /**
- * O modelo com os marcadores, e a mensagem que ele vira. Os marcadores e os
- * valores de exemplo são os de `reminder-settings-form.tsx` — a mesma prévia
- * que a pessoa vê quando configura o lembrete.
+ * O modelo com as etiquetas, e a mensagem que ele vira. As etiquetas levam os
+ * mesmos rótulos de REMINDER_TOKENS — a landing promete a tela que existe, e
+ * nela ninguém escreve `{cliente}` nem vê chave nenhuma.
  */
 const TEMPLATE: (string | { tag: string })[] = [
   "Olá ",
-  { tag: "{cliente}" },
+  { tag: "nome da cliente" },
   "! Confirmando seu horário de ",
-  { tag: "{servico}" },
+  { tag: "serviço" },
   " em ",
-  { tag: "{data}" },
+  { tag: "data" },
   " às ",
-  { tag: "{hora}" },
+  { tag: "horário" },
   ".",
 ];
 
@@ -491,7 +491,7 @@ function ReminderVisual() {
           typeof part === "string" ? (
             <span key={i}>{part}</span>
           ) : (
-            <span key={i} className="rounded bg-primary/10 px-1 py-0.5 font-mono text-[0.6875rem] text-primary dark:text-violet-300">
+            <span key={i} className="rounded-md bg-primary/10 px-1.5 py-0.5 text-[0.75rem] font-medium text-primary dark:text-violet-300">
               {part.tag}
             </span>
           )

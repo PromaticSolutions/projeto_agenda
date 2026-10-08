@@ -59,7 +59,7 @@ export default async function RemindersPage() {
                 {connection.connected_phone
                   ? ` do número ${formatPhoneDisplay(connection.connected_phone)}`
                   : " do número conectado"}
-                , com os marcadores já substituídos.
+                , já com o nome e o horário de cada cliente preenchidos.
               </p>
             </div>
           </div>

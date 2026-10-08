@@ -1447,3 +1447,82 @@ nova é um eixo separado e não passa por `access.ts`.
   o insert antes de entregar o acesso.
 - Assinatura num salão: hoje cada atendente tem a sua, e a gerente não a vê.
   Quem paga pelo salão inteiro é pergunta de negócio, ainda não respondida.
+
+## A mensagem automática deixou de pedir que a dona do salão leia código (2026-10-08)
+
+### O problema era a chave, não o texto
+
+A tela de lembretes pedia que a pessoa escrevesse `{cliente}`, `{servico}`,
+`{data}`. Chave é sintaxe de programador: quem nunca viu uma não sabe se
+precisa digitar, se pode traduzir, se o acento falta de propósito em
+`{servico}`, nem o que acontece se apagar só a chave de fechamento. A mensagem
+é a coisa que a cliente recebe — a parte do produto com menos margem para
+"depois eu entendo".
+
+### O formato gravado continua o mesmo
+
+A conversão para etiqueta acontece só na fronteira com a tela. O banco, a
+Server Action, o schema do Zod, a fila e o disparador continuam vendo
+`{cliente}` — nenhuma migração, nenhum template já salvo quebrou. Trocar o
+formato gravado por algo "mais amigável" teria exigido migrar as linhas
+existentes e reescrever a substituição, sem ganho nenhum: ninguém lê o que
+está no banco.
+
+### A tabela de marcadores virou uma só
+
+`REMINDER_PLACEHOLDERS` (em validation.ts) listava os marcadores para os botões
+da tela, e `renderReminderMessage` (em reminders.ts) tinha a sua própria regex
+com os mesmos cinco. Duas listas, um comentário pedindo que ficassem iguais.
+Agora é `REMINDER_TOKENS`, em reminders.ts: cada entrada carrega o marcador, o
+rótulo em português e a função que produz o valor. A regex de substituição e os
+botões saem dela, então um marcador novo não consegue nascer com botão na tela
+e sem troca no envio. Um teste cobre isso.
+
+A substituição continua numa passada só (`String.replace` com uma regex
+alternada, não um laço de `replaceAll`): uma cliente cadastrada como "{salao}"
+teria o próprio nome substituído pela rodada seguinte.
+
+### A prévia passou a ser o envio
+
+Antes o componente tinha a sua tabela de valores de exemplo e a sua função de
+preenchimento. Podia divergir da substituição real sem ninguém notar até a
+primeira cliente receber a mensagem errada. Agora a prévia chama
+`renderReminderMessage` — a mesma função do disparador — com um agendamento
+fictício de amanhã às 14:30 (`exampleReminderData`).
+
+### Por que `contenteditable`, e não `<textarea>`
+
+Não tem contorno: textarea desenha texto puro, então o marcador apareceria
+exatamente como está — que é o problema. A etiqueta precisa de fundo, cor e um
+× para remover, e isso exige markup dentro do campo.
+
+O que isso custou, e como foi contido (`message-template-editor.tsx`):
+
+- **O cursor.** O campo é não-controlado enquanto a pessoa digita. Recalcular o
+  HTML a cada tecla faria o React recriar os nós e o cursor voltar para o
+  começo a cada letra. Troca vinda de fora (aplicar um modelo pronto) avisa por
+  uma prop `revision`, que remonta o campo de propósito.
+- **A quebra de linha.** Cada navegador representa o Enter de um jeito (Chrome
+  embrulha em `<div>`, Firefox solta um `<br>`). `serialize` normaliza os dois
+  para `\n`, e ignora o `<br>` de recheio no fim de um bloco — contá-lo dobraria
+  toda quebra de linha.
+- **A colagem.** Cola como texto puro via `insertText`, que preserva o Ctrl+Z
+  nativo; inserção manual por `Range` o zeraria.
+- **O foco.** Os botões de inserir usam `preventDefault` no `mousedown`: sem
+  isso o campo perderia o cursor e toda etiqueta cairia no fim do texto.
+- **Marcador colado à mão.** Quem cola uma mensagem antiga com `{cliente}`
+  escrito vê a etiqueta aparecer ao sair do campo, em vez de texto cru.
+
+Fica sem teste automatizado: a suíte roda em Node sem DOM, e o projeto não tem
+nenhuma dependência de DOM para testes. Foi verificado no servidor de
+desenvolvimento, pelo HTML renderizado.
+
+### Modelos prontos
+
+Três mensagens (`REMINDER_TEMPLATE_PRESETS`): lembrete simpático, pedido de
+confirmação, curta e direta. A hipótese é que a maioria escolhe uma e muda uma
+palavra — escrever do zero continua possível, mas deixou de ser o caminho
+padrão.
+
+A landing acompanhou: as etiquetas de `features.tsx` mostram os mesmos rótulos
+em português. Ela promete a tela que existe.

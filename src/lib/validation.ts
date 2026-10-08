@@ -414,13 +414,12 @@ export const clientInputSchema = z.object({
 // Lembretes (item 7)
 // ---------------------------------------------------------------------------
 
-export const REMINDER_PLACEHOLDERS = [
-  "{cliente}",
-  "{servico}",
-  "{data}",
-  "{hora}",
-  "{salao}",
-] as const;
+/*
+ * Os marcadores da mensagem (`{cliente}`, `{servico}`, ...) NÃO ficam aqui:
+ * moraram neste arquivo até a tela passar a mostrá-los como etiquetas em
+ * português. Agora cada um carrega rótulo e valor junto, e por isso vive ao
+ * lado da substituição, em REMINDER_TOKENS (src/lib/reminders.ts).
+ */
 
 /** Presets de antecedência oferecidos na interface, em minutos. */
 export const REMINDER_LEAD_TIME_OPTIONS = [
