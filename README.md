@@ -17,7 +17,7 @@ Outros comandos úteis:
 ```bash
 npm run typecheck # tsc --noEmit
 npm run lint       # eslint
-npm run test        # vitest (algoritmo de disponibilidade)
+npm run test        # vitest (disponibilidade, cobrança, conversas, assinatura…)
 npm run build       # build de produção
 ```
 
@@ -33,23 +33,30 @@ SUPABASE_SERVICE_ROLE_KEY=...       # secreta! nunca comitar, nunca prefixar com
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ```
 
+Há mais variáveis (WhatsApp, cron, AbacatePay) — todas opcionais para
+rodar, cada uma comentada em `.env.local.example`.
+
 **Depois de preencher as chaves, rode TODAS as migrações de
 [`supabase/migrations/`](supabase/migrations/) em ordem numérica** (0001,
-0002, … 0017) no SQL Editor do seu projeto (Dashboard → SQL Editor → New
+0002, … 0024) no SQL Editor do seu projeto (Dashboard → SQL Editor → New
 query, cole o arquivo inteiro e rode), ou via qualquer conexão direta ao
 Postgres. Elas criam as tabelas, a constraint anti-colisão de horário, as
 policies de RLS, os grants de tabela, o CRM de clientes, a fila de
-mensagens, a cobrança da plataforma, o registro de consentimento e o
-WhatsApp da própria plataforma.
+mensagens, a cobrança da plataforma, o registro de consentimento, o
+WhatsApp da própria plataforma, a caixa de conversas, os anexos dos
+serviços, a mídia das conversas, a cobrança pela AbacatePay e a hierarquia
+salão/gerente/atendente.
 
 Cada tela avisa quando falta a migração dela em vez de estourar erro — se
 o painel disser "rode a migração 00XX", é literalmente isso.
 
-> Já aplicadas no projeto `mcgecpnpxilrhavtbsfn` referenciado em
-> `.env.local` (2026-07-23): as 5 tabelas, RLS, a exclusion constraint
-> `bookings_no_overlap` e os grants estão todos confirmados via consulta
-> direta ao Postgres e via PostgREST. `npm run dev` já lê/escreve no banco
-> real — não precisa rodar nada manualmente para este projeto.
+> No projeto `mcgecpnpxilrhavtbsfn` referenciado em `.env.local`, a base
+> (0001: as 5 tabelas, RLS, a exclusion constraint `bookings_no_overlap` e
+> os grants) foi confirmada via consulta direta ao Postgres e via PostgREST
+> em 2026-07-23 — `npm run dev` lê/escreve no banco real. **As migrações
+> posteriores não foram reconferidas desde então**: se uma tela pedir uma
+> migração, rode-a. As 0019–0024 são as mais recentes; 0020, 0022 criam
+> buckets de Storage.
 
 Se quiser testar sem Supabase, **não precisa fazer nada**: sem
 `.env.local`, o app inteiro roda contra um store em memória (estúdio
@@ -70,6 +77,17 @@ um provedor de e-mail, desative em Authentication → Providers → Email →
 - `src/app/app/onboarding` — criação do estúdio (fora do grupo autenticado).
 - `src/app/app/(dashboard)` — painel do dono (serviços, horários, agenda do dia, agendamento manual, clientes).
 - `src/app/app/(dashboard)/clients` — CRM básico: lista de clientes, histórico de agendamentos e notas.
+- `src/app/app/(dashboard)/conversations` — caixa de atendimento do WhatsApp
+  (lista, conversa e atalhos de disponibilidade, agendamento, orçamento e fotos).
+- `src/app/app/(dashboard)/assinatura` — plano do estúdio: estado, assinar,
+  cancelar e histórico de pagamentos.
+- `src/app/app/gerencia` — área da **gerente**: visão geral do salão, atendentes
+  (cadastrar, editar, desativar) e a leitura de clientes, conversas e
+  agendamentos das atendentes, com filtro por atendente.
+- `src/lib/access.ts` — regra centralizada de quem pode o quê na hierarquia
+  atendente → gerente (com testes). Não é a defesa: a defesa é a RLS da 0024.
+- `src/lib/data/salons.ts` — resolução do papel a partir da sessão e as leituras
+  e escritas do salão.
 - `src/app/api/bookings` — API route que revalida disponibilidade e cria o booking.
 - `src/lib/availability.ts` — algoritmo de horários livres (com testes).
 - `src/lib/data/*` — camada de dados; alterna Supabase real ↔ mock conforme `.env.local`.
@@ -78,6 +96,14 @@ um provedor de e-mail, desative em Authentication → Providers → Email →
   faturamento, leads, WhatsApp).
 - `src/lib/billing.ts` — vocabulário e aritmética da cobrança (com testes).
 - `src/lib/data/billing.ts` / `src/lib/data/platformMetrics.ts` — leituras do superadmin (dinheiro e uso).
+- `src/lib/abacatepay.ts` — adaptador do gateway que cobra a assinatura (com testes).
+- `src/lib/subscription-state.ts` — regra pura que traduz a assinatura no que a
+  tela mostra, e que vai decidir o bloqueio depois do teste (com testes).
+- `src/lib/conversations.ts` / `src/lib/data/conversations.ts` — identidade do
+  chat, leitura e escrita das conversas.
+- `src/lib/data/conversationMedia.ts` — download e guarda da mídia no bucket privado.
+- `src/lib/working-week.ts` / `src/lib/bookings-filter.ts` — semana de trabalho
+  em Horários e filtros da lista de agendamentos (ambos com testes).
 - `supabase/migrations/0001_init.sql` — schema + RLS + constraint anti-colisão.
 - `supabase/migrations/0011_billing.sql` — planos, assinaturas, faturas e pagamentos.
 - `supabase/migrations/0015_consents.sql` — prova datada de consentimento do
@@ -94,6 +120,24 @@ um provedor de e-mail, desative em Authentication → Providers → Email →
 - `supabase/migrations/0018_rate_limit_indexes.sql` — índice
   `(studio_id, created_at desc)` em `bookings`, que sustenta o teto anti-abuso
   por janela de `/api/bookings`.
+- `supabase/migrations/0019_whatsapp_messages.sql` — as conversas de WhatsApp.
+  É aqui que o produto deixa de só enviar e passa a receber.
+- `supabase/migrations/0020_service_attachments.sql` — bucket **privado**
+  `service-attachments` (10 MB; JPG/PNG/WebP/AVIF/PDF) para fotos e fichas do
+  procedimento. Uso interno do dono: nada disso aparece na página pública.
+- `supabase/migrations/0021_conversations_all_chats.sql` — a caixa deixa de ser
+  só das clientes cadastradas: toda conversa do número conectado passa a ser
+  gravada, inclusive grupo, e quem separa é o filtro da tela.
+- `supabase/migrations/0022_conversation_media.sql` — bucket **privado**
+  `conversation-media` e as colunas `media_path`/`media_status`. Sem ela, foto e
+  áudio de cliente aparecem como "não está mais disponível".
+- `supabase/migrations/0023_abacatepay.sql` — plano "Timely" (R$ 39,90/mês, 30
+  dias de teste), gateway `abacatepay` aceito e trigger que faz todo estúdio
+  novo nascer em teste.
+- `supabase/migrations/0024_salons.sql` — salão, gerente e as policies de
+  leitura da gerente. `studios.salon_id` é **nulo por default** e nulo é estado
+  final: profissional autônoma. Ver **[Salão, gerente e
+  atendentes](#salão-gerente-e-atendentes)**.
 
 Decisões e riscos documentados em [DECISIONS.md](DECISIONS.md) e
 [RISKS.md](RISKS.md). Status do projeto em [REPORT.md](REPORT.md).
@@ -148,10 +192,55 @@ exige nova migração. Nada de segredo no banco: chave de API e secret de
 webhook ficam em variável de ambiente. Cartão nunca é armazenado — só marca
 e 4 últimos dígitos, o que o gateway devolve.
 
-Enquanto não houver integração, o painel mostra assinatura e faturamento a
-partir do que existe no banco (a 0011 coloca os estúdios já cadastrados em
-teste de 14 dias) e nenhum número é inventado: sem pagamento registrado, a
-receita aparece como zero, não como estimativa.
+Essa aposta se pagou na [`0023_abacatepay.sql`](supabase/migrations/0023_abacatepay.sql):
+ligar o gateway de verdade não exigiu mudar o modelo, só acrescentar o nome à
+constraint. Ver **[Assinatura do estúdio](#assinatura-do-estúdio-abacatepay)**.
+
+Nenhum número é inventado: sem pagamento registrado, a receita aparece como
+zero, não como estimativa.
+
+## Assinatura do estúdio (AbacatePay)
+
+Quem cobra o estúdio é a [AbacatePay](https://abacatepay.com). O fluxo:
+
+```
+/app/assinatura  → "Assinar" → checkout na AbacatePay → o dono paga
+                                                          ↓
+                               /api/webhooks/abacatepay ← aviso de pagamento
+                                                          ↓
+                                      subscriptions.status = 'ativa'
+```
+
+A renovação dos meses seguintes é da AbacatePay; cada uma chega como outro
+aviso. O `externalId` do checkout é o **ID do estúdio**, não o da assinatura —
+um estúdio que cancelou e voltou não tem assinatura vigente para apontar, e o
+webhook precisa saber de quem é o pagamento mesmo assim.
+
+Três variáveis, uma por ambiente da AbacatePay (Dev Mode e produção têm as
+suas):
+
+```
+ABACATEPAY_API_KEY=            # chave da API
+ABACATEPAY_PRODUCT_ID=         # produto com ciclo mensal criado no painel deles
+ABACATEPAY_WEBHOOK_SECRET=     # mínimo 32 caracteres
+```
+
+Sem `ABACATEPAY_WEBHOOK_SECRET` a rota devolve **404** e não anuncia que existe
+— falha fechada, igual à da Evolution. E ela **nunca** devolve 410: a AbacatePay
+desliga o webhook de vez ao receber esse código.
+
+> A assinatura HMAC que vem no header `X-Webhook-Signature` usa uma chave
+> **pública**, publicada na documentação deles. Ela prova que o corpo não foi
+> alterado no caminho; não prova quem mandou. Quem autentica é o nosso segredo —
+> por isso a rota confere os dois.
+
+Todo estúdio novo nasce em teste de 30 dias, por trigger no banco (`studios`),
+não por código no onboarding — o estúdio pode nascer por SQL Editor, superadmin
+ou script, e o teste tem de existir em todos.
+
+**Hoje o teste vencido só avisa, não bloqueia.** A regra que decidirá o bloqueio
+já existe isolada e testada em `src/lib/subscription-state.ts`; ligá-la ao
+acesso é trabalho pendente.
 
 ## Lembretes no WhatsApp
 
@@ -297,3 +386,191 @@ Chamar duas vezes seguidas é seguro: o planejamento é idempotente por índice
 Botão "Conectar número" → QR na tela → ler no aparelho. A tela pergunta o
 estado ao gateway a cada 4 segundos e muda sozinha quando parear. Abaixo dela
 fica o histórico das últimas mensagens, com status e erro de cada uma.
+
+## Conversas (`/app/conversations`)
+
+Até a migração 0019 o produto só **enviava** — lembrete, envio manual, aviso de
+lead. Agora o estúdio lê e responde dentro do painel, no desenho de caixa de
+atendimento: lista à esquerda, conversa no centro e, à direita, os cartões de
+contato e de atendimento com atalhos de disponibilidade, agendamento, orçamento
+e fotos. A ideia é que responder "tem horário quinta?" não exija sair da tela.
+
+Exige a Evolution conectada em `/app/whatsapp` e as migrações **0019, 0021 e
+0022**.
+
+### O que fica gravado no nosso banco
+
+Toda conversa do número conectado — **inclusive grupo, família e fornecedor**.
+A 0019 nasceu restrita a quem já estivesse em `clients`, mas isso escondia
+justamente quem pergunta preço antes de virar cliente, e a 0021 abriu o escopo.
+Quem separa uma coisa da outra é o filtro "só clientes cadastradas", na tela.
+
+Dito sem rodeio: é o número do estúdio e a escolha é de quem o conecta, mas o
+produto ainda **não** avisa isso na tela de conexão. É pendência conhecida (ver
+[DECISIONS.md](DECISIONS.md)).
+
+A conversa é identificada pelo **chat**, não pela cliente. Quem é cliente se
+decide por telefone na leitura, então cadastrar a pessoa depois faz a conversa
+virar de cliente sozinha, sem backfill.
+
+### Mídia
+
+Foto, áudio, vídeo e documento são baixados **uma vez** e guardados no bucket
+privado `conversation-media` (0022). Isso existe porque pedir o arquivo à
+Evolution a cada balão depende de ela guardar as mensagens no banco dela, e a
+instalação de referência roda com `DATABASE_SAVE_DATA_NEW_MESSAGE=false` — antes
+da 0022, toda foto de cliente aparecia como "não está mais disponível".
+
+Mensagem nova baixa pelo próprio webhook (que recebe a chave de mídia junto);
+mensagem antiga baixa ao abrir o balão ou pela recuperação em lote da tela.
+`media_status = 'indisponivel'` significa que o WhatsApp não tem mais o arquivo
+— nesse caso não se tenta de novo, a tela diz direto.
+
+Excluir a cliente apaga as mensagens em cascata e remove os objetos do bucket
+(`deleteClient`, em `src/lib/data/clients.ts`).
+
+### Importar o histórico
+
+O botão de importação puxa o que já existe no gateway, em lotes de 15 conversas,
+pulando o que já está no banco. É repetível e retomável: rodar duas vezes não
+duplica, e uma queda no meio não obriga a recomeçar.
+
+### Limites conhecidos
+
+- **Grupo é só leitura.** Responder exigiria JID na fila de envio, e a fila
+  (0010) só aceita telefone em dígitos.
+- Grupo aparece como "Grupo &lt;4 últimos dígitos&gt;" — o evento não traz o assunto.
+- `/chat/findChats` e `/chat/findMessages` não foram testados contra uma
+  Evolution real; o adaptador tolera os três formatos conhecidos da 2.x.
+
+## Fotos e anexos nos procedimentos
+
+O formulário do serviço aceita imagem (JPG/PNG/WebP/AVIF) e PDF — foto de
+antes/depois, ficha de anamnese, termo, tabela de preparo. Migração **0020**.
+
+É uso interno do dono, como as observações do serviço: o bucket
+`service-attachments` é **privado** e a tela lê por URL assinada. Nada disso
+aparece na página pública, ao contrário de `studio-media` (0007).
+
+O arquivo sobe na hora, mas o vínculo com o serviço só é gravado no **Salvar** —
+fechar sem salvar não muda nada. O tipo é conferido pelos **bytes**, não pela
+extensão, e o caminho é conferido contra a pasta do estúdio ao gravar.
+
+O teto é 10 MB (`MAX_ATTACHMENT_BYTES`, e o mesmo no bucket). O
+`bodySizeLimit` do `next.config.ts` subiu para 11 MB por causa disso, com folga
+para o overhead de multipart. **Falta conferir o teto de corpo da Vercel contra
+esse valor.**
+
+## Salão, gerente e atendentes
+
+Há três papéis, em dois eixos independentes:
+
+```
+atendente   dona de um estúdio. Vê só os próprios dados.
+            salon_id pode ser NULL  →  profissional autônoma
+gerente     vinculada a um salão. LÊ as atendentes daquele salão.
+            não tem estúdio, nem página pública, nem agenda própria
+admin       /superadmin, via platform_admins (0003). Eixo à parte, intocado.
+```
+
+A hierarquia é da migração **0024**. O eixo do `/superadmin` não passa por ela.
+
+### Por que o salão fica ACIMA de `studios`, e não é o próprio `studios`
+
+Porque `studios.owner_id` é `unique`: a 0001 fixou "1 usuário Auth = 1 dono = 1
+estúdio", e serviços, horários, agendamentos, clientes, conversas e a instância
+da Evolution penduram todos em `studio_id`.
+
+Na prática o estúdio **é** a atendente — a conversa dela é a conversa do número
+dela. O salão só podia entrar como um nível acima:
+
+```
+salons
+  └── studios (salon_id NULL = autônoma)
+        └── clients, bookings, whatsapp_messages, services, ...
+salon_managers (user_id → salon_id)
+```
+
+### `salon_id` nulo não é pendência
+
+É estado final e suportado. Existe profissional que compra o sistema sozinha, e
+ela foi o único caso que o produto atendeu até a 0024. A coluna nasce nula,
+nenhuma linha existente foi alterada, e nada no sistema exige preenchê-la.
+
+### O isolamento entre salões está no banco
+
+As onze policies da 0024 são **aditivas e só de SELECT**. Policy permissiva se
+soma às outras por OR, então nenhuma policy da atendente mudou — e por isso as
+funções da camada de dados dela também não mudaram: é a RLS que recorta o
+resultado conforme quem pergunta.
+
+Quem decide o recorte é `salon_studio_ids()`, função `security definer` que
+**não aceita parâmetro** e deriva tudo de `auth.uid()`. Um id de outro salão
+trocado na URL ou no corpo da requisição não encontra linha: o Postgres devolve
+vazio.
+
+`src/lib/access.ts` (com testes) é a regra centralizada do lado da aplicação.
+Ela existe para recusar cedo e com mensagem legível, **não** para ser a defesa —
+a defesa é a RLS. Toda Server Action de `/app/gerencia` repete `requireManager()`
+pela mesma razão que as do `/superadmin` repetem `checkPlatformAdmin`: layout
+não protege Server Action, que é uma porta HTTP própria.
+
+### A gerente lê; ela não opera no lugar da atendente
+
+Todas as policies são `for select`. Ela acompanha agenda, clientes e conversas,
+mas não remarca horário nem responde mensagem fingindo ser outra pessoa.
+
+As duas escritas que ela PODE fazer — cadastrar e editar atendente — passam pelo
+servidor com a `service_role` (criar usuário no Auth exige), depois de conferir
+o vínculo, e ainda carregam `.eq("salon_id", ...)` como segunda trava.
+
+**O formulário de nova atendente não tem campo de salão**, nem oculto: o vínculo
+é montado a partir da sessão da gerente. É o que impede cadastrar atendente em
+salão alheio.
+
+### O que a gerente NÃO vê, de propósito
+
+Assinatura, faturas e pagamentos da atendente (contrato dela com a plataforma,
+não operação do salão) e os registros de LGPD — `consents` e
+`data_subject_requests`. Abrir qualquer um exige policy nova e decisão
+registrada.
+
+### Desativar ≠ excluir
+
+- **Desativar** (`studios.deactivated_at`) tira a página pública do ar. **Não
+  mexe no login nem apaga nada** — agendamento, cliente e conversa são dado de
+  terceiro. O canal do art. 18 (`/[slug]/meus-dados`) continua no ar mesmo
+  desativada: o direito da titular não depende do status comercial da
+  profissional.
+- **Remover do salão** é `salon_id = null`. A atendente volta a ser autônoma com
+  tudo o que é dela, e dá para vinculá-la de novo.
+
+### Criando o primeiro salão e a primeira gerente
+
+Não há tela, pela mesma razão que não há tela para cadastrar admin da plataforma
+(0003): é ato de quem vende o sistema, não operação do dia. No SQL Editor:
+
+```sql
+-- 1. o salão
+insert into salons (name) values ('Salão da Ana') returning id;
+
+-- 2. a gerente se cadastra sozinha em /signup e NÃO cria estúdio.
+--    Pegue o id dela em Authentication > Users.
+
+-- 3. o vínculo
+insert into salon_managers (user_id, salon_id, name, email)
+values ('<uuid-do-usuario>', '<uuid-do-salao>', 'Ana', 'ana@exemplo.com');
+
+-- 4. atendentes que JÁ existem e vão para esse salão (opcional).
+--    Nomeie uma a uma: um update sem `where` jogaria toda autônoma do
+--    sistema dentro do salão.
+update studios set salon_id = '<uuid-do-salao>'
+where slug in ('atendente-1', 'atendente-2');
+```
+
+> Faça o passo 3 **antes** de entregar o acesso. Entre o cadastro e o vínculo a
+> gerente vê a tela de criar estúdio — e se criar um, vira atendente, porque
+> `getCurrentActor` resolve estúdio primeiro.
+
+A partir daí, as atendentes novas saem de `/app/gerencia/atendentes` e já nascem
+com o `salon_id` certo, sem SQL.

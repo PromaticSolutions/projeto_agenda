@@ -2,7 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { createMyStudio, getMyStudio, isSlugAvailable } from "@/lib/data/studios";
-import { studioOnboardingSchema } from "@/lib/validation";
+import { ForbiddenError, createSalonWithManager, getCurrentActor } from "@/lib/data/salons";
+import { salonOnboardingSchema, studioOnboardingSchema } from "@/lib/validation";
 
 export type OnboardingActionState = { ok: false; error: string } | null;
 
@@ -13,6 +14,14 @@ export async function createStudioAction(
   const existing = await getMyStudio();
   if (existing) {
     redirect("/app");
+  }
+
+  /* A página já desvia a gerente, mas a Server Action é uma porta própria:
+     ela aceita POST de quem montar o formulário na mão. Guardar só na tela
+     deixaria a porta aberta. */
+  const actor = await getCurrentActor();
+  if (actor?.role === "gerente") {
+    redirect("/app/gerencia");
   }
 
   const raw = {
@@ -43,4 +52,40 @@ export async function createStudioAction(
   });
 
   redirect("/app");
+}
+
+export type SalonOnboardingState = { ok: false; error: string } | null;
+
+/**
+ * Abre um salão e torna quem está cadastrando a gerente dele.
+ *
+ * O outro ramo do onboarding. Antes desta ação, virar salão só acontecia por
+ * SQL — a hierarquia existia no banco e não existia para quem compra o sistema.
+ */
+export async function createSalonAction(
+  _prevState: SalonOnboardingState,
+  formData: FormData
+): Promise<SalonOnboardingState> {
+  const existing = await getMyStudio();
+  if (existing) {
+    redirect("/app");
+  }
+
+  const parsed = salonOnboardingSchema.safeParse({
+    salonName: String(formData.get("salonName") ?? ""),
+    managerName: String(formData.get("managerName") ?? ""),
+  });
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Dados inválidos" };
+  }
+
+  try {
+    await createSalonWithManager(parsed.data);
+  } catch (error) {
+    if (error instanceof ForbiddenError) return { ok: false, error: error.message };
+    if (error instanceof Error) return { ok: false, error: error.message };
+    return { ok: false, error: "Não foi possível abrir o salão." };
+  }
+
+  redirect("/app/gerencia");
 }

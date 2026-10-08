@@ -206,6 +206,44 @@ export const studioOnboardingSchema = z.object({
   brand_color: hexColorSchema,
 });
 
+/**
+ * Abertura de salão no onboarding (0024).
+ *
+ * Sem `salon_id`: quem preenche está CRIANDO um salão, não entrando num que já
+ * existe. Entrar num salão alheio é convite de quem já está lá — um campo aqui
+ * seria a porta para se autodeclarar gerente dos outros.
+ */
+export const salonOnboardingSchema = z.object({
+  salonName: z.string().trim().min(2, "Informe o nome do salão").max(80),
+  managerName: z.string().trim().min(2, "Informe o seu nome").max(80),
+});
+
+/**
+ * Cadastro de atendente feito pela GERENTE (0024).
+ *
+ * Deliberadamente não tem campo de salão: o vínculo vem da sessão da gerente,
+ * em `createSalonAttendant`. Um campo aqui, mesmo oculto, seria exatamente a
+ * porta para cadastrar atendente em salão alheio.
+ *
+ * Mínimo de 6 caracteres na senha para casar com o que /signup já exige — duas
+ * regras diferentes para a mesma senha confundiriam quem recebe o acesso.
+ */
+export const salonAttendantSchema = z.object({
+  name: z.string().trim().min(2, "Informe o nome da atendente").max(80),
+  email: z.string().trim().toLowerCase().email("E-mail inválido"),
+  password: z.string().min(6, "A senha precisa ter pelo menos 6 caracteres").max(72),
+  whatsapp: whatsappSchema,
+  slug: slugSchema,
+});
+
+/** Edição do cadastro da atendente pela gerente. Sem e-mail e sem senha:
+ *  credencial é da pessoa, e trocá-la pela tela da gerente passaria por cima
+ *  do fluxo de autenticação do Supabase. */
+export const salonAttendantEditSchema = z.object({
+  name: z.string().trim().min(2, "Informe o nome da atendente").max(80),
+  whatsapp: whatsappSchema,
+});
+
 /** Aba "Identidade" da Conta: o cadastro + as imagens que só existem aqui.
  *  `logo_url` vazio é um estado válido e significativo — é o que diz "use a
  *  marca do Timely na minha página". */

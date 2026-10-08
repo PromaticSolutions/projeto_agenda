@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getPublicStudioBySlug } from "@/lib/data/studios";
+import { getBookablePublicStudioBySlug } from "@/lib/data/studios";
 import { countRecentBookings, createBookingServerSide } from "@/lib/data/bookings";
 import { createBookingSchema } from "@/lib/validation";
 import { clientIpFromRequest, recordBookingConsent } from "@/lib/data/consents";
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const studio = await getPublicStudioBySlug(slug);
+    const studio = await getBookablePublicStudioBySlug(slug);
     if (!studio) {
       return NextResponse.json({ error: "Estúdio não encontrado" }, { status: 404 });
     }

@@ -75,6 +75,10 @@ function buildSeedDb(): MockDb {
       owner_cpf: null,
       owner_birth_date: null,
       acquired_at: null,
+      /* 0024 — a Bella Studio é autônoma: o modo demonstração existe para
+         exercitar a visão da atendente, que é a que funciona sem salão. */
+      salon_id: null,
+      deactivated_at: null,
       created_at: new Date().toISOString(),
     },
   ];
@@ -269,11 +273,20 @@ type MockStudioInput = Omit<
   | "owner_cpf"
   | "owner_birth_date"
   | "acquired_at"
+  | "salon_id"
+  | "deactivated_at"
 > &
   Partial<
     Pick<
       Studio,
-      "logo_url" | "banner_url" | "owner_name" | "owner_cpf" | "owner_birth_date" | "acquired_at"
+      | "logo_url"
+      | "banner_url"
+      | "owner_name"
+      | "owner_cpf"
+      | "owner_birth_date"
+      | "acquired_at"
+      | "salon_id"
+      | "deactivated_at"
     >
   >;
 
@@ -286,6 +299,10 @@ export function mockCreateStudio(input: MockStudioInput): Studio {
     owner_cpf: input.owner_cpf ?? null,
     owner_birth_date: input.owner_birth_date ?? null,
     acquired_at: input.acquired_at ?? null,
+    /* 0024: o estúdio do modo demonstração é autônomo, como qualquer estúdio
+       criado pelo onboarding. Salão só existe com Supabase de verdade. */
+    salon_id: input.salon_id ?? null,
+    deactivated_at: input.deactivated_at ?? null,
     id: uid(),
     created_at: new Date().toISOString(),
   };

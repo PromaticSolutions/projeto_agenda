@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { getPublicStudioBySlug } from "@/lib/data/studios";
+import { getBookablePublicStudioBySlug } from "@/lib/data/studios";
 import { listPublicServices } from "@/lib/data/services";
 import { BookingFlow } from "@/components/public/booking-flow";
 import { SystemLogo } from "@/components/system-logo";
@@ -13,7 +13,7 @@ interface StudioPageProps {
 
 export async function generateMetadata(props: StudioPageProps): Promise<Metadata> {
   const { slug } = await props.params;
-  const studio = await getPublicStudioBySlug(slug);
+  const studio = await getBookablePublicStudioBySlug(slug);
   if (!studio) return {};
   return {
     title: `Agendar horário — ${studio.name}`,
@@ -23,7 +23,7 @@ export async function generateMetadata(props: StudioPageProps): Promise<Metadata
 
 export default async function PublicStudioPage(props: StudioPageProps) {
   const { slug } = await props.params;
-  const studio = await getPublicStudioBySlug(slug);
+  const studio = await getBookablePublicStudioBySlug(slug);
   if (!studio) notFound();
 
   const services = await listPublicServices(studio.id);

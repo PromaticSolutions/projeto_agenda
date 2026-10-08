@@ -93,6 +93,26 @@ export async function getPublicStudioBySlug(slug: string): Promise<Studio | null
   return data;
 }
 
+/**
+ * Como a leitura pública acima, mas recusa o estúdio desativado pela gerente
+ * (`deactivated_at`, 0024). É o que tira a página de agendamento do ar.
+ *
+ * Função separada, e não um filtro dentro de `getPublicStudioBySlug`, por dois
+ * motivos concretos:
+ *
+ *   - `isSlugAvailable` usa a outra. Esconder o estúdio desativado lá faria o
+ *     link dela parecer livre, outra pessoa tomaria o slug, e reativar ficaria
+ *     impossível;
+ *   - o canal do art. 18 (`/[slug]/meus-dados`) continua usando a outra DE
+ *     PROPÓSITO. O direito da titular de pedir acesso ou exclusão dos próprios
+ *     dados não depende de o salão ter desativado a profissional.
+ */
+export async function getBookablePublicStudioBySlug(slug: string): Promise<Studio | null> {
+  const studio = await getPublicStudioBySlug(slug);
+  if (!studio) return null;
+  return studio.deactivated_at ? null : studio;
+}
+
 export async function isSlugAvailable(slug: string, excludeStudioId?: string): Promise<boolean> {
   const existing = await getPublicStudioBySlug(slug);
   if (!existing) return true;

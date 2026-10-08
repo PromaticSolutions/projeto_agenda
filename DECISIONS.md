@@ -1075,3 +1075,375 @@ Vercel colocam sozinhos.
 nonce por requisição (o Next injeta script inline) e da lista de origens do
 Supabase e do Storage. Escrita no chute, ela quebra a página pública em
 produção sem aviso — é trabalho próprio, não linha copiada.
+
+## Caixa de mensagens do WhatsApp (2026-09-22, migrações 0019 e 0021)
+
+### Até aqui o produto só ENVIAVA
+
+Lembrete, envio manual, aviso de lead: tudo saía. Nada entrava. A 0019 inverte
+isso por decisão do dono do produto: o estúdio passa a ler e responder, dentro
+do painel, em `/app/conversations`.
+
+### A 0019 nasceu restrita a clientes — e a 0021 desfez isso em uma semana
+
+A 0019 só gravava mensagem trocada com um número que já existisse em `clients`
+daquele estúdio. Conversa com família, fornecedor ou grupo era descartada **na
+entrada**, no webhook, não escondida na tela. O recorte era o que tornava a
+feature defensável do ponto de vista de dado pessoal.
+
+Na prática ele escondia exatamente quem importa comercialmente: a pessoa que
+pergunta preço **antes** de virar cliente. E fazia a tela parecer quebrada — a
+mensagem chegava no celular e não aparecia no painel.
+
+A 0021 (2026-09-22) passou a gravar toda conversa do número conectado,
+inclusive grupo, e moveu a separação para a tela, num filtro "só clientes
+cadastradas". Dito sem rodeio, porque a própria migração diz: conversa pessoal
+e de fornecedor do número conectado passa a ficar no nosso banco. É o número do
+estúdio e a escolha é de quem o conecta, mas **o produto precisa falar isso na
+tela de conexão em vez de deixar implícito** — isso ainda não foi feito.
+
+### A conversa é identificada pelo CHAT, não pela cliente
+
+`client_id` deixou de ser obrigatório — conversa de quem não está no cadastro
+tem chat e não tem cliente. A coluna continuou existindo por um motivo
+específico: é o `on delete cascade` dela que faz o pedido de exclusão do
+titular (0016) apagar também as mensagens, pelo botão que já existe em
+Clientes.
+
+Quem é cliente é decidido **por telefone, na leitura** (view). Cadastrar a
+pessoa depois faz a conversa virar de cliente sozinha, sem backfill.
+
+### Importação em lotes de 15, pulando o que já está no banco
+
+O histórico que já existe no gateway é importado em lotes, ignorando o que já
+foi gravado. Repetível e retomável: rodar duas vezes não duplica, e uma queda
+no meio não obriga a recomeçar.
+
+### Limites assumidos
+
+- **Grupo é leitura.** Responder exigiria JID na fila de envio, e a fila (0010)
+  só aceita telefone em dígitos.
+- **Grupo aparece como "Grupo <4 últimos dígitos>"**: o evento da Evolution não
+  traz o assunto.
+- `/chat/findChats` e `/chat/findMessages` **não foram testados contra uma
+  Evolution real** — o adaptador tolera os três formatos conhecidos da 2.x.
+
+## Fotos e anexos nos procedimentos (2026-09-22, migração 0020)
+
+### Bucket privado, ao contrário do `studio-media`
+
+Foto de antes/depois, ficha de anamnese, termo de consentimento, tabela de
+preparo: é uso interno do dono, como `services.notes`. Nada disso aparece na
+página pública — por isso o bucket `service-attachments` é **privado** e a tela
+lê por URL assinada, ao contrário de `studio-media` (0007), que existe
+justamente para ser exibido a quem agenda.
+
+### O arquivo sobe na hora; o vínculo só no Salvar
+
+Mesmo desenho do logo na Conta: fechar o formulário sem salvar não muda nada.
+
+### Tipo conferido pelos bytes, não pela extensão
+
+`sniffFileType` lê o cabeçalho do arquivo. O nome é palpite de quem envia; os
+bytes não. O caminho também é conferido contra a pasta do estúdio no momento de
+gravar, para que um path forjado não alcance arquivo de outro estúdio.
+
+### `bodySizeLimit` subiu para 11 MB
+
+Um PDF de ficha passa fácil dos 4 MB de logo/banner. O teto real continua no
+servidor e no bucket (10 MB, `MAX_ATTACHMENT_BYTES`); os 11 MB do Next são
+folga para o overhead de multipart, que conta para esse limite. O formulário
+manda um arquivo por requisição, então vários anexos não somam.
+
+**Em aberto:** o teto de corpo da Vercel não foi conferido contra esse valor.
+
+## Caixa de atendimento e mídia guardada no app (2026-09-25, migração 0022)
+
+### Foto e áudio não carregavam, e a culpa não era da tela
+
+O app pedia o arquivo à Evolution só pelo **id da mensagem**, o que depende de a
+Evolution ter a mensagem no banco DELA. A instalação de referência
+(`deploy/evolution`) roda com `DATABASE_SAVE_DATA_NEW_MESSAGE=false`. Resultado:
+toda foto e todo áudio de cliente apareciam como "não está mais disponível".
+
+A 0022 inverte a estratégia — o arquivo é baixado **uma vez** e guardado num
+bucket privado `conversation-media`:
+
+- **mensagem nova**: no próprio webhook, que recebe a mensagem inteira (com a
+  chave de mídia), então o download funciona mesmo sem a Evolution guardar nada;
+- **mensagem antiga**: na primeira vez que o balão pede o arquivo, ou pela
+  recuperação em lote disparada ao abrir Conversas.
+
+### `media_status` distingue "ainda não tentei" de "não existe mais"
+
+- nulo — não tentado, ou tentativa anterior falhou por erro transitório (gateway
+  fora do ar). Tenta de novo.
+- `salva` — o arquivo está em `media_path`.
+- `indisponivel` — o WhatsApp respondeu que o arquivo não existe mais. **Não se
+  tenta de novo**: a tela diz isso direto, em vez de ficar girando.
+
+A diferença importa porque sem ela um gateway temporariamente fora do ar
+marcaria mídia boa como perdida, para sempre.
+
+### LGPD: o arquivo pertence à conversa
+
+Excluir a cliente apaga as mensagens em cascata, e `deleteClient`
+(`src/lib/data/clients.ts`) remove os objetos do bucket logo depois. O bucket é
+privado e só é lido pelo servidor, depois de a RLS confirmar que a mensagem é do
+estúdio.
+
+### A tela virou caixa de atendimento, não lista de mensagens
+
+Lista à esquerda, conversa no centro, e à direita os cartões de contato e de
+atendimento com uma trilha de atalhos — disponibilidade, agendamento, orçamento
+e fotos — que operam sobre a cliente da conversa aberta. O objetivo é que
+responder "tem horário quinta?" não exija sair da tela.
+
+## Redesenho da landing (2026-09-25)
+
+Papel marfim, horário na abertura de cada seção, fios finos no lugar de cartões
+e tipografia única (Jakarta), com o nó 3D da marca girando em marca d'água no
+hero (`GlassKnotGhost`). Preço e "para quem é" ficaram em cartões elevados.
+
+Os estilos ficam **escopados em `.landing`** no `globals.css`: a landing tem
+superfície própria (marfim) e não pode vazar para o painel nem para as telas de
+auth, que seguem o tema do produto.
+
+`product.tsx` e `transformation.tsx` saíram; entraram `features.tsx`,
+`pricing.tsx`, `benefits.tsx`, `solution.tsx`, `final-cta.tsx`, `signup-cta.tsx`,
+`section-heading.tsx` e `landing-footer.tsx`.
+
+## Ajustes de auth, agenda, horários e página pública (2026-09-25)
+
+Trabalho que estava em andamento no working tree e foi fechado junto: estilos
+globais (inclui o bloco `.landing`), login/cadastro/recuperação de senha,
+filtros de agendamentos, semana de trabalho em Horários, formulários do painel e
+fluxo público de agendamento.
+
+Duas regras saíram da tela para virar módulo com teste próprio:
+`src/lib/working-week.ts` (semana de trabalho) e `src/lib/bookings-filter.ts`
+(filtros da lista de agendamentos). Mesmo critério de sempre: regra que decide o
+que a pessoa vê não se confere no olho.
+
+## Cobrança do plano pela AbacatePay (2026-09-28, migração 0023)
+
+A 0011 deixou a cobrança **agnóstica de gateway** de propósito, guardando
+`gateway` como texto mais o ID externo. A aposta se pagou: ligar a AbacatePay não
+exigiu mudar o modelo, só acrescentar o nome à constraint.
+
+### O `externalId` do checkout é o ID do ESTÚDIO, não o da assinatura
+
+Um estúdio que cancelou e voltou não tem assinatura vigente para apontar, e o
+webhook precisa saber de quem é o pagamento mesmo assim.
+
+### O ID do produto não mora no banco
+
+`ABACATEPAY_PRODUCT_ID` é diferente no Dev Mode e em produção, então fica em
+variável de ambiente junto da chave do mesmo ambiente. Guardá-lo na migração
+obrigaria a um SQL por ambiente.
+
+### A assinatura de teste nasce por trigger, não no onboarding
+
+O estúdio pode nascer por outros caminhos — SQL Editor, superadmin, script — e o
+teste tem de existir em todos. A função é `security definer` porque quem insere o
+estúdio é o próprio dono, e o dono não tem permissão de escrita em
+`subscriptions` (0011).
+
+Antes da 0023, só os estúdios que existiam quando a 0011 rodou tinham
+assinatura: quem se cadastrou depois não aparecia no faturamento nem tinha prazo
+de teste. O backfill da 0023 corrige isso **apenas para quem nunca teve
+assinatura** — quem já teve, inclusive testes vencidos, fica como está. O que
+fazer com esses é decisão à parte, ainda não tomada.
+
+### Os três planos da 0011 saíram do catálogo, mas não da tabela
+
+`active = false`, não `delete`: as assinaturas antigas apontam para eles com `on
+delete restrict`.
+
+### A regra do estado é função pura, separada da tela
+
+`describeSubscription` (`src/lib/subscription-state.ts`) traduz a assinatura em
+`sem_assinatura`, `teste`, `teste_acabou`, `ativa`, `pagamento_pendente` ou
+`cancelada`. Está fora da tela porque **a mesma regra vai decidir o bloqueio
+depois do teste**, e regra de acesso precisa de teste automatizado, não de
+conferência visual.
+
+### O que cada código de resposta do webhook significa para a AbacatePay
+
+- **2xx** — entregue, para de tentar;
+- **5xx** — tenta de novo (até 7 vezes em ~18h). É o que devolvemos quando o
+  banco falha, para o pagamento não se perder;
+- **404** — segredo errado; não repete, e a rota não anuncia que existe;
+- **410 nunca** — a AbacatePay desliga o webhook de vez ao receber 410.
+
+### A assinatura HMAC da AbacatePay não autentica ninguém
+
+A chave HMAC do header `X-Webhook-Signature` é **pública** — está na
+documentação deles. Ela prova que o corpo não foi alterado no caminho, não prova
+quem mandou. Quem autentica é o nosso `ABACATEPAY_WEBHOOK_SECRET`, e por isso a
+rota confere os dois.
+
+**Em aberto:** o bloqueio efetivo de acesso ao painel quando o teste vence não
+foi ligado. Hoje a tela avisa; o acesso continua.
+
+## Hierarquia atendente → gerente (2026-10-01, migração 0024)
+
+### O estúdio já era a atendente — o salão teve que entrar ACIMA dele
+
+A pergunta que decidia tudo era se `studios` é o salão ou a atendente. O schema
+responde sozinho: `studios.owner_id` é UNIQUE, e a 0001 diz na primeira linha
+"1 usuário Auth = 1 dono = 1 estúdio". Daí para baixo, serviços, horários,
+bloqueios, agendamentos, clientes, conversas, anexos, fila de mensagens e a
+instância da Evolution (`<prefixo>_<id do estúdio>`) penduram todos em
+`studio_id`.
+
+Na linguagem do produto isso significa que o estúdio **é** a atendente: a
+"conversa dela" é a conversa do número dela; a "agenda dela" é a agenda do
+estúdio dela.
+
+Transformar `studios` no salão — o caminho que parece óbvio porque a palavra
+"salão" já aparece em `reminder_settings` — exigiria criar `atendente_id` em
+todas essas tabelas, reescrever todas as policies e todas as queries, e fazer
+backfill do histórico inteiro. Quebraria exatamente quem já usa o sistema.
+
+Então:
+
+```
+salons
+  └── studios (salon_id NULL = atendente autônoma)
+        └── clients, bookings, whatsapp_messages, services, ...
+salon_managers (user_id → salon_id)
+```
+
+### `salon_id` nasce nulo e nulo é estado final
+
+Não é pendência de migração a ser resolvida depois. Existe profissional que
+compra o sistema sozinha, e ela é um caso de primeira classe — o único que o
+produto atendia antes da 0024. A coluna é `null` por default, `on delete set
+null` (apagar o salão devolve a atendente à autonomia, não apaga a agenda
+dela), e nenhuma linha existente foi tocada.
+
+### A gerente entrou por policy ADITIVA, não por refatoração de policy
+
+Policy permissiva — o default do Postgres — se soma às outras por OR. As onze
+policies novas da 0024 são todas `for select` e nenhuma substitui, altera ou
+restringe as "owner manages own X" que já existiam.
+
+O efeito prático é o que importa: **as funções da camada de dados da atendente
+não mudaram uma linha** e passaram a servir a gerente também, porque é a RLS
+que decide o recorte. `listMyClients(studioId)` devolve o que a atendente
+sempre viu quando quem chama é a atendente, e devolve o do salão quando quem
+chama é a gerente — sem `if` em lugar nenhum.
+
+### Isolamento: o banco, não a tela
+
+`salon_studio_ids()` é `security definer`, não aceita parâmetro e deriva tudo de
+`auth.uid()`. Um id de outro salão trocado na URL ou no corpo da requisição não
+encontra linha: o Postgres devolve vazio, não "proibido".
+
+Não há IDOR a fechar na aplicação porque não há caminho aberto no banco. O
+`src/lib/access.ts` existe para a aplicação recusar cedo e com mensagem legível,
+não para ser a defesa — e o teste dele documenta a armadilha: se quem monta o
+`Target` copiar o salão da SESSÃO em vez de ler `studios.salon_id` do alvo, a
+checagem vira carimbo. Por isso `assertStudioInMySalon` lê a linha do banco
+antes de comparar.
+
+### `security definer` em vez de subconsulta direta na policy
+
+Policy que consulta outra tabela fica sujeita à RLS daquela tabela. Escrever
+`salon_id in (select salon_id from salon_managers ...)` dentro da policy de
+`studios` amarraria uma na outra — caminho curto para recursão infinita. A
+função ignora a RLS de propósito, e é segura justamente por não aceitar
+parâmetro.
+
+### Dois nulos não são o mesmo salão
+
+`sameSalon(null, null)` devolve false, e isso tem nome, comentário e teste. Sem
+essa recusa explícita, `null === null` daria a toda gerente acesso a toda
+profissional autônoma do sistema — exatamente quem não pertence a salão nenhum.
+É o erro mais caro possível no módulo.
+
+### A gerente lê; ela não opera no lugar da atendente
+
+Todas as policies da 0024 são `for select`. A gerente acompanha agenda,
+clientes e conversas, mas não remarca horário nem responde mensagem fingindo ser
+outra pessoa. Se o negócio pedir isso, é uma policy nova e explícita — não um
+efeito colateral desta.
+
+As escritas que ela PODE fazer (cadastrar e editar atendente) passam pela
+service_role no servidor, porque criar usuário no Auth exige isso de qualquer
+forma. Nesses caminhos a autorização é conferida em código, antes, e a escrita
+ainda carrega `.eq("salon_id", ...)` como segunda trava.
+
+### O salão do cadastro vem da sessão, nunca do formulário
+
+`salonAttendantSchema` não tem campo de salão, e o diálogo não tem input oculto
+com ele. `createSalonAttendant` monta o vínculo com `managedSalonId(actor)`. Um
+campo ali, mesmo escondido, seria precisamente a porta para cadastrar atendente
+em salão alheio.
+
+Se a criação do estúdio falhar depois de o usuário do Auth já existir, o usuário
+é removido: meia atendente é pior que nenhuma — ela ocuparia o e-mail e não
+entraria em lugar nenhum.
+
+### Toda Server Action repete o `requireManager`
+
+Mesmo com o layout protegendo a navegação. Server Action é porta HTTP própria e
+aceita POST de quem montar a requisição à mão; layout não protege ação. É a
+mesma razão pela qual cada ação do /superadmin repete o `checkPlatformAdmin`.
+
+### Desativar é uma data, não um DELETE
+
+`studios.deactivated_at` tira a página pública do ar e marca a atendente como
+inativa na visão da gerente. Não mexe no login nem apaga nada: agendamento,
+cliente e conversa são dado de terceiro, que a LGPD manda guardar enquanto
+houver finalidade.
+
+"Remover do salão" é `salon_id = null` — reversível, e devolve a atendente à
+condição de autônoma com tudo o que é dela.
+
+Duas sutilezas no desativar que custaram atenção:
+
+- `getBookablePublicStudioBySlug` é função separada de `getPublicStudioBySlug`,
+  e não um filtro dentro dela, porque `isSlugAvailable` usa a segunda. Esconder
+  o estúdio desativado lá faria o link dela parecer livre, outra pessoa tomaria
+  o slug, e reativar ficaria impossível.
+- o canal do art. 18 (`/[slug]/meus-dados`) continua na função sem filtro, de
+  propósito: o direito da titular de pedir acesso ou exclusão dos próprios dados
+  não depende de o salão ter desativado a profissional.
+
+### Estúdio primeiro, gerência depois
+
+`getCurrentActor` resolve o estúdio ANTES de consultar `salon_managers`. Quem já
+tem estúdio é atendente e continua atendente, aconteça o que acontecer na tabela
+de gerentes — é o que garante que ninguém que usa o sistema hoje mude de papel
+por efeito colateral desta migração.
+
+Efeito colateral bom: para quem tem estúdio, o layout do painel nem chega a
+chamar `getCurrentActor`. Nenhuma consulta nova no caminho da atendente.
+
+### O que a gerente NÃO enxerga, e por quê
+
+`subscriptions`, `invoices`, `payments`, `billing_events`: a assinatura é
+contrato entre a atendente e a plataforma. Gerenciar a operação do salão não
+implica ver o que a profissional paga pelo software.
+
+`consents` e `data_subject_requests` (0015/0016): prova de consentimento e
+pedido do titular são registros de prestação de contas entre a atendente e a
+cliente dela. Ampliar quem os lê precisa de decisão explícita.
+
+### O /superadmin não foi tocado
+
+`platform_admins` e `checkPlatformAdmin` continuam como estavam. A hierarquia
+nova é um eixo separado e não passa por `access.ts`.
+
+### Em aberto
+
+- Não há tela para criar salão nem para promover gerente — é SQL, documentado
+  no cabeçalho da 0024, pela mesma razão que cadastrar admin da plataforma é
+  SQL desde a 0003.
+- Entre o cadastro da gerente em /signup e o insert em `salon_managers`, ela vê
+  a tela de criar estúdio. Se criar um, vira atendente. O caminho certo é fazer
+  o insert antes de entregar o acesso.
+- Assinatura num salão: hoje cada atendente tem a sua, e a gerente não a vê.
+  Quem paga pelo salão inteiro é pergunta de negócio, ainda não respondida.

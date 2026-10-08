@@ -116,6 +116,14 @@ export interface Database {
           /** `date` do Postgres chega como "YYYY-MM-DD". */
           owner_birth_date: string | null;
           acquired_at: string | null;
+          /**
+           * 0024_salons.sql — salão da atendente. NULL é estado final válido:
+           * profissional autônoma, que é como o sistema nasceu e continua
+           * funcionando.
+           */
+          salon_id: string | null;
+          /** 0024 — não-nulo tira a página pública do ar. Não afeta o login. */
+          deactivated_at: string | null;
           created_at: string;
         };
         Insert: {
@@ -131,6 +139,8 @@ export interface Database {
           owner_cpf?: string | null;
           owner_birth_date?: string | null;
           acquired_at?: string | null;
+          salon_id?: string | null;
+          deactivated_at?: string | null;
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["studios"]["Insert"]>;
@@ -775,6 +785,43 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["platform_admins"]["Insert"]>;
         Relationships: [];
       };
+      /** 0024_salons.sql — o salão que agrupa atendentes. */
+      salons: {
+        Row: {
+          id: string;
+          name: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["salons"]["Insert"]>;
+        Relationships: [];
+      };
+      /**
+       * 0024_salons.sql — quem gerencia qual salão. Fechada para o browser,
+       * como `platform_admins`: só o servidor lê, com a service_role key.
+       */
+      salon_managers: {
+        Row: {
+          user_id: string;
+          salon_id: string;
+          name: string | null;
+          email: string | null;
+          created_at: string;
+        };
+        Insert: {
+          user_id: string;
+          salon_id: string;
+          name?: string | null;
+          email?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["salon_managers"]["Insert"]>;
+        Relationships: [];
+      };
     };
     Views: {
       /** 0019 — última mensagem e não lidas por cliente (security_invoker). */
@@ -803,6 +850,16 @@ export interface Database {
       claim_pending_messages: {
         Args: { p_limit: number };
         Returns: Database["public"]["Tables"]["message_outbox"]["Row"][];
+      };
+      /** 0024_salons.sql — salão da gerente autenticada. Sem parâmetro. */
+      my_salon_id: {
+        Args: Record<string, never>;
+        Returns: string | null;
+      };
+      /** 0024_salons.sql — estúdios do salão da gerente autenticada. */
+      salon_studio_ids: {
+        Args: Record<string, never>;
+        Returns: string[];
       };
     };
   };

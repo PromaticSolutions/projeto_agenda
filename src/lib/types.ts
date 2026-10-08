@@ -21,6 +21,9 @@ export type Client = Database["public"]["Tables"]["clients"]["Row"];
 export type ReminderSettings = Database["public"]["Tables"]["reminder_settings"]["Row"];
 export type WhatsAppConnection = Database["public"]["Tables"]["whatsapp_connections"]["Row"];
 export type PlatformAdmin = Database["public"]["Tables"]["platform_admins"]["Row"];
+/** Salão que agrupa atendentes — 0024_salons.sql. */
+export type Salon = Database["public"]["Tables"]["salons"]["Row"];
+export type SalonManager = Database["public"]["Tables"]["salon_managers"]["Row"];
 export type MessageOutbox = Database["public"]["Tables"]["message_outbox"]["Row"];
 /** Conversas de WhatsApp com clientes cadastradas — 0019_whatsapp_messages.sql. */
 export type WhatsAppMessage = Database["public"]["Tables"]["whatsapp_messages"]["Row"];
