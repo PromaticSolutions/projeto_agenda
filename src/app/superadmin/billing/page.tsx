@@ -5,10 +5,10 @@ import {
   isBillingSchemaReady,
   listInvoices,
 } from "@/lib/data/billing";
-import { KpiTile } from "@/components/superadmin/kpi-tile";
-import { ChartCard } from "@/components/superadmin/chart-card";
-import { CategoryBars } from "@/components/superadmin/category-bars";
-import { RevenueBars } from "@/components/superadmin/revenue-bars";
+import { KpiTile } from "@/components/charts/kpi-tile";
+import { ChartCard } from "@/components/charts/chart-card";
+import { CategoryBars } from "@/components/charts/category-bars";
+import { ValueBars } from "@/components/charts/value-bars";
 import { InvoicesTable } from "@/components/superadmin/invoices-table";
 import { InvoicesToolbar } from "@/components/superadmin/invoices-toolbar";
 import { MigrationNotice } from "@/components/superadmin/migration-notice";
@@ -148,7 +148,16 @@ export default async function SuperAdminBillingPage({ searchParams }: BillingPag
             ]),
           }}
         >
-          <RevenueBars data={revenueByMonth} />
+          <ValueBars
+              data={revenueByMonth.map((point) => ({
+                key: point.month,
+                label: formatMonthShort(point.month),
+                cents: point.cents,
+                count: point.count,
+              }))}
+              countNoun={["fatura", "faturas"]}
+              highlightKey={revenueByMonth.at(-1)?.month}
+            />
         </ChartCard>
 
         <ChartCard

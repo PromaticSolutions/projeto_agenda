@@ -30,7 +30,7 @@ export function ChartCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className={cn("panel flex flex-col gap-3 p-4", className)}>
+    <section className={cn("panel panel-soft flex flex-col gap-3 p-4", className)}>
       <div>
         <p className="section-label">{title}</p>
         {subtitle && <p className="mt-0.5 text-sm text-foreground">{subtitle}</p>}

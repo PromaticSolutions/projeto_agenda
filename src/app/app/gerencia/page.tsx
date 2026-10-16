@@ -4,21 +4,94 @@ import {
   getSalon,
   getSalonAttendantStats,
   listSalonAttendants,
+  listSalonBookings,
   requireManager,
 } from "@/lib/data/salons";
+import { listServiceCatalog } from "@/lib/data/services";
 import { attendantStatus } from "@/lib/access";
 import { formatPhoneDisplay } from "@/lib/format";
+import { localDayRangeUtc, utcToLocalDate } from "@/lib/availability";
+import {
+  inRange,
+  parsePeriodDays,
+  periodBefore,
+  periodEndingAt,
+  rankBookings,
+  revenueByLocalDay,
+  revenueByWeekday,
+  summarizePeriod,
+} from "@/lib/metrics";
+import { DashboardOverview } from "@/components/app/dashboard-overview";
 
 export const metadata = { title: "Visão geral do salão — Timely" };
 
-export default async function GerenciaPage() {
+/**
+ * Os mesmos indicadores da atendente, somados sobre TODAS as atendentes.
+ *
+ * A agregação é literalmente a mesma (src/lib/metrics.ts) — o que muda é só a
+ * origem das linhas. Por isso a gerente ganha um ranking a mais, por
+ * atendente: é a única pergunta que existe no salão e não existe no estúdio.
+ */
+async function loadSalonOverview(studioIds: string[], today: string, periodDays: number) {
+  const range = periodEndingAt(today, periodDays);
+  const previousRange = periodBefore(range, periodDays);
+
+  const [rows, catalog] = await Promise.all([
+    listSalonBookings(
+      studioIds,
+      localDayRangeUtc(previousRange.from).start.toISOString(),
+      localDayRangeUtc(range.to).end.toISOString()
+    ),
+    listServiceCatalog(studioIds),
+  ]);
+
+  const prices = new Map([...catalog].map(([id, service]) => [id, service.priceCents]));
+  const now = new Date();
+  const current = inRange(rows, range);
+
+  return {
+    range,
+    rows: current,
+    totals: summarizePeriod(current, prices, now),
+    previous: summarizePeriod(inRange(rows, previousRange), prices, now),
+    daily: revenueByLocalDay(current, prices, range, now),
+    weekday: revenueByWeekday(current, prices, now),
+    prices,
+    catalog,
+    now,
+  };
+}
+
+interface GerenciaPageProps {
+  searchParams: Promise<{ periodo?: string }>;
+}
+
+export default async function GerenciaPage({ searchParams }: GerenciaPageProps) {
   const manager = await requireManager();
-  const [salon, attendants] = await Promise.all([
+  const [{ periodo }, salon, attendants] = await Promise.all([
+    searchParams,
     getSalon(manager.salonId),
     listSalonAttendants(manager.salonId),
   ]);
 
-  const stats = await getSalonAttendantStats(attendants.map((a) => a.id));
+  const periodDays = parsePeriodDays(periodo);
+  const studioIds = attendants.map((a) => a.id);
+
+  const [stats, overview] = await Promise.all([
+    getSalonAttendantStats(studioIds),
+    loadSalonOverview(studioIds, utcToLocalDate(new Date()), periodDays),
+  ]);
+
+  const nameByStudio = new Map(attendants.map((a) => [a.id, a.name]));
+  const byAttendant = rankBookings(overview.rows, overview.prices, overview.now, (booking) => {
+    const name = nameByStudio.get(booking.studio_id);
+    return name ? { key: booking.studio_id, label: name } : null;
+  });
+  const byService = rankBookings(overview.rows, overview.prices, overview.now, (booking) => {
+    const service = overview.catalog.get(booking.service_id);
+    return service ? { key: booking.service_id, label: service.name } : null;
+  });
+
   const active = attendants.filter((a) => attendantStatus(a) === "ativa");
 
   const totals = attendants.reduce(
@@ -52,6 +125,32 @@ export default async function GerenciaPage() {
         </Link>
       </header>
 
+      <DashboardOverview
+        periodDays={periodDays}
+        range={overview.range}
+        totals={overview.totals}
+        previous={overview.previous}
+        daily={overview.daily}
+        weekday={overview.weekday}
+        rankings={[
+          {
+            title: "Atendentes que mais renderam",
+            rows: byAttendant,
+            emptyLabel: "Nenhum atendimento concluído no período.",
+          },
+          {
+            title: "Serviços que mais renderam",
+            rows: byService,
+            emptyLabel: "Nenhum atendimento concluído no período.",
+          },
+        ]}
+        hrefForPeriod={(days) => `/app/gerencia?periodo=${days}`}
+      />
+
+      {/* Fica depois dos indicadores, e não junto deles: são números de
+          ESTADO (quantas clientes existem, o que está na caixa agora), não de
+          período — misturá-los na mesma faixa faria parecer que também
+          respondem ao seletor de 7/30/90 dias. */}
       <div className="grid gap-4 sm:grid-cols-3">
         <SummaryCard label="Clientes no salão" value={totals.clients} />
         <SummaryCard label="Agendamentos à frente" value={totals.upcoming} />

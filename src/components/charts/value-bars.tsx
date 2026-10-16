@@ -1,30 +1,50 @@
 "use client";
 
 import { useState } from "react";
-import { formatMonthShort, type MonthlyPoint } from "@/lib/billing";
 import { formatPriceCents } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
+export interface ValueBarPoint {
+  key: string;
+  /** Rótulo curto do eixo: "ago/26", "seg", "05/10". */
+  label: string;
+  cents: number;
+  count: number;
+}
+
 /**
- * Receita realizada por mês.
+ * Colunas de valor por período fechado — mês de faturamento, dia da semana.
  *
- * Colunas, não linha: cada mês é um total fechado e independente, e linha
+ * Colunas, e não linha: cada barra é um total fechado e independente, e linha
  * sugere continuidade entre dois pontos que não existe (não há receita "no
- * meio" de julho e agosto). Uma série só, então sem legenda — o título do
- * card já diz o que está plotado.
+ * meio" de segunda e terça). Uma série só, então sem legenda — o título do
+ * card já diz o que está plotado. Para série contínua no tempo (faturamento
+ * dia a dia num período), a forma certa é a linha: use `TrendChart`.
  *
  * Construído em HTML/CSS em vez de SVG porque as colunas são poucas e o
  * layout precisa reagir à largura do card; barra é um `<button>` para o valor
  * também chegar por teclado e por leitor de tela, não só no hover.
  */
-export function RevenueBars({ data }: { data: MonthlyPoint[] }) {
+export function ValueBars({
+  data,
+  countNoun = ["atendimento", "atendimentos"],
+  /** Coluna que ganha ênfase e rótulo direto — o mês corrente, o melhor dia. */
+  highlightKey,
+}: {
+  data: ValueBarPoint[];
+  countNoun?: readonly [string, string];
+  highlightKey?: string;
+}) {
   const [hovered, setHovered] = useState<number | null>(null);
 
   const max = Math.max(...data.map((d) => d.cents), 0);
   // Teto arredondado para um número redondo: o eixo tem que ser legível, não
   // exato no pico (R$ 1.000 e não R$ 987,43).
   const ceiling = niceCeiling(max);
-  const lastIndex = data.length - 1;
+
+  function noun(count: number): string {
+    return count === 1 ? countNoun[0] : countNoun[1];
+  }
 
   return (
     <div className="flex gap-3">
@@ -49,25 +69,32 @@ export function RevenueBars({ data }: { data: MonthlyPoint[] }) {
           <ul className="absolute inset-0 flex items-end justify-between gap-1">
             {data.map((point, index) => {
               const height = ceiling > 0 ? (point.cents / ceiling) * 100 : 0;
-              const isLast = index === lastIndex;
+              const highlighted = point.key === highlightKey;
+              /* Uma regra só de ênfase, para a opacidade não vir de dois
+                 lugares: enquanto o cursor está sobre uma coluna, ela é a
+                 destacada; fora do hover, o destaque é o da prop. */
+              const dimmed =
+                hovered !== null
+                  ? hovered !== index
+                  : highlightKey !== undefined && !highlighted;
               return (
-                <li key={point.month} className="flex h-full min-w-0 flex-1 items-end justify-center">
+                <li key={point.key} className="flex h-full min-w-0 flex-1 items-end justify-center">
                   <button
                     type="button"
                     // A área de toque é a coluna inteira, não só a barra
-                    // pintada: mês zerado também precisa ser alcançável.
-                    className="group relative flex h-full w-full max-w-6 cursor-default items-end justify-center rounded-t-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    // pintada: período zerado também precisa ser alcançável.
+                    className="group relative flex h-full w-full max-w-10 cursor-default items-end justify-center rounded-t-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     onPointerEnter={() => setHovered(index)}
                     onPointerLeave={() => setHovered(null)}
                     onFocus={() => setHovered(index)}
                     onBlur={() => setHovered(null)}
-                    aria-label={`${formatMonthShort(point.month)}: ${formatPriceCents(point.cents)} em ${point.count} fatura${point.count === 1 ? "" : "s"}`}
+                    aria-label={`${point.label}: ${formatPriceCents(point.cents)} em ${point.count} ${noun(point.count)}`}
                   >
                     <span
                       aria-hidden
                       className={cn(
                         "w-full rounded-t-[4px] transition-opacity",
-                        hovered !== null && hovered !== index && "opacity-60"
+                        dimmed && "opacity-50"
                       )}
                       style={{
                         height: `${Math.max(height, point.cents > 0 ? 1.5 : 0)}%`,
@@ -76,10 +103,10 @@ export function RevenueBars({ data }: { data: MonthlyPoint[] }) {
                     />
                   </button>
 
-                  {/* Rótulo direto só no mês corrente: número em toda coluna
-                      vira ruído e ninguém lê (o resto está no eixo, no hover
-                      e na tabela). */}
-                  {isLast && point.cents > 0 && (
+                  {/* Rótulo direto só na coluna em destaque: número em toda
+                      coluna vira ruído e ninguém lê (o resto está no eixo, no
+                      hover e na tabela). */}
+                  {highlighted && point.cents > 0 && (
                     <span className="pointer-events-none absolute -translate-y-[calc(100%+0.5rem)] text-[0.6875rem] font-medium tabular-nums text-foreground">
                       {compact(point.cents)}
                     </span>
@@ -96,23 +123,24 @@ export function RevenueBars({ data }: { data: MonthlyPoint[] }) {
             >
               <p className="font-semibold tabular-nums">{formatPriceCents(data[hovered].cents)}</p>
               <p className="opacity-70">
-                {formatMonthShort(data[hovered].month)} · {data[hovered].count} fatura
-                {data[hovered].count === 1 ? "" : "s"}
+                {data[hovered].label} · {data[hovered].count} {noun(data[hovered].count)}
               </p>
             </div>
           )}
         </div>
 
         <div className="mt-1.5 flex justify-between gap-1">
-          {data.map((point, index) => (
+          {data.map((point) => (
             <span
-              key={point.month}
+              key={point.key}
               className={cn(
                 "min-w-0 flex-1 truncate text-center text-[0.625rem]",
-                index === lastIndex ? "font-medium text-foreground" : "text-muted-foreground"
+                point.key === highlightKey
+                  ? "font-medium text-foreground"
+                  : "text-muted-foreground"
               )}
             >
-              {formatMonthShort(point.month)}
+              {point.label}
             </span>
           ))}
         </div>

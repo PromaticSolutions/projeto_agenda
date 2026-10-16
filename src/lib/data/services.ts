@@ -6,9 +6,11 @@ import {
   mockCreateService,
   mockDeleteService,
   mockGetService,
+  mockListServicePrices,
   mockListServices,
   mockUpdateService,
 } from "@/lib/mock/store";
+import { fetchAllPages } from "@/lib/supabase/paginate";
 import { removeAttachmentObjects, signAttachmentUrls } from "@/lib/data/storage";
 import { planAttachmentSync } from "@/lib/service-attachments";
 import type { ServiceAttachmentItem } from "@/lib/validation";
@@ -216,4 +218,51 @@ export async function listServicesByStudioIds(studioIds: string[]): Promise<Serv
   const { data, error } = await supabase.from("services").select("*").in("studio_id", studioIds);
   if (error) throw error;
   return data ?? [];
+}
+
+export interface ServiceCatalogEntry {
+  name: string;
+  priceCents: number;
+}
+
+/**
+ * Catálogo para os indicadores do painel: `service_id` -> nome e preço.
+ *
+ * Inclui os ARQUIVADOS, ao contrário de `listMyServices`. A diferença é o
+ * ponto da função: um serviço só é arquivado porque TINHA agendamento, e são
+ * esses agendamentos que o painel soma. Usar a listagem normal faria o
+ * faturamento do passado encolher — e o serviço sumir do ranking — toda vez
+ * que alguém arrumasse o catálogo.
+ *
+ * Nome e preço juntos porque as duas telas precisam dos dois: o preço para o
+ * valor, o nome para o rótulo do ranking. Duas consultas para a mesma tabela
+ * seria só ida a mais ao banco.
+ *
+ * Aceita vários estúdios para servir às duas leituras com uma consulta só — a
+ * atendente passa o próprio id, a gerente passa os do salão.
+ */
+export async function listServiceCatalog(
+  studioIds: string[]
+): Promise<Map<string, ServiceCatalogEntry>> {
+  if (studioIds.length === 0) return new Map();
+
+  if (!isSupabaseConfigured) {
+    return new Map(
+      mockListServicePrices(studioIds).map((s) => [s.id, { name: s.name, priceCents: s.price_cents }])
+    );
+  }
+
+  const supabase = await createServerSupabaseClient();
+  // Paginado: um salão grande (dezenas de atendentes, cada uma com seu
+  // catálogo) passa do corte silencioso de 1000 linhas do PostgREST, e aqui a
+  // linha que faltasse viraria serviço "sem preço" no painel.
+  const rows = await fetchAllPages<{ id: string; name: string; price_cents: number }>((from, to) =>
+    supabase
+      .from("services")
+      .select("id, name, price_cents")
+      .in("studio_id", studioIds)
+      .order("id")
+      .range(from, to)
+  );
+  return new Map(rows.map((row) => [row.id, { name: row.name, priceCents: row.price_cents }]));
 }

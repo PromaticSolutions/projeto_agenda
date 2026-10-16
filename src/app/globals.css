@@ -122,6 +122,13 @@
      do fundo só por uma borda de 1px, que é o desenho de planilha. Uma sombra
      muito baixa e quente faz o mesmo trabalho com ar de papel sobre a mesa. */
   --shadow-panel: 0 1px 2px rgb(74 44 60 / 0.04), 0 6px 16px -10px rgb(74 44 60 / 0.14);
+  /* Repouso dos cards de painel (indicador e gráfico). Um passo acima da
+     `--shadow-panel`: eles aparecem em grade, lado a lado, e com a sombra de
+     bloco de conteúdo a grade lê como uma tabela de retângulos. Um pouco mais
+     difusa, cada card volta a ser um objeto. Continua sombra de repouso — sem
+     deslocamento, sem hover; quem se move é o `card-lift`, e esses cards não
+     são clicáveis. */
+  --shadow-card-soft: 0 1px 2px rgb(74 44 60 / 0.05), 0 10px 24px -14px rgb(74 44 60 / 0.22);
   --sidebar: #ffffff;
   --sidebar-foreground: #2b2229;
   --sidebar-primary: var(--violet-600);
@@ -160,6 +167,10 @@
      um pouco mais clara. O token existe nos dois temas para o utilitário
      `panel` não precisar saber em qual está. */
   --shadow-panel: 0 1px 2px rgb(0 0 0 / 0.3);
+  /* Degrau PRÓPRIO do escuro, não o claro invertido: aqui a sombra não é um
+     tom mais escuro do fundo, é preto contra um fundo já escuro, e precisa de
+     opacidade bem maior para existir. */
+  --shadow-card-soft: 0 1px 2px rgb(0 0 0 / 0.4), 0 12px 28px -16px rgb(0 0 0 / 0.75);
   --chart-1: #9b74f0;
   --chart-2: #e05fa4;
   /* Azul mais saturado que o #6ba3d8 anterior: naquele passo o token
@@ -236,6 +247,13 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-2xl);
   box-shadow: var(--shadow-panel);
+}
+
+/* Vai JUNTO com `panel`, nunca sozinho: só troca a sombra de repouso. Fica
+   declarado depois dele de propósito — as duas regras mexem em `box-shadow`
+   com a mesma especificidade, então quem vence é a última da folha. */
+@utility panel-soft {
+  box-shadow: var(--shadow-card-soft);
 }
 
 /* Movimento de hover dos objetos que aparecem em coleção: cards de

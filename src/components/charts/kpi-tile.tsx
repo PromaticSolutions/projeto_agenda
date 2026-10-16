@@ -50,7 +50,7 @@ export function KpiTile({
   }[tone];
 
   return (
-    <div className={cn("panel flex flex-col gap-2 p-4", toneRing && `ring-1 ${toneRing}`, className)}>
+    <div className={cn("panel panel-soft flex flex-col gap-2 p-4", toneRing && `ring-1 ${toneRing}`, className)}>
       <div className="flex items-start justify-between gap-2">
         <p className="section-label">{label}</p>
         {Icon && <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden />}

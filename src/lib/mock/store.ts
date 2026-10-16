@@ -626,3 +626,20 @@ export function mockDeleteClient(id: string): void {
     if (bookings[i].client_id === id) bookings[i] = { ...bookings[i], client_id: null };
   }
 }
+
+/**
+ * Preço de TODO serviço dos estúdios indicados — inclusive os ARQUIVADOS.
+ *
+ * `mockListServices` esconde o arquivado de propósito (ele não pode voltar a
+ * ser oferecido), mas o painel precisa justamente dele: um serviço só vira
+ * arquivado porque TINHA agendamento, e esse agendamento é parte do histórico
+ * que a tela soma. Sem isto, arquivar um serviço zeraria o faturamento
+ * passado dele.
+ */
+export function mockListServicePrices(
+  studioIds: string[]
+): { id: string; name: string; price_cents: number }[] {
+  return services
+    .filter((s) => studioIds.includes(s.studio_id))
+    .map((s) => ({ id: s.id, name: s.name, price_cents: s.price_cents }));
+}

@@ -1526,3 +1526,87 @@ padrão.
 
 A landing acompanhou: as etiquetas de `features.tsx` mostram os mesmos rótulos
 em português. Ela promete a tela que existe.
+
+## Painel com faturamento, melhores dias e comparação (2026-10-08)
+
+A primeira tela tinha quatro contadores do dia (total, agendados, em
+atendimento, finalizados) e mais nada. Nenhum valor, nenhuma comparação,
+nenhuma resposta para "como foi meu mês" ou "qual é o meu melhor dia".
+
+### "Realizado" é o que passou e não foi cancelado
+
+Não é só o que está marcado como `finalizado`. Marcar o status é um gesto do
+fim do atendimento, e quem está com a mão na cliente esquece — contar só o
+`finalizado` mostraria faturamento perto de zero num salão cheio, e o painel
+inteiro pareceria quebrado.
+
+A escolha tem o erro oposto: a cliente que faltou e nunca foi cancelada entra
+na conta. Por isso `confirmedCount` sai separado de `realizedCount`, e o tile
+de atendimentos mostra "X de Y marcados como finalizados" — é com esse número
+que a dona do salão decide quanta confiança o faturamento merece.
+
+### Todo valor é estimativa, e a tela diz isso
+
+`bookings` guarda `service_id`, não o preço cobrado. O valor sai da tabela de
+preços ATUAL, então mudar o preço de um serviço reescreve o passado. Resolver
+de verdade exige gravar o preço na linha do agendamento — mudança de schema,
+fora do alcance de uma tela, e registrada aqui como dívida.
+
+Enquanto isso, os dois tiles de dinheiro carregam o `hint` do `KpiTile`
+("Estimativa pelo preço atual dos serviços, não pelo valor cobrado"), e quando
+algum atendimento fica sem preço o aviso diz quantos ficaram de fora em vez de
+deixar o total silenciosamente menor. O sem-preço também fica fora do divisor
+do ticket médio: incluí-lo faria cada serviço apagado derrubar a média como se
+tivesse sido cobrado R$ 0.
+
+### O catálogo de preços inclui o serviço ARQUIVADO
+
+`listMyServices` filtra `archived_at is null`, e usá-la aqui seria um bug
+silencioso: um serviço só é arquivado porque TINHA agendamento (a 0001 tem
+`on delete restrict`), e são justamente esses agendamentos que o painel soma.
+Arrumar o catálogo encolheria o faturamento do passado. Daí
+`listServiceCatalog`, que traz nome e preço de todos — inclusive arquivados.
+
+### Uma consulta cobre as duas janelas
+
+A comparação com o período anterior precisa de dois totais. Em vez de duas
+consultas, a página busca de `periodBefore(range).from` até `range.to` e corta
+em memória com `inRange`. Comparar dois números não vale uma segunda ida ao
+banco.
+
+### Os gráficos saíram do superadmin em vez de serem copiados
+
+`KpiTile`, `ChartCard`, `CategoryBars`, `TrendChart` e `RevenueBars` já
+existiam em `components/superadmin/`, já seguiam a skill de dataviz (tabela
+atrás de `<details>`, hover, barra como `<button>`) e não tinham nada de
+superadmin. Foram para `components/charts/`. `RevenueBars` virou `ValueBars`
+(ponto genérico em vez de `MonthlyPoint`) e `TrendChart` passou a plotar um
+`value` qualquer. O superadmin consome os mesmos componentes.
+
+**Função não atravessa a fronteira servidor→cliente.** A primeira versão
+passava `formatValue={formatPriceCents}` para o `TrendChart`, que é
+`"use client"` — e o render quebrava com "Functions cannot be passed directly
+to Client Components". O erro só apareceu no log do dev server: a página
+continuava devolvendo 200. Virou `format="currency"`, um literal, com o
+formatador importado dentro do componente.
+
+### O seletor de período é navegação, não estado
+
+7/30/90 dias são links com `?periodo=`, lidos no servidor. Nada de `useState`:
+o bloco inteiro é Server Component e só as ilhas de hover (`TrendChart`,
+`ValueBars`) são cliente. Na agenda, o link preserva a data escolhida — perder
+o dia ao clicar em "90 dias" jogaria a pessoa de volta para hoje.
+
+### Mesma conta para a atendente e para a gerente
+
+`src/lib/metrics.ts` é puro e não sabe de onde vêm os agendamentos; o que muda
+é só a origem (um estúdio ou todos os do salão). A gerente ganha um ranking a
+mais, por atendente — a única pergunta que existe no salão e não existe no
+estúdio. 24 testes cobrem a agregação.
+
+### O que ficou sem verificação de runtime
+
+A tela da atendente foi exercitada no servidor de desenvolvimento em modo
+mock. A da gerente não: `requireManager` barra o usuário semeado, que é
+atendente, e `src/lib/data/salons.ts` não tem caminho mock. Ela compila, passa
+no typecheck e no build, mas só foi vista renderizada com banco real.

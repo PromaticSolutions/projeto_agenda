@@ -16,11 +16,11 @@ import {
 } from "@/lib/data/platformMetrics";
 import { getBillingOverview, getRevenueByMonth } from "@/lib/data/billing";
 import { listStudioRows } from "@/lib/data/superadminRows";
-import { KpiTile } from "@/components/superadmin/kpi-tile";
-import { ChartCard } from "@/components/superadmin/chart-card";
-import { CategoryBars } from "@/components/superadmin/category-bars";
-import { RevenueBars } from "@/components/superadmin/revenue-bars";
-import { TrendChart } from "@/components/superadmin/trend-chart";
+import { KpiTile } from "@/components/charts/kpi-tile";
+import { ChartCard } from "@/components/charts/chart-card";
+import { CategoryBars } from "@/components/charts/category-bars";
+import { ValueBars } from "@/components/charts/value-bars";
+import { TrendChart } from "@/components/charts/trend-chart";
 import { MigrationNotice } from "@/components/superadmin/migration-notice";
 import {
   PAYMENT_METHOD_COLOR,
@@ -274,7 +274,16 @@ export default async function SuperAdminPage() {
               </p>
             }
           >
-            <RevenueBars data={revenueByMonth} />
+            <ValueBars
+              data={revenueByMonth.map((point) => ({
+                key: point.month,
+                label: formatMonthShort(point.month),
+                cents: point.cents,
+                count: point.count,
+              }))}
+              countNoun={["fatura", "faturas"]}
+              highlightKey={revenueByMonth.at(-1)?.month}
+            />
           </ChartCard>
         )}
 
@@ -327,7 +336,11 @@ export default async function SuperAdminPage() {
             rows: bookingsTrend.map((point) => [point.date, String(point.count)]),
           }}
         >
-          <TrendChart data={bookingsTrend} color="var(--chart-1)" />
+          <TrendChart
+            data={bookingsTrend.map((p) => ({ date: p.date, value: p.count }))}
+            color="var(--chart-1)"
+            ariaLabel={`Agendamentos por dia, ${bookingsTrend.length} dias`}
+          />
         </ChartCard>
 
         <ChartCard
@@ -338,7 +351,11 @@ export default async function SuperAdminPage() {
             rows: signupsTrend.map((point) => [point.date, String(point.count)]),
           }}
         >
-          <TrendChart data={signupsTrend} color="var(--chart-2)" />
+          <TrendChart
+            data={signupsTrend.map((p) => ({ date: p.date, value: p.count }))}
+            color="var(--chart-2)"
+            ariaLabel={`Cadastros por dia, ${signupsTrend.length} dias`}
+          />
         </ChartCard>
       </div>
 

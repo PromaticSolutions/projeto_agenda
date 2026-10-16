@@ -1,7 +1,8 @@
 "use client";
 
 import { useId, useMemo, useState, type PointerEvent } from "react";
-import type { DailyPoint } from "@/lib/data/platformMetrics";
+import { formatPriceCents } from "@/lib/format";
+
 
 const WIDTH = 640;
 const HEIGHT = 200;
@@ -16,21 +17,48 @@ function formatShortDate(iso: string): string {
   );
 }
 
-/** Gráfico de linha de uma série só (contagem diária) — sem legenda porque o
- * título do card já diz o que está plotado. Crosshair + tooltip no hover,
- * como manda a skill de dataviz pra qualquer gráfico de linha. */
-export function TrendChart({ data, color }: { data: DailyPoint[]; color: string }) {
+export interface SeriesPoint {
+  /** Data local, "YYYY-MM-DD". */
+  date: string;
+  value: number;
+}
+
+/**
+ * Gráfico de linha de uma série só — sem legenda porque o título do card já
+ * diz o que está plotado. Crosshair + tooltip no hover, como manda a skill de
+ * dataviz pra qualquer gráfico de linha.
+ *
+ * O valor é genérico (contagem, centavos) e o `format` diz como escrevê-lo.
+ * É um literal, e não uma função de formatação: este é um Client Component, e
+ * função não atravessa a fronteira servidor→cliente — passar `formatPriceCents`
+ * como prop de uma página RSC quebra o render. Uma segunda cópia do arquivo só
+ * para trocar "12" por "R$ 12,00" deixaria a mesma geometria em dois lugares.
+ */
+export function TrendChart({
+  data,
+  color,
+  format = "number",
+  ariaLabel,
+}: {
+  data: SeriesPoint[];
+  color: string;
+  format?: "number" | "currency";
+  ariaLabel?: string;
+}) {
+  const formatValue = (value: number) =>
+    format === "currency" ? formatPriceCents(value) : String(value);
+
   const gradientId = useId();
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
   const { points, path, areaPath } = useMemo(() => {
-    const max = Math.max(1, ...data.map((d) => d.count));
+    const max = Math.max(1, ...data.map((d) => d.value));
     const innerW = WIDTH - PAD_X * 2;
     const innerH = HEIGHT - PAD_TOP - PAD_BOTTOM;
     const stepX = data.length > 1 ? innerW / (data.length - 1) : 0;
     const pts = data.map((d, i) => ({
       x: PAD_X + stepX * i,
-      y: PAD_TOP + innerH - (d.count / max) * innerH,
+      y: PAD_TOP + innerH - (d.value / max) * innerH,
       ...d,
     }));
     const linePath = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
@@ -67,7 +95,7 @@ export function TrendChart({ data, color }: { data: DailyPoint[]; color: string 
         onPointerMove={handlePointerMove}
         onPointerLeave={() => setHoverIndex(null)}
         role="img"
-        aria-label={`Tendência diária, ${data.length} dias`}
+        aria-label={ariaLabel ?? `Série diária, ${data.length} dias`}
       >
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
@@ -129,7 +157,7 @@ export function TrendChart({ data, color }: { data: DailyPoint[]; color: string 
           className="pointer-events-none absolute top-0 z-10 -translate-x-1/2 rounded-md bg-foreground px-2 py-1 text-xs whitespace-nowrap text-background shadow-md"
           style={{ left: `${(hovered.x / WIDTH) * 100}%` }}
         >
-          <p className="font-semibold">{hovered.count}</p>
+          <p className="font-semibold">{formatValue(hovered.value)}</p>
           <p className="opacity-70">{formatShortDate(hovered.date)}</p>
         </div>
       )}

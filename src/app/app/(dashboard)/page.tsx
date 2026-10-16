@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { Search, X } from "lucide-react";
 import { getMyStudio } from "@/lib/data/studios";
-import { listMyServices } from "@/lib/data/services";
+import { listMyServices, listServiceCatalog } from "@/lib/data/services";
 import { listMyClients } from "@/lib/data/clients";
-import { listBookingsForDay, searchBookings } from "@/lib/data/bookings";
+import { listBookingsForDay, listBookingsForRange, searchBookings } from "@/lib/data/bookings";
+import { DashboardOverview } from "@/components/app/dashboard-overview";
 import { DateNav } from "@/components/app/date-nav";
 import { WeekStrip } from "@/components/app/week-strip";
 import { BookingStatusSelect } from "@/components/app/booking-status-select";
@@ -15,6 +16,16 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { formatDateLocal, formatTimeLocal, getStudioPublicUrl } from "@/lib/format";
 import { nextLocalDate, prevLocalDate, utcToLocalDate } from "@/lib/availability";
+import {
+  inRange,
+  parsePeriodDays,
+  periodBefore,
+  periodEndingAt,
+  rankBookings,
+  revenueByLocalDay,
+  revenueByWeekday,
+  summarizePeriod,
+} from "@/lib/metrics";
 import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Painel do dia — Timely" };
@@ -33,22 +44,69 @@ function findNowMarkerIndex(
   return bookings.findIndex((booking) => new Date(booking.start_at).getTime() > nowMs);
 }
 
+/**
+ * Indicadores do período, para o bloco "Visão geral".
+ *
+ * As duas janelas (a atual e a anterior, que é a base da comparação) saem de
+ * UMA consulta e são recortadas em memória: comparar dois totais não vale uma
+ * segunda ida ao banco.
+ *
+ * O catálogo vem de `listServiceCatalog`, e não de `listMyServices`, porque
+ * aquele inclui os serviços arquivados — e é justamente o serviço arquivado
+ * que carrega histórico para somar.
+ */
+async function loadOverview(studioId: string, today: string, periodDays: number) {
+  const range = periodEndingAt(today, periodDays);
+  const previousRange = periodBefore(range, periodDays);
+
+  const [rows, catalog] = await Promise.all([
+    listBookingsForRange(studioId, previousRange.from, range.to),
+    listServiceCatalog([studioId]),
+  ]);
+
+  const prices = new Map([...catalog].map(([id, service]) => [id, service.priceCents]));
+  const now = new Date();
+  const current = inRange(rows, range);
+
+  return {
+    range,
+    totals: summarizePeriod(current, prices, now),
+    previous: summarizePeriod(inRange(rows, previousRange), prices, now),
+    daily: revenueByLocalDay(current, prices, range, now),
+    weekday: revenueByWeekday(current, prices, now),
+    topServices: rankBookings(current, prices, now, (booking) => {
+      const service = catalog.get(booking.service_id);
+      return service ? { key: booking.service_id, label: service.name } : null;
+    }),
+    // A chave é o telefone, não o nome: duas "Ana" diferentes são duas
+    // clientes, e a mesma cliente cadastrada com grafias diferentes é uma só.
+    topClients: rankBookings(current, prices, now, (booking) => ({
+      key: booking.client_phone,
+      label: booking.client_name,
+    })),
+  };
+}
+
 interface DashboardHomeProps {
-  searchParams: Promise<{ date?: string; q?: string }>;
+  searchParams: Promise<{ date?: string; q?: string; periodo?: string }>;
 }
 
 export default async function DashboardHomePage({ searchParams }: DashboardHomeProps) {
   const studio = await getMyStudio();
   if (!studio) return null;
 
-  const { date: dateParam, q } = await searchParams;
+  const { date: dateParam, q, periodo } = await searchParams;
   const today = utcToLocalDate(new Date());
   const date = dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : today;
   const query = q?.trim() ?? "";
+  const periodDays = parsePeriodDays(periodo);
 
-  const [services, clients] = await Promise.all([
+  const [services, clients, overview] = await Promise.all([
     listMyServices(studio.id),
     listMyClients(studio.id),
+    // Durante uma busca a visão geral não aparece, e puxar 60 a 180 dias de
+    // agendamento para não desenhar nada seria desperdício em toda tecla.
+    query ? null : loadOverview(studio.id, today, periodDays),
   ]);
   const serviceById = new Map(services.map((s) => [s.id, s]));
 
@@ -122,13 +180,33 @@ export default async function DashboardHomePage({ searchParams }: DashboardHomeP
         )}
       </form>
 
-      {!query && (
-        <section aria-label="Resumo do dia" className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatTile label="Total" value={counters.total} accent="bg-foreground" />
-          <StatTile label="Agendados" value={counters.agendado} accent="bg-primary" />
-          <StatTile label="Em atendimento" value={counters.em_atendimento} accent="bg-amber-500" />
-          <StatTile label="Finalizados" value={counters.finalizado} accent="bg-emerald-500" />
-        </section>
+      {overview && (
+        <DashboardOverview
+          periodDays={periodDays}
+          range={overview.range}
+          totals={overview.totals}
+          previous={overview.previous}
+          daily={overview.daily}
+          weekday={overview.weekday}
+          rankings={[
+            {
+              title: "Serviços que mais renderam",
+              rows: overview.topServices,
+              emptyLabel: "Nenhum atendimento concluído no período.",
+            },
+            {
+              title: "Clientes que mais voltaram",
+              rows: overview.topClients,
+              by: "count",
+              emptyLabel: "Nenhuma cliente atendida no período.",
+            },
+          ]}
+          // O dia escolhido na agenda sobrevive à troca de período: perder a
+          // data ao clicar em "90 dias" jogaria a pessoa de volta para hoje.
+          hrefForPeriod={(days) =>
+            date === today ? `/app?periodo=${days}` : `/app?date=${date}&periodo=${days}`
+          }
+        />
       )}
 
       {bookings.length === 0 ? (
@@ -152,9 +230,24 @@ export default async function DashboardHomePage({ searchParams }: DashboardHomeP
             <h2 className="font-medium text-foreground">
               {query ? "Resultados" : "Agenda do dia"}
             </h2>
-            <span className="text-sm text-muted-foreground">
-              {bookings.length} {bookings.length === 1 ? "atendimento" : "atendimentos"}
-            </span>
+            {query ? (
+              <span className="text-sm text-muted-foreground">
+                {bookings.length} {bookings.length === 1 ? "atendimento" : "atendimentos"}
+              </span>
+            ) : (
+              /* O estado do DIA fica aqui, colado na agenda a que se refere.
+                 Os números do bloco de cima são do PERÍODO — juntos, os dois
+                 passariam por leituras do mesmo recorte. */
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+                <DayCount label="agendados" value={counters.agendado} dot="bg-primary" />
+                <DayCount
+                  label="em atendimento"
+                  value={counters.em_atendimento}
+                  dot="bg-amber-500"
+                />
+                <DayCount label="finalizados" value={counters.finalizado} dot="bg-emerald-500" />
+              </div>
+            )}
           </header>
 
           <ol className="divide-y divide-border">
@@ -242,14 +335,12 @@ function BookingRows({
   );
 }
 
-function StatTile({ label, value, accent }: { label: string; value: number; accent: string }) {
+function DayCount({ label, value, dot }: { label: string; value: number; dot: string }) {
   return (
-    <div className="panel card-lift overflow-hidden">
-      <div className={cn("h-1", accent)} />
-      <div className="p-3">
-        <output className="block text-2xl font-semibold text-foreground">{value}</output>
-        <p className="text-sm text-muted-foreground">{label}</p>
-      </div>
-    </div>
+    <span className="flex items-center gap-1.5">
+      <span className={cn("size-1.5 shrink-0 rounded-full", dot)} aria-hidden />
+      <span className="font-medium tabular-nums text-foreground">{value}</span>
+      {label}
+    </span>
   );
 }

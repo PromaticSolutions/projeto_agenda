@@ -9,10 +9,10 @@ import {
 } from "lucide-react";
 import { getStudioDetail } from "@/lib/data/platformMetrics";
 import { getStudioBilling, isBillingSchemaReady } from "@/lib/data/billing";
-import { KpiTile } from "@/components/superadmin/kpi-tile";
-import { ChartCard } from "@/components/superadmin/chart-card";
-import { CategoryBars } from "@/components/superadmin/category-bars";
-import { TrendChart } from "@/components/superadmin/trend-chart";
+import { KpiTile } from "@/components/charts/kpi-tile";
+import { ChartCard } from "@/components/charts/chart-card";
+import { CategoryBars } from "@/components/charts/category-bars";
+import { TrendChart } from "@/components/charts/trend-chart";
 import { InvoicesTable } from "@/components/superadmin/invoices-table";
 import { MigrationNotice } from "@/components/superadmin/migration-notice";
 import { Badge } from "@/components/ui/badge";
@@ -338,7 +338,11 @@ export default async function StudioDetailPage({ params }: StudioDetailPageProps
               rows: detail.bookingsTrend.map((point) => [point.date, String(point.count)]),
             }}
           >
-            <TrendChart data={detail.bookingsTrend} color="var(--chart-1)" />
+            <TrendChart
+              data={detail.bookingsTrend.map((p) => ({ date: p.date, value: p.count }))}
+              color="var(--chart-1)"
+              ariaLabel={`Agendamentos por dia, ${detail.bookingsTrend.length} dias`}
+            />
           </ChartCard>
 
           <ChartCard title="Situação dos agendamentos" subtitle="Todo o histórico do estúdio">
