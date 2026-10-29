@@ -215,6 +215,8 @@ export interface SentReplyRecord {
   providerMessageId: string | null;
   /** Padrão "texto". */
   messageType?: "texto" | "imagem";
+  /** 0026 — quem respondeu. O agente precisa disso para não confundir a própria resposta com a de um humano. */
+  sentBy?: "agente" | "painel";
   now?: Date;
 }
 
@@ -228,26 +230,45 @@ export interface SentReplyRecord {
  */
 export async function recordSentReply(input: SentReplyRecord): Promise<void> {
   const now = input.now ?? new Date();
+  // Sem id do gateway não há como deduplicar com o webhook; um id local ao
+  // menos mantém a linha única. Na 2.3.7 o `sendText` sempre devolve `key.id`.
+  const providerMessageId = input.providerMessageId ?? `local:${crypto.randomUUID()}`;
   const supabase = createServiceRoleSupabaseClient();
-  const { error } = await supabase.from("whatsapp_messages").upsert(
-    {
-      studio_id: input.studioId,
-      client_id: input.clientId,
-      chat_id: input.chatId,
-      chat_phone: input.chatPhone,
-      is_group: false,
-      direction: "enviada",
-      message_type: input.messageType ?? "texto",
-      body: input.body,
-      // Sem id do gateway não há como deduplicar com o webhook; um id local
-      // ao menos mantém a linha única. Na 2.3.7 o `sendText` sempre devolve
-      // `key.id`, então isto é reserva.
-      provider_message_id: input.providerMessageId ?? `local:${crypto.randomUUID()}`,
-      sent_at: now.toISOString(),
-    },
-    { onConflict: "studio_id,provider_message_id", ignoreDuplicates: true }
-  );
+  const row = {
+    studio_id: input.studioId,
+    client_id: input.clientId,
+    chat_id: input.chatId,
+    chat_phone: input.chatPhone,
+    is_group: false,
+    direction: "enviada" as const,
+    message_type: input.messageType ?? ("texto" as const),
+    body: input.body,
+    provider_message_id: providerMessageId,
+    sent_at: now.toISOString(),
+  };
+  const upsert = (values: typeof row & { sent_by?: "agente" | "painel" }) =>
+    supabase
+      .from("whatsapp_messages")
+      .upsert(values, { onConflict: "studio_id,provider_message_id", ignoreDuplicates: true });
+
+  let { error } = await upsert(input.sentBy ? { ...row, sent_by: input.sentBy } : row);
+  // 42703 = coluna `sent_by` ainda não existe (código no ar antes da 0026): a
+  // resposta é gravada sem a autoria, como antes.
+  const hasSentBy = !(error && (error as { code?: string }).code === "42703");
+  if (!hasSentBy) ({ error } = await upsert(row));
   if (error) throw error;
+
+  // O eco do webhook pode ter chegado antes e gravado a linha sem autoria; aí
+  // o upsert acima é ignorado e a marca precisa ir por update.
+  if (input.sentBy && hasSentBy) {
+    const { error: markError } = await supabase
+      .from("whatsapp_messages")
+      .update({ sent_by: input.sentBy })
+      .eq("studio_id", input.studioId)
+      .eq("provider_message_id", providerMessageId)
+      .is("sent_by", null);
+    if (markError) throw markError;
+  }
 }
 
 /** Marca como lidas as recebidas de uma conversa. Devolve quantas mudaram. */

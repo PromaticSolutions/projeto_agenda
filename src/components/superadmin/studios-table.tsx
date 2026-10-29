@@ -1,13 +1,14 @@
 import Link from "next/link";
-import { ChevronRight, ExternalLink } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { EnterAccountButton } from "@/components/superadmin/enter-account-button";
 import {
   PLAN_INTERVAL_LABELS,
   SUBSCRIPTION_STATUS_DOT,
   SUBSCRIPTION_STATUS_LABELS,
   formatPercent,
 } from "@/lib/billing";
-import { formatDateLocal, formatPriceCents, getStudioPublicUrl } from "@/lib/format";
+import { formatDateLocal, formatFullDateLocal, formatPriceCents } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { PlanInterval, SubscriptionStatus } from "@/lib/types";
 import type { StudioListRow } from "@/lib/data/superadminRows";
@@ -24,10 +25,12 @@ export function StudiosTable({ studios }: { studios: StudioListRow[] }) {
   return (
     <div className="panel overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[64rem] text-left text-sm">
+        <table className="w-full min-w-[72rem] text-left text-sm">
           <thead>
             <tr className="border-b border-border text-xs text-muted-foreground">
               <th className="px-4 py-2.5 font-medium">Cliente</th>
+              <th className="px-4 py-2.5 font-medium">Login</th>
+              <th className="px-4 py-2.5 font-medium">Cadastro</th>
               <th className="px-4 py-2.5 font-medium">Assinatura</th>
               <th className="px-4 py-2.5 font-medium text-right">MRR</th>
               <th className="px-4 py-2.5 font-medium text-right">Pago</th>
@@ -50,6 +53,23 @@ export function StudiosTable({ studios }: { studios: StudioListRow[] }) {
                       {studio.ownerName && ` · ${studio.ownerName}`}
                     </p>
                   </Link>
+                </td>
+
+                <td className="px-4 py-2.5">
+                  <Link href={`/superadmin/studios/${studio.id}`} className="block outline-none">
+                    <p className="max-w-56 truncate text-foreground">
+                      {studio.ownerEmail ?? <span className="text-muted-foreground">sem login</span>}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {studio.lastSignInAt
+                        ? `último acesso ${formatFullDateLocal(new Date(studio.lastSignInAt))}`
+                        : "nunca entrou"}
+                    </p>
+                  </Link>
+                </td>
+
+                <td className="px-4 py-2.5 tabular-nums text-muted-foreground">
+                  {formatFullDateLocal(new Date(studio.createdAt))}
                 </td>
 
                 <td className="px-4 py-2.5">
@@ -100,16 +120,7 @@ export function StudiosTable({ studios }: { studios: StudioListRow[] }) {
 
                 <td className="px-4 py-2.5">
                   <div className="flex items-center justify-end gap-1">
-                    <Link
-                      href={getStudioPublicUrl(studio.slug)}
-                      target="_blank"
-                      rel="noreferrer"
-                      title="Abrir página pública"
-                      className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                    >
-                      <ExternalLink className="size-3.5" />
-                      <span className="sr-only">Página pública de {studio.name}</span>
-                    </Link>
+                    <EnterAccountButton studioId={studio.id} studioName={studio.name} compact />
                     <Link
                       href={`/superadmin/studios/${studio.id}`}
                       title="Abrir ficha"

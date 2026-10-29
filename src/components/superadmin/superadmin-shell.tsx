@@ -3,8 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Bot,
   Building2,
+  Plug,
   LayoutDashboard,
+  LifeBuoy,
   MessageCircle,
   Receipt,
   ShieldCheck,
@@ -34,7 +37,10 @@ const NAV_ITEMS = [
   { href: "/superadmin/studios", label: "Clientes", icon: Building2 },
   { href: "/superadmin/billing", label: "Faturamento", icon: Receipt },
   { href: "/superadmin/leads", label: "Leads", icon: UserPlus },
+  { href: "/superadmin/chamados", label: "Chamados", icon: LifeBuoy },
   { href: "/superadmin/whatsapp", label: "WhatsApp", icon: MessageCircle },
+  { href: "/superadmin/agente", label: "Agente IA", icon: Bot },
+  { href: "/superadmin/integracoes", label: "Integrações", icon: Plug },
 ] as const;
 
 function isActive(pathname: string, href: string): boolean {

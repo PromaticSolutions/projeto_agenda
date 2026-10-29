@@ -39,7 +39,7 @@ export const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
         type="tel"
         inputMode="numeric"
         autoComplete="tel"
-        placeholder={props.placeholder ?? "(11) 93447-6935"}
+        placeholder={props.placeholder ?? "(11) 91234-5678"}
         value={display}
         onChange={(e) => {
           const formatted = formatBRPhone(e.target.value);

@@ -15,6 +15,7 @@ import {
   Scissors,
   Search,
   Settings,
+  LifeBuoy,
   Users,
 } from "lucide-react";
 
@@ -36,6 +37,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Conta", href: "/app/account", icon: CircleUserRound },
   { label: "Assinatura", href: "/app/assinatura", icon: CreditCard },
   { label: "Configurações", href: "/app/settings", icon: Settings },
+  { label: "Suporte", href: "/app/suporte", icon: LifeBuoy },
 ];
 
 export function CommandPalette() {

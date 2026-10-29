@@ -75,7 +75,7 @@ export function StudiosToolbar({
           <Input
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="Buscar por estúdio, slug, dona ou WhatsApp"
+            placeholder="Buscar por estúdio, login, dona ou WhatsApp"
             aria-label="Buscar clientes"
             className="pl-9"
           />

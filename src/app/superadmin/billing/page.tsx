@@ -1,287 +1,129 @@
-import { AlertTriangle, CircleDollarSign, Receipt, TrendingDown } from "lucide-react";
-import {
-  getBillingOverview,
-  getRevenueByMonth,
-  isBillingSchemaReady,
-  listInvoices,
-} from "@/lib/data/billing";
-import { KpiTile } from "@/components/charts/kpi-tile";
-import { ChartCard } from "@/components/charts/chart-card";
-import { CategoryBars } from "@/components/charts/category-bars";
-import { ValueBars } from "@/components/charts/value-bars";
-import { InvoicesTable } from "@/components/superadmin/invoices-table";
-import { InvoicesToolbar } from "@/components/superadmin/invoices-toolbar";
+import Link from "next/link";
+import { Building2, ChevronRight, Landmark } from "lucide-react";
+import { isBillingSchemaReady } from "@/lib/data/billing";
 import { MigrationNotice } from "@/components/superadmin/migration-notice";
-import {
-  PAYMENT_METHOD_COLOR,
-  PAYMENT_METHOD_LABELS,
-  PAYMENT_METHOD_ORDER,
-  SUBSCRIPTION_STATUS_LABELS,
-  SUBSCRIPTION_STATUS_ORDER,
-  formatMonthShort,
-  formatPercent,
-  lastMonths,
-} from "@/lib/billing";
-import {
-  invoiceFilterToStatus,
-  parseInvoiceFilter,
-  parseMonthParam,
-} from "@/lib/superadmin-filters";
-import { formatPriceCents } from "@/lib/format";
+import { TotalBillingView } from "@/app/superadmin/billing/total-view";
+import { ClientBillingDetail, ClientBillingList } from "@/app/superadmin/billing/clients-view";
+import { parseInvoiceFilter, parseMonthParam } from "@/lib/superadmin-filters";
 import { utcToLocalDate } from "@/lib/availability";
+import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Faturamento — Timely Admin" };
 
 interface BillingPageProps {
-  searchParams: Promise<{ situacao?: string; mes?: string; q?: string }>;
+  searchParams: Promise<{
+    visao?: string;
+    cliente?: string;
+    situacao?: string;
+    mes?: string;
+    q?: string;
+  }>;
 }
 
+type BillingView = "total" | "clientes";
+
 /**
- * Faturamento da plataforma.
+ * Faturamento da plataforma, em duas visões escolhidas pelos cards do topo:
  *
- * Dois números convivem aqui e a tela precisa manter a diferença explícita:
- * MRR é o contratado (recorrência), receita realizada é o que entrou (fatura
- * paga). Painel de SaaS que mistura os dois consegue mostrar crescimento num
- * mês em que ninguém pagou.
+ * - Total: a soma de todos os estúdios (MRR, receita, inadimplência, faturas).
+ * - Por cliente: a lista de estúdios e, escolhido um, o dinheiro só dele.
+ *
+ * A visão e o cliente escolhido vivem na URL (`visao`, `cliente`), como os
+ * outros filtros do /superadmin: o voltar do navegador funciona e o link de um
+ * cliente específico pode ser favoritado.
  */
 export default async function SuperAdminBillingPage({ searchParams }: BillingPageProps) {
   const ready = await isBillingSchemaReady();
   if (!ready) {
     return (
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
-        <header className="space-y-1 border-b border-border pb-5">
-          <h1 className="text-xl font-semibold text-foreground">Faturamento</h1>
-          <p className="text-sm text-muted-foreground">
-            Assinaturas, faturas e pagamentos dos estúdios.
-          </p>
-        </header>
+        <BillingHeader />
         <MigrationNotice migration="0011_billing.sql" feature="A cobrança da plataforma" />
       </div>
     );
   }
 
   const params = await searchParams;
-  const filter = parseInvoiceFilter(params.situacao);
-  const month = parseMonthParam(params.mes);
+  const view: BillingView = params.visao === "clientes" ? "clientes" : "total";
   const query = params.q?.trim() ?? "";
   const today = utcToLocalDate(new Date());
 
-  const [overview, revenueByMonth, invoices] = await Promise.all([
-    getBillingOverview(),
-    getRevenueByMonth(12),
-    listInvoices({ status: invoiceFilterToStatus(filter), month, query }),
-  ]);
-
-  const shownTotalCents = invoices.reduce((total, row) => total + row.invoice.total_cents, 0);
-
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-      <header className="space-y-1 border-b border-border pb-5">
-        <h1 className="text-xl font-semibold text-foreground">Faturamento</h1>
-        <p className="text-sm text-muted-foreground">
-          O que os estúdios pagam pela Timely — assinaturas, faturas e pagamentos.
-        </p>
-      </header>
+      <BillingHeader />
 
-      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <KpiTile
-          label="MRR"
-          value={formatPriceCents(overview.mrrCents)}
-          sublabel={`${overview.payingSubscriptions} assinatura${overview.payingSubscriptions === 1 ? "" : "s"} pagante${overview.payingSubscriptions === 1 ? "" : "s"}`}
-          hint={`Projeção anual: ${formatPriceCents(overview.projectedArrCents)}`}
-          icon={CircleDollarSign}
-          tone="primary"
+      <nav aria-label="Visão do faturamento" className="grid gap-3 sm:grid-cols-2">
+        <ViewCard
+          href="/superadmin/billing"
+          active={view === "total"}
+          icon={Landmark}
+          title="Total da plataforma"
+          description="MRR, receita recebida, inadimplência e todas as faturas somadas."
         />
-        <KpiTile
-          label="Recebido em 12 meses"
-          value={formatPriceCents(overview.revenueWindowCents)}
-          sublabel={`${overview.paidInvoicesWindow} faturas pagas · ticket ${formatPriceCents(overview.averageTicketCents)}`}
-          icon={Receipt}
+        <ViewCard
+          href="/superadmin/billing?visao=clientes"
+          active={view === "clientes"}
+          icon={Building2}
+          title="Por cliente"
+          description="Escolha um estúdio e veja quanto ele já pagou, o que deve e as faturas dele."
         />
-        <KpiTile
-          label="Líquido de taxas"
-          value={formatPriceCents(overview.netRevenueWindowCents)}
-          sublabel={`${formatPriceCents(overview.feesWindowCents)} retidos pelo gateway`}
-        />
-        <KpiTile
-          label="Em atraso"
-          value={formatPriceCents(overview.overdueCents)}
-          sublabel={`${overview.overdueInvoices} fatura${overview.overdueInvoices === 1 ? "" : "s"} · ${formatPriceCents(overview.openReceivableCents)} a receber em dia`}
-          icon={AlertTriangle}
-          tone={overview.overdueCents > 0 ? "warning" : "neutral"}
-        />
-        <KpiTile
-          label="Recebido no mês"
-          value={formatPriceCents(overview.revenueThisMonthCents)}
-          sublabel={`mês anterior: ${formatPriceCents(overview.revenueLastMonthCents)}`}
-        />
-        <KpiTile
-          label="MRR em risco"
-          value={formatPriceCents(overview.mrrAtRiskCents)}
-          sublabel="assinaturas marcadas como inadimplentes"
-          tone={overview.mrrAtRiskCents > 0 ? "warning" : "neutral"}
-        />
-        <KpiTile
-          label="Churn de receita (30d)"
-          value={formatPercent(overview.churnRate30d)}
-          sublabel={`${overview.canceled30d} cancelamento${overview.canceled30d === 1 ? "" : "s"} no período`}
-          hint="Estimativa: não considera downgrade nem expansão."
-          icon={TrendingDown}
-        />
-        <KpiTile
-          label="Em teste"
-          value={String(overview.trials)}
-          sublabel={`${overview.trialsEndingSoon} vencem nos próximos 7 dias`}
-        />
-      </section>
+      </nav>
 
-      <div className="grid gap-3 lg:grid-cols-2">
-        <ChartCard
-          title="Receita realizada"
-          subtitle="Faturas pagas por mês, últimos 12 meses"
-          data={{
-            columns: ["Mês", "Recebido", "Faturas"],
-            rows: revenueByMonth.map((point) => [
-              formatMonthShort(point.month),
-              formatPriceCents(point.cents),
-              String(point.count),
-            ]),
-          }}
-        >
-          <ValueBars
-              data={revenueByMonth.map((point) => ({
-                key: point.month,
-                label: formatMonthShort(point.month),
-                cents: point.cents,
-                count: point.count,
-              }))}
-              countNoun={["fatura", "faturas"]}
-              highlightKey={revenueByMonth.at(-1)?.month}
-            />
-        </ChartCard>
-
-        <ChartCard
-          title="Método de pagamento"
-          subtitle="Pagamentos aprovados nos últimos 12 meses"
-          data={{
-            columns: ["Método", "Valor", "Pagamentos"],
-            rows: PAYMENT_METHOD_ORDER.map((method) => {
-              const row = overview.methodSplit.find((m) => m.method === method);
-              return [
-                PAYMENT_METHOD_LABELS[method],
-                formatPriceCents(row?.cents ?? 0),
-                String(row?.count ?? 0),
-              ];
-            }),
-          }}
-          footer={
-            <p className="text-xs text-muted-foreground">
-              {overview.failedPaymentsWindow} tentativa
-              {overview.failedPaymentsWindow === 1 ? "" : "s"} recusada ou expirada no período.
-            </p>
-          }
-        >
-          <CategoryBars
-            bars={PAYMENT_METHOD_ORDER.map((method) => {
-              const row = overview.methodSplit.find((m) => m.method === method);
-              return {
-                key: method,
-                label: PAYMENT_METHOD_LABELS[method],
-                value: row?.cents ?? 0,
-                formatted: formatPriceCents(row?.cents ?? 0),
-                color: PAYMENT_METHOD_COLOR[method],
-                meta: row ? `${row.count} pagamento${row.count === 1 ? "" : "s"}` : undefined,
-              };
-            })}
-            emptyLabel="Nenhum pagamento aprovado ainda — o gateway não está integrado."
-          />
-        </ChartCard>
-
-        <ChartCard
-          title="Inadimplência por faixa de atraso"
-          subtitle="Faturas vencidas e não pagas"
-          data={{
-            columns: ["Faixa", "Valor", "Faturas"],
-            rows: overview.aging.map((row) => [
-              row.label,
-              formatPriceCents(row.cents),
-              String(row.count),
-            ]),
-          }}
-        >
-          <CategoryBars
-            bars={overview.aging.map((row) => ({
-              key: row.key,
-              label: row.label,
-              value: row.cents,
-              formatted: formatPriceCents(row.cents),
-              // Faixa de atraso é escala ORDENADA, não categoria: um tom só,
-              // escurecendo com a gravidade, em vez de cores diferentes.
-              color:
-                row.key === "1-7"
-                  ? "color-mix(in srgb, var(--destructive) 35%, transparent)"
-                  : row.key === "8-30"
-                    ? "color-mix(in srgb, var(--destructive) 55%, transparent)"
-                    : row.key === "31-60"
-                      ? "color-mix(in srgb, var(--destructive) 75%, transparent)"
-                      : "var(--destructive)",
-              meta: `${row.count} fatura${row.count === 1 ? "" : "s"}`,
-            }))}
-            emptyLabel="Nenhuma fatura em atraso."
-          />
-        </ChartCard>
-
-        <ChartCard
-          title="Assinaturas por situação"
-          subtitle="Base inteira, incluindo canceladas"
-          data={{
-            columns: ["Situação", "Assinaturas"],
-            rows: SUBSCRIPTION_STATUS_ORDER.map((status) => [
-              SUBSCRIPTION_STATUS_LABELS[status],
-              String(overview.subscriptionsByStatus[status]),
-            ]),
-          }}
-        >
-          <CategoryBars
-            bars={SUBSCRIPTION_STATUS_ORDER.map((status) => ({
-              key: status,
-              label: SUBSCRIPTION_STATUS_LABELS[status],
-              value: overview.subscriptionsByStatus[status],
-              formatted: String(overview.subscriptionsByStatus[status]),
-              color:
-                status === "ativa"
-                  ? "var(--wa)"
-                  : status === "trial"
-                    ? "var(--chart-1)"
-                    : status === "inadimplente"
-                      ? "var(--destructive)"
-                      : status === "pausada"
-                        ? "var(--chart-2)"
-                        : "var(--muted-foreground)",
-            }))}
-            emptyLabel="Nenhuma assinatura registrada."
-          />
-        </ChartCard>
-      </div>
-
-      <section className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-sm font-medium text-foreground">Faturas</h2>
-          <p className="text-xs text-muted-foreground">
-            {invoices.length} fatura{invoices.length === 1 ? "" : "s"} · {formatPriceCents(shownTotalCents)}{" "}
-            no recorte
-          </p>
-        </div>
-
-        <InvoicesToolbar
-          filter={filter}
-          month={month}
+      {view === "total" ? (
+        <TotalBillingView
+          filter={parseInvoiceFilter(params.situacao)}
+          month={parseMonthParam(params.mes)}
           query={query}
-          months={[...lastMonths(12)].reverse()}
+          today={today}
         />
-
-        <InvoicesTable rows={invoices} today={today} />
-      </section>
+      ) : params.cliente ? (
+        <ClientBillingDetail studioId={params.cliente} today={today} />
+      ) : (
+        <ClientBillingList query={query} />
+      )}
     </div>
+  );
+}
+
+function BillingHeader() {
+  return (
+    <header className="space-y-1 border-b border-border pb-5">
+      <h1 className="text-xl font-semibold text-foreground">Faturamento</h1>
+      <p className="text-sm text-muted-foreground">
+        O que os estúdios pagam pela Timely — no total ou cliente a cliente.
+      </p>
+    </header>
+  );
+}
+
+function ViewCard({
+  href,
+  active,
+  icon: Icon,
+  title,
+  description,
+}: {
+  href: string;
+  active: boolean;
+  icon: typeof Landmark;
+  title: string;
+  description: string;
+}) {
+  return (
+    <Link
+      href={href}
+      aria-current={active ? "page" : undefined}
+      className={cn(
+        "panel flex items-center gap-3 p-4 transition-colors",
+        active ? "border-primary ring-1 ring-primary" : "hover:bg-muted/50"
+      )}
+    >
+      <Icon className={cn("size-5 shrink-0", active ? "text-primary" : "text-muted-foreground")} aria-hidden />
+      <div className="min-w-0 flex-1">
+        <p className="font-medium text-foreground">{title}</p>
+        <p className="text-sm text-muted-foreground">{description}</p>
+      </div>
+      <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+    </Link>
   );
 }

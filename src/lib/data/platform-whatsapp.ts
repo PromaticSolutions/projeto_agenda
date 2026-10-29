@@ -69,15 +69,14 @@ export async function savePlatformWhatsApp(
 }
 
 /**
- * Para onde mandar o aviso de lead, e se há como mandar.
+ * Para onde mandar o aviso de lead.
  *
- * Devolve o número só quando existe destino E a sessão está de pé. Sem isso o
- * aviso entraria na fila para ser adiado a cada rodada do disparador até
- * expirar — barulho no log para um envio que nunca ia acontecer.
+ * Devolve o destino mesmo com a sessão CAÍDA: o aviso entra na fila e espera
+ * a reconexão. Antes só devolvia com a sessão de pé, e o lead que chegava
+ * durante uma queda nunca era avisado — foi o que aconteceu em setembro, com
+ * a instância parada em "aguardando QR" por semanas sem ninguém notar.
  */
 export async function leadNotifyTarget(): Promise<string | null> {
   const conexao = await getPlatformWhatsApp();
-  if (!conexao.notify_phone) return null;
-  if (conexao.status !== "conectado" || !conexao.instance_name) return null;
   return conexao.notify_phone;
 }

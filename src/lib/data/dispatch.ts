@@ -13,7 +13,9 @@ import {
   cancelMessage,
   cancelRemindersForCanceledBookings,
   claimDueMessages,
+  claimMessage,
   enqueueReminders,
+  listPendingPlatformMessageIds,
   markMessageAttemptFailed,
   markMessageSent,
   releaseMessage,
@@ -271,7 +273,9 @@ export async function sendDueMessages(options?: {
   for (const message of claimed) {
     // Mensagem velha demais não sai. Ver STALE_AFTER_MINUTES: o cenário é o
     // estúdio que passou dias desconectado e reconectou.
-    if (new Date(message.scheduled_for) < staleBefore) {
+    // Aviso de lead não vence: o lead continua sendo um lead dias depois, e
+    // é justamente quando a sessão caiu que o aviso não pode sumir.
+    if (message.kind !== "lead" && new Date(message.scheduled_for) < staleBefore) {
       await cancelMessage(message.id, "Passou da hora — não faz mais sentido enviar");
       expiradas++;
       continue;
@@ -335,4 +339,81 @@ export async function runReminderDispatch(now = new Date()): Promise<DispatchRep
   const plan = await planReminderQueue(now);
   const send = await sendDueMessages({ now });
   return { ...plan, ...send };
+}
+
+// ---------------------------------------------------------------------------
+// Envio imediato das mensagens da plataforma
+// ---------------------------------------------------------------------------
+
+export type PlatformSendOutcome =
+  | { status: "enviado" }
+  /** `disconnected`: a sessão da plataforma está caída — não adianta insistir. */
+  | { status: "adiado"; reason: string; disconnected: boolean }
+  | { status: "falhou"; reason: string }
+  /** Outro envio (o cron, ou um clique duplo) já tinha pegado a mensagem. */
+  | { status: "ocupado" };
+
+/**
+ * Envia AGORA uma mensagem da plataforma que já está na fila.
+ *
+ * Existe porque o aviso de lead não pode depender só do cron: ele roda numa
+ * VPS fora deste repositório e, se parar, ninguém percebe. O formulário da
+ * landing chama isto logo depois de enfileirar; o cron continua de rede de
+ * segurança para o que não sair aqui. Como a mensagem é reivindicada antes
+ * (`claimMessage`), os dois caminhos nunca mandam a mesma coisa duas vezes.
+ */
+export async function sendPlatformMessageNow(
+  messageId: string,
+  provider?: WhatsAppProvider | null
+): Promise<PlatformSendOutcome> {
+  const gateway = provider === undefined ? await getWhatsAppProvider() : provider;
+  if (!gateway) return { status: "adiado", reason: "Nenhum gateway configurado", disconnected: true };
+
+  const message = await claimMessage(messageId);
+  if (!message) return { status: "ocupado" };
+
+  const plataforma = await syncPlatformWhatsApp(gateway);
+  if (plataforma.status !== "conectado" || !plataforma.instance_name) {
+    const reason = "WhatsApp da plataforma não está conectado";
+    await releaseMessage(message, reason);
+    return { status: "adiado", reason, disconnected: true };
+  }
+
+  try {
+    const { providerMessageId } = await gateway.sendText({
+      instanceName: plataforma.instance_name,
+      toPhone: message.to_phone,
+      body: message.body,
+    });
+    await markMessageSent(message.id, providerMessageId);
+    return { status: "enviado" };
+  } catch (cause) {
+    const retryable = cause instanceof WhatsAppProviderError ? cause.retryable : true;
+    const reason = cause instanceof Error ? cause.message : "Falha desconhecida no envio";
+    const outcome = await markMessageAttemptFailed(message, reason, { retryable });
+    return outcome === "falhou"
+      ? { status: "falhou", reason }
+      : { status: "adiado", reason, disconnected: false };
+  }
+}
+
+/**
+ * Manda tudo o que a plataforma tem parado na fila — chamado quando a sessão
+ * volta a ficar de pé. Para no primeiro "adiado" por desconexão: se a sessão
+ * caiu de novo no meio, insistir só gastaria idas ao gateway.
+ */
+export async function flushPlatformQueue(): Promise<{ enviadas: number; pendentes: number }> {
+  const provider = await getWhatsAppProvider();
+  if (!provider) return { enviadas: 0, pendentes: 0 };
+
+  const ids = await listPendingPlatformMessageIds();
+  let enviadas = 0;
+  for (const [index, id] of ids.entries()) {
+    const outcome = await sendPlatformMessageNow(id, provider);
+    if (outcome.status === "enviado") enviadas++;
+    if (outcome.status === "adiado" && outcome.disconnected) {
+      return { enviadas, pendentes: ids.length - index };
+    }
+  }
+  return { enviadas, pendentes: 0 };
 }

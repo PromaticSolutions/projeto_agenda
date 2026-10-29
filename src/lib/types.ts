@@ -33,6 +33,10 @@ export type MarketResearchLead = Database["public"]["Tables"]["market_research_l
 export type Consent = Database["public"]["Tables"]["consents"]["Row"];
 export type DataSubjectRequest =
   Database["public"]["Tables"]["data_subject_requests"]["Row"];
+/** Chamados de suporte — 0028_support_tickets.sql. */
+export type SupportTicket = Database["public"]["Tables"]["support_tickets"]["Row"];
+export type SupportTicketMessage = Database["public"]["Tables"]["support_ticket_messages"]["Row"];
+export type { SupportTicketStatus, SupportTicketCategory, SupportAuthor } from "@/lib/supabase/types";
 /** Cobrança da plataforma — 0011_billing.sql. */
 export type Plan = Database["public"]["Tables"]["plans"]["Row"];
 export type Subscription = Database["public"]["Tables"]["subscriptions"]["Row"];

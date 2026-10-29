@@ -179,6 +179,8 @@ export interface StudioActivityRow {
   id: string;
   name: string;
   slug: string;
+  /** `auth.users.id` do dono — é por ele que se acha o login (ver `platformAccounts`). */
+  ownerId: string;
   ownerName: string | null;
   whatsapp: string;
   createdAt: string;
@@ -332,6 +334,7 @@ export async function listStudiosWithActivity(): Promise<StudioActivityRow[]> {
         id: studio.id,
         name: studio.name,
         slug: studio.slug,
+        ownerId: studio.owner_id,
         ownerName: studio.owner_name,
         whatsapp: studio.whatsapp,
         createdAt: studio.created_at,

@@ -8,6 +8,7 @@ import {
   CalendarRange,
   CircleUserRound,
   Clock,
+  LifeBuoy,
   CreditCard,
   MessageCircle,
   MessagesSquare,
@@ -60,6 +61,7 @@ const NAV_GROUPS = [
       { href: "/app/account", label: "Conta", icon: CircleUserRound },
       { href: "/app/assinatura", label: "Assinatura", icon: CreditCard },
       { href: "/app/settings", label: "Configurações", icon: Settings },
+      { href: "/app/suporte", label: "Suporte", icon: LifeBuoy },
     ],
   },
 ] as const;

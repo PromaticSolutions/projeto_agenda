@@ -3,7 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { checkPlatformAdmin } from "@/lib/data/platformAdmins";
 import { getPlatformWhatsApp, savePlatformWhatsApp } from "@/lib/data/platform-whatsapp";
-import { syncPlatformWhatsApp } from "@/lib/data/dispatch";
+import {
+  flushPlatformQueue,
+  sendPlatformMessageNow,
+  syncPlatformWhatsApp,
+} from "@/lib/data/dispatch";
+import { requeuePlatformMessage } from "@/lib/data/outbox";
+import { createServiceRoleSupabaseClient } from "@/lib/supabase/service";
 import {
   friendlyProviderError,
   getWhatsAppProvider,
@@ -67,6 +73,7 @@ export async function connectPlatformWhatsAppAction(): Promise<PlatformWhatsAppA
 
     if (!pairing.qrCodeBase64 && !pairing.pairingCode) {
       const conexao = await syncPlatformWhatsApp(provider);
+      if (conexao.status === "conectado") await flushPlatformQueue();
       revalidatePath("/superadmin/whatsapp");
       return {
         ok: true,
@@ -111,6 +118,9 @@ export async function refreshPlatformWhatsAppAction(): Promise<
   if (!provider) return { ok: false, error: SEM_GATEWAY };
 
   const conexao = await syncPlatformWhatsApp(provider);
+  // A sessão de pé é a deixa para mandar o que esperou na fila durante a
+  // queda — em desenvolvimento o webhook não chega, e é este o único aviso.
+  if (conexao.status === "conectado") await flushPlatformQueue();
   revalidatePath("/superadmin/whatsapp");
   return { ok: true, status: conexao.status, phone: conexao.connected_phone };
 }
@@ -178,4 +188,67 @@ export async function savePlatformNotifyPhoneAction(
 export async function readPlatformWhatsAppAction() {
   if (!(await guard())) return null;
   return getPlatformWhatsApp();
+}
+
+export type NoticeActionState = { ok: true; message: string } | { ok: false; error: string } | null;
+
+const SEND_RESULT: Record<"enviado" | "ocupado", string> = {
+  enviado: "Enviado. Confira o WhatsApp de destino.",
+  ocupado: "Já está sendo enviado.",
+};
+
+/**
+ * Manda uma mensagem de teste pelo MESMO caminho do aviso de lead: entra na
+ * fila como `lead` e sai pelo envio imediato. Testar por outro caminho
+ * provaria que o gateway funciona, não que o aviso funciona.
+ */
+export async function sendPlatformTestAction(): Promise<NoticeActionState> {
+  if (!(await guard())) return { ok: false, error: SEM_ACESSO };
+
+  const conexao = await getPlatformWhatsApp();
+  if (!conexao.notify_phone) {
+    return { ok: false, error: "Defina primeiro o número que recebe." };
+  }
+
+  const supabase = createServiceRoleSupabaseClient();
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from("message_outbox")
+    .insert({
+      studio_id: null,
+      booking_id: null,
+      kind: "lead",
+      to_phone: conexao.notify_phone,
+      body: "*TESTE — TIMELY*\n\nSe esta mensagem chegou, os avisos de lead da landing estão funcionando.",
+      scheduled_for: now,
+      status: "pendente",
+      created_at: now,
+      updated_at: now,
+    })
+    .select("id")
+    .single();
+  if (error) {
+    console.error("[superadmin/whatsapp/test]", error);
+    return { ok: false, error: "Não foi possível criar a mensagem de teste." };
+  }
+
+  const outcome = await sendPlatformMessageNow(data.id);
+  revalidatePath("/superadmin/whatsapp");
+  if (outcome.status === "enviado" || outcome.status === "ocupado") {
+    return { ok: true, message: SEND_RESULT[outcome.status] };
+  }
+  return { ok: false, error: `Não saiu: ${outcome.reason}` };
+}
+
+/** "Enviar agora" de um aviso que ficou pendente ou falhou. */
+export async function retryPlatformNoticeAction(messageId: string): Promise<NoticeActionState> {
+  if (!(await guard())) return { ok: false, error: SEM_ACESSO };
+
+  await requeuePlatformMessage(messageId);
+  const outcome = await sendPlatformMessageNow(messageId);
+  revalidatePath("/superadmin/whatsapp");
+  if (outcome.status === "enviado" || outcome.status === "ocupado") {
+    return { ok: true, message: SEND_RESULT[outcome.status] };
+  }
+  return { ok: false, error: outcome.reason };
 }

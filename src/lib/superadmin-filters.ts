@@ -55,6 +55,7 @@ export interface StudioFilterInput {
   name: string;
   slug: string;
   ownerName: string | null;
+  ownerEmail?: string | null;
   whatsapp: string;
   createdAt: string;
   bookingsLast30d: number;
@@ -106,6 +107,7 @@ export function filterAndSortStudios<T extends StudioFilterInput>(
       row.name.toLowerCase().includes(query) ||
       row.slug.includes(query) ||
       (row.ownerName?.toLowerCase().includes(query) ?? false) ||
+      (row.ownerEmail?.toLowerCase().includes(query) ?? false) ||
       (digits.length >= 4 && row.whatsapp.includes(digits))
     );
   });

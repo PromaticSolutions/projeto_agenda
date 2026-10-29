@@ -176,7 +176,7 @@ async function markMediaUnavailable(studioId: string, messageId: string): Promis
   if (error && !isMissingColumn(error)) console.error("[conversation-media] mark", error.message);
 }
 
-async function downloadStored(path: string): Promise<{ bytes: Uint8Array; type: string | null } | null> {
+export async function downloadStored(path: string): Promise<{ bytes: Uint8Array; type: string | null } | null> {
   const supabase = createServiceRoleSupabaseClient();
   const { data, error } = await supabase.storage.from(CONVERSATION_MEDIA_BUCKET).download(path);
   if (error || !data) return null;

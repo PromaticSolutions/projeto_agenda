@@ -239,6 +239,88 @@ export async function listRecentMessages(
 }
 
 // ---------------------------------------------------------------------------
+// Mensagens da plataforma (aviso de lead)
+// ---------------------------------------------------------------------------
+
+/**
+ * Reivindica UMA mensagem pendente, pelo id, para enviar na hora.
+ *
+ * Mesmo efeito de `claim_pending_messages` para uma linha só: o `status =
+ * pendente` no filtro é o que impede o envio em dobro quando o cron e o envio
+ * imediato chegam juntos — o UPDATE trava a linha, e quem chega depois não
+ * encontra mais nada pendente. Nulo = outro já pegou (ou ela não existe).
+ */
+export async function claimMessage(id: string): Promise<MessageOutbox | null> {
+  const supabase = createServiceRoleSupabaseClient();
+  const { data: current, error: readError } = await supabase
+    .from("message_outbox")
+    .select("attempts")
+    .eq("id", id)
+    .eq("status", "pendente")
+    .maybeSingle();
+  if (readError) throw readError;
+  if (!current) return null;
+
+  const { data, error } = await supabase
+    .from("message_outbox")
+    .update({
+      status: "enviando",
+      attempts: current.attempts + 1,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .eq("status", "pendente")
+    .select("*")
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Devolve à fila, zerada, uma mensagem da plataforma que falhou ou ficou
+ * pendente — o "tentar de novo" da tela. Zera as tentativas porque quem clica
+ * já resolveu (ou acha que resolveu) o motivo da falha.
+ */
+export async function requeuePlatformMessage(id: string): Promise<void> {
+  const supabase = createServiceRoleSupabaseClient();
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .from("message_outbox")
+    .update({ status: "pendente", attempts: 0, scheduled_for: now, updated_at: now })
+    .eq("id", id)
+    .is("studio_id", null)
+    .in("status", ["pendente", "falhou", "cancelado"]);
+  if (error) throw error;
+}
+
+/** Ids das mensagens da plataforma esperando envio, da mais antiga à mais nova. */
+export async function listPendingPlatformMessageIds(limit = 25): Promise<string[]> {
+  const supabase = createServiceRoleSupabaseClient();
+  const { data, error } = await supabase
+    .from("message_outbox")
+    .select("id")
+    .is("studio_id", null)
+    .eq("status", "pendente")
+    .order("scheduled_for", { ascending: true })
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []).map((row) => row.id);
+}
+
+/** Histórico dos avisos da plataforma — a tabela da tela /superadmin/whatsapp. */
+export async function listPlatformMessages(limit = 30): Promise<MessageOutbox[]> {
+  const supabase = createServiceRoleSupabaseClient();
+  const { data, error } = await supabase
+    .from("message_outbox")
+    .select("*")
+    .is("studio_id", null)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data ?? [];
+}
+
+// ---------------------------------------------------------------------------
 // Envio manual (0012)
 // ---------------------------------------------------------------------------
 

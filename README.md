@@ -38,14 +38,14 @@ rodar, cada uma comentada em `.env.local.example`.
 
 **Depois de preencher as chaves, rode TODAS as migrações de
 [`supabase/migrations/`](supabase/migrations/) em ordem numérica** (0001,
-0002, … 0024) no SQL Editor do seu projeto (Dashboard → SQL Editor → New
+0002, … 0028) no SQL Editor do seu projeto (Dashboard → SQL Editor → New
 query, cole o arquivo inteiro e rode), ou via qualquer conexão direta ao
 Postgres. Elas criam as tabelas, a constraint anti-colisão de horário, as
 policies de RLS, os grants de tabela, o CRM de clientes, a fila de
 mensagens, a cobrança da plataforma, o registro de consentimento, o
 WhatsApp da própria plataforma, a caixa de conversas, os anexos dos
-serviços, a mídia das conversas, a cobrança pela AbacatePay e a hierarquia
-salão/gerente/atendente.
+serviços, a mídia das conversas, a cobrança pela AbacatePay, a hierarquia
+salão/gerente/atendente, o agente de IA e os chamados de suporte.
 
 Cada tela avisa quando falta a migração dela em vez de estourar erro — se
 o painel disser "rode a migração 00XX", é literalmente isso.
@@ -55,7 +55,7 @@ o painel disser "rode a migração 00XX", é literalmente isso.
 > os grants) foi confirmada via consulta direta ao Postgres e via PostgREST
 > em 2026-07-23 — `npm run dev` lê/escreve no banco real. **As migrações
 > posteriores não foram reconferidas desde então**: se uma tela pedir uma
-> migração, rode-a. As 0019–0024 são as mais recentes; 0020, 0022 criam
+> migração, rode-a. As 0019–0028 são as mais recentes; 0020, 0022 criam
 > buckets de Storage.
 
 Se quiser testar sem Supabase, **não precisa fazer nada**: sem
@@ -138,6 +138,14 @@ um provedor de e-mail, desative em Authentication → Providers → Email →
   leitura da gerente. `studios.salon_id` é **nulo por default** e nulo é estado
   final: profissional autônoma. Ver **[Salão, gerente e
   atendentes](#salão-gerente-e-atendentes)**.
+- `supabase/migrations/0025_conversations_view_perf.sql` — reescreve a view
+  `whatsapp_conversations` (a lista de conversas travava depois de importar
+  histórico).
+- `supabase/migrations/0026_ai_agent.sql` e `0027_ai_integrations.sql` — agente
+  de IA do WhatsApp por estúdio e as chaves de IA da plataforma (Integrações no
+  `/superadmin`). Tabelas só da service_role.
+- `supabase/migrations/0028_support_tickets.sql` — chamados de suporte: o dono
+  lê só os do próprio estúdio (RLS); escrita só pelo servidor.
 
 Decisões e riscos documentados em [DECISIONS.md](DECISIONS.md) e
 [RISKS.md](RISKS.md). Status do projeto em [REPORT.md](REPORT.md).

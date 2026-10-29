@@ -1,11 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import type { CSSProperties } from "react";
+import { MessageCircle } from "lucide-react";
 import { getBookablePublicStudioBySlug } from "@/lib/data/studios";
 import { listPublicServices } from "@/lib/data/services";
+import { nextSlotByService } from "@/lib/data/publicAvailability";
 import { BookingFlow } from "@/components/public/booking-flow";
 import { SystemLogo } from "@/components/system-logo";
-import { CalendarCheck2, ShieldCheck, Sparkles } from "lucide-react";
+import { utcToLocalDate } from "@/lib/availability";
+import { brandForeground } from "@/lib/public-booking";
 
 interface StudioPageProps {
   params: Promise<{ slug: string }>;
@@ -17,79 +21,111 @@ export async function generateMetadata(props: StudioPageProps): Promise<Metadata
   if (!studio) return {};
   return {
     title: `Agendar horário — ${studio.name}`,
-    description: `Marque seu horário em ${studio.name} em poucos cliques.`,
+    description: `Escolha o serviço, o dia e o horário e marque em ${studio.name} em menos de um minuto.`,
   };
 }
 
+/**
+ * A página que o estúdio manda para as clientes marcarem horário.
+ *
+ * É a vitrine do estúdio, não do Timely: a cor e a capa são as do dono, e a
+ * marca da plataforma fica só no rodapé. Visual sóbrio de propósito — fios
+ * finos em vez de cartões flutuando, nada de selos e brilhos — porque quem
+ * abre o link quer resolver uma coisa só: achar um horário e marcar.
+ */
 export default async function PublicStudioPage(props: StudioPageProps) {
   const { slug } = await props.params;
   const studio = await getBookablePublicStudioBySlug(slug);
   if (!studio) notFound();
 
   const services = await listPublicServices(studio.id);
+  const nextSlots = await nextSlotByService(studio.id, services, utcToLocalDate(new Date()));
+
+  const brandStyle = {
+    "--brand": studio.brand_color,
+    "--brand-fg": brandForeground(studio.brand_color),
+  } as CSSProperties;
 
   return (
-    <div className="public-booking-page relative flex flex-1 flex-col overflow-hidden bg-[#f8f7ff]">
-      <div aria-hidden className="public-orb public-orb-one" />
-      <div aria-hidden className="public-orb public-orb-two" />
-      <header
-        className="relative mx-3 mt-3 flex flex-col items-center gap-4 overflow-hidden rounded-[2rem] px-5 pt-10 pb-20 text-center text-white shadow-2xl shadow-violet-950/15 sm:mx-5 sm:rounded-[2.5rem]"
-        style={{ backgroundColor: studio.brand_color }}
-      >
-        <div aria-hidden className="absolute inset-0 bg-[radial-gradient(circle_at_15%_0%,rgba(255,255,255,.3),transparent_32%),radial-gradient(circle_at_90%_95%,rgba(21,7,47,.35),transparent_45%)]" />
-        <div className="relative inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-bold tracking-[0.12em] uppercase backdrop-blur">
-          <Sparkles className="size-3" /> agenda online
-        </div>
-        {studio.logo_url ? (
-          // eslint-disable-next-line @next/next/no-img-element -- logo hospedado externamente pelo dono
+    <div className="flex flex-1 flex-col bg-background" style={brandStyle}>
+      <header>
+        {studio.banner_url ? (
+          // eslint-disable-next-line @next/next/no-img-element -- capa hospedada no storage do dono
           <img
-            src={studio.logo_url}
-            alt={studio.name}
-            className="size-20 rounded-full border-2 border-white/40 object-cover shadow-lg"
+            src={studio.banner_url}
+            alt=""
+            className="h-32 w-full object-cover sm:h-48"
           />
         ) : (
-          /* Sem logo próprio, entra a marca do Timely — e não mais a
-             inicial do nome. Fundo branco sólido porque a cor do cabeçalho é
-             escolhida pelo dono: sobre um violeta parecido, a peça sumiria. */
-          <span className="flex size-20 items-center justify-center rounded-full bg-white shadow-lg ring-4 ring-white/15">
-            <SystemLogo className="size-14" size={112} />
-          </span>
+          <div aria-hidden className="h-24 sm:h-32" style={{ backgroundColor: studio.brand_color }} />
         )}
-        <div>
-          <h1 className="font-heading text-3xl font-semibold">{studio.name}</h1>
-          <p className="mt-1 text-sm text-white/80">Seu próximo momento começa por aqui.</p>
-        </div>
-        <div className="relative mt-1 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs font-medium text-white/80">
-          <span className="flex items-center gap-1.5"><CalendarCheck2 className="size-3.5" /> reserva em poucos passos</span>
-          <span className="flex items-center gap-1.5"><ShieldCheck className="size-3.5" /> confirmação imediata</span>
+
+        <div className="mx-auto w-full max-w-5xl px-4">
+          {studio.logo_url ? (
+            // eslint-disable-next-line @next/next/no-img-element -- logo hospedado externamente pelo dono
+            <img
+              src={studio.logo_url}
+              alt={studio.name}
+              className="-mt-10 size-20 rounded-full border-4 border-background bg-background object-cover"
+            />
+          ) : (
+            /* Sem logo próprio, entra a marca do Timely — e não a inicial do
+               nome. Fundo sólido porque a cor da faixa é escolhida pelo dono:
+               sobre um violeta parecido, a peça sumiria. */
+            <span className="-mt-10 flex size-20 items-center justify-center rounded-full border-4 border-background bg-white">
+              <SystemLogo className="size-12" size={96} />
+            </span>
+          )}
+
+          <div className="mt-3 flex flex-wrap items-end justify-between gap-x-6 gap-y-3 border-b border-border pb-5">
+            <div className="min-w-0">
+              <h1 className="text-2xl font-semibold text-foreground sm:text-3xl">{studio.name}</h1>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Escolha o serviço, o dia e o horário. A confirmação é na hora.
+              </p>
+            </div>
+            <a
+              href={`https://wa.me/${studio.whatsapp}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+            >
+              <MessageCircle className="size-4 text-wa" aria-hidden />
+              Falar no WhatsApp
+            </a>
+          </div>
         </div>
       </header>
 
-      <main className="relative mx-auto -mt-12 w-full max-w-xl flex-1 px-4 pb-10 sm:px-5">
+      <main className="flex-1 pt-6 sm:pt-8">
         {services.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-plum-900/15 bg-card p-8 text-center text-muted-foreground shadow-sm">
-            Nenhum serviço disponível para agendamento no momento.
-          </p>
+          <div className="mx-auto max-w-5xl px-4">
+            <p className="rounded-xl border border-dashed border-border p-8 text-center text-muted-foreground">
+              {studio.name} ainda não abriu horários para agendamento online. Fale pelo WhatsApp.
+            </p>
+          </div>
         ) : (
-          <BookingFlow studio={studio} services={services} />
+          <BookingFlow studio={studio} services={services} nextSlots={nextSlots} />
         )}
       </main>
 
-      <footer className="relative flex flex-col items-center gap-3 px-4 py-7 text-center text-xs text-muted-foreground">
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-950/8 bg-white/60 px-3 py-1.5 shadow-sm">
-          <Sparkles className="size-3 text-violet-600" /> Agendamento por <span className="font-semibold text-plum-900">Timely</span>
-        </span>
-        {/* O canal do art. 18 da LGPD precisa ser ALCANÇÁVEL, não só existir
-            escrito na política. Aqui é o único lugar do produto por onde uma
-            cliente do estúdio passa — ela não tem login nem painel. */}
-        <span className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
-          <Link href={`/${slug}/meus-dados`} className="underline underline-offset-4 hover:text-foreground">
-            Meus dados
-          </Link>
-          <Link href="/politica-de-privacidade" className="underline underline-offset-4 hover:text-foreground">
-            Privacidade
-          </Link>
-        </span>
+      <footer className="mt-10 border-t border-border">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-5 text-xs text-muted-foreground">
+          <span>
+            Agendamento por <span className="font-medium text-foreground">Timely</span>
+          </span>
+          {/* O canal do art. 18 da LGPD precisa ser ALCANÇÁVEL, não só existir
+              escrito na política. Aqui é o único lugar do produto por onde uma
+              cliente do estúdio passa — ela não tem login nem painel. */}
+          <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <Link href={`/${slug}/meus-dados`} className="underline underline-offset-4 hover:text-foreground">
+              Meus dados
+            </Link>
+            <Link href="/politica-de-privacidade" className="underline underline-offset-4 hover:text-foreground">
+              Privacidade
+            </Link>
+          </span>
+        </div>
       </footer>
     </div>
   );

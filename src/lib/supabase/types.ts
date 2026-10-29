@@ -32,6 +32,23 @@ export type MessageOutboxStatus =
   | "falhou"
   | "cancelado";
 
+/** 0026 — agente de IA. */
+export type AgentProvider = "gemini" | "groq" | "openrouter" | "openai" | "anthropic" | "custom";
+export type TranscriptionProvider = "desligado" | "groq" | "openai" | "custom";
+export type AgentTone = "acolhedor" | "profissional" | "descontraido";
+/** 0028 — chamados de suporte. */
+export type SupportTicketStatus = "aberto" | "em_andamento" | "resolvido";
+export type SupportTicketCategory = "problema" | "duvida" | "financeiro" | "sugestao";
+export type SupportAuthor = "cliente" | "suporte";
+/** 0027 — um modelo lido do provedor. `kind` separa conversa de transcrição. */
+export interface IntegrationModel {
+  id: string;
+  name: string;
+  kind: "chat" | "audio" | "other";
+  free: boolean;
+}
+export type AgentRunStatus = "respondeu" | "pausado" | "humano" | "limite" | "erro" | "simulacao";
+
 /** enum `lead_interest` — 0013_market_research_leads.sql */
 export type LeadInterest = "sim" | "talvez" | "saber_mais" | "nao";
 
@@ -430,6 +447,10 @@ export interface Database {
           media_mime: string | null;
           /** 0022 — nulo = não tentado; "salva"; "indisponivel". */
           media_status: "salva" | "indisponivel" | null;
+          /** 0026 — quem mandou a resposta; nulo = recebida ou digitada no celular. */
+          sent_by: "agente" | "painel" | null;
+          /** 0026 — texto do áudio transcrito para o agente. */
+          transcript: string | null;
         };
         Insert: {
           id?: string;
@@ -450,6 +471,8 @@ export interface Database {
           media_path?: string | null;
           media_mime?: string | null;
           media_status?: "salva" | "indisponivel" | null;
+          sent_by?: "agente" | "painel" | null;
+          transcript?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["whatsapp_messages"]["Insert"]>;
         Relationships: [];
@@ -771,6 +794,198 @@ export interface Database {
           received_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["billing_events"]["Insert"]>;
+        Relationships: [];
+      };
+      /** 0026 — agente de IA do WhatsApp, por estúdio. Só service_role. */
+      studio_agents: {
+        Row: {
+          studio_id: string;
+          enabled: boolean;
+          provider: AgentProvider;
+          base_url: string | null;
+          model: string | null;
+          api_key_encrypted: string | null;
+          api_key_last4: string | null;
+          transcription_provider: TranscriptionProvider;
+          transcription_base_url: string | null;
+          transcription_model: string | null;
+          transcription_key_encrypted: string | null;
+          transcription_key_last4: string | null;
+          assistant_name: string | null;
+          tone: AgentTone;
+          instructions: string | null;
+          can_book: boolean;
+          handoff_hours: number;
+          max_replies_per_day: number;
+          /** 0027 */
+          integration_id: string | null;
+          transcription_integration_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          studio_id: string;
+          enabled?: boolean;
+          provider?: AgentProvider;
+          base_url?: string | null;
+          model?: string | null;
+          api_key_encrypted?: string | null;
+          api_key_last4?: string | null;
+          transcription_provider?: TranscriptionProvider;
+          transcription_base_url?: string | null;
+          transcription_model?: string | null;
+          transcription_key_encrypted?: string | null;
+          transcription_key_last4?: string | null;
+          assistant_name?: string | null;
+          tone?: AgentTone;
+          instructions?: string | null;
+          can_book?: boolean;
+          handoff_hours?: number;
+          max_replies_per_day?: number;
+          integration_id?: string | null;
+          transcription_integration_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["studio_agents"]["Insert"]>;
+        Relationships: [];
+      };
+      /** 0027 — chaves de API de IA, com os modelos de cada uma. */
+      ai_integrations: {
+        Row: {
+          id: string;
+          name: string;
+          provider: AgentProvider;
+          base_url: string | null;
+          api_key_encrypted: string;
+          api_key_last4: string;
+          models: IntegrationModel[];
+          models_updated_at: string | null;
+          last_error: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          provider: AgentProvider;
+          base_url?: string | null;
+          api_key_encrypted: string;
+          api_key_last4: string;
+          models?: IntegrationModel[];
+          models_updated_at?: string | null;
+          last_error?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["ai_integrations"]["Insert"]>;
+        Relationships: [];
+      };
+      /** 0026 — pausa do agente por conversa. */
+      agent_chat_state: {
+        Row: {
+          studio_id: string;
+          chat_id: string;
+          paused_until: string | null;
+          paused_reason: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          studio_id: string;
+          chat_id: string;
+          paused_until?: string | null;
+          paused_reason?: string | null;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["agent_chat_state"]["Insert"]>;
+        Relationships: [];
+      };
+      /** 0026 — registro de cada ação do agente. */
+      agent_runs: {
+        Row: {
+          id: string;
+          studio_id: string;
+          chat_id: string;
+          status: AgentRunStatus;
+          detail: string | null;
+          reply: string | null;
+          tools_used: string[];
+          input_tokens: number | null;
+          output_tokens: number | null;
+          duration_ms: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          studio_id: string;
+          chat_id: string;
+          status: AgentRunStatus;
+          detail?: string | null;
+          reply?: string | null;
+          tools_used?: string[];
+          input_tokens?: number | null;
+          output_tokens?: number | null;
+          duration_ms?: number | null;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["agent_runs"]["Insert"]>;
+        Relationships: [];
+      };
+      /** 0028 — chamado de suporte aberto pelo dono do estúdio. */
+      support_tickets: {
+        Row: {
+          id: string;
+          number: number;
+          studio_id: string;
+          opened_by: string | null;
+          subject: string;
+          category: SupportTicketCategory;
+          status: SupportTicketStatus;
+          last_message_at: string;
+          last_message_by: SupportAuthor;
+          client_seen_at: string | null;
+          support_seen_at: string | null;
+          resolved_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          studio_id: string;
+          opened_by?: string | null;
+          subject: string;
+          category?: SupportTicketCategory;
+          status?: SupportTicketStatus;
+          last_message_at?: string;
+          last_message_by?: SupportAuthor;
+          client_seen_at?: string | null;
+          support_seen_at?: string | null;
+          resolved_at?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["support_tickets"]["Insert"]>;
+        Relationships: [];
+      };
+      /** 0028 — cada mensagem de um chamado. */
+      support_ticket_messages: {
+        Row: {
+          id: string;
+          ticket_id: string;
+          studio_id: string;
+          author: SupportAuthor;
+          author_id: string | null;
+          body: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          ticket_id: string;
+          studio_id: string;
+          author: SupportAuthor;
+          author_id?: string | null;
+          body: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["support_ticket_messages"]["Insert"]>;
         Relationships: [];
       };
       platform_admins: {

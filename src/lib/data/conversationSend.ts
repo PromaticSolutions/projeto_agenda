@@ -2,6 +2,7 @@ import "server-only";
 import { getMyStudio } from "@/lib/data/studios";
 import { getMyClientByPhone } from "@/lib/data/clients";
 import { getConversation, recordSentReply } from "@/lib/data/conversations";
+import { pauseAgentForHumanReply } from "@/lib/agent/data";
 import {
   sendManualWhatsAppMessage,
   type ManualMedia,
@@ -159,8 +160,11 @@ async function recordReply(
       clientId: target.clientId,
       body: sent.body,
       providerMessageId: sent.providerMessageId,
+      sentBy: "painel",
       ...(sent.messageType ? { messageType: sent.messageType } : {}),
     });
+    // A equipe assumiu a conversa pelo painel: o agente de IA se cala nela.
+    await pauseAgentForHumanReply(target.studioId, target.chatId, "A equipe respondeu pelo painel");
   } catch (cause) {
     // A mensagem SAIU. Falhar aqui não pode virar "erro ao enviar" na tela: o
     // dono tentaria de novo e a pessoa receberia duas vezes. O `send.message`

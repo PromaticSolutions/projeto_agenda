@@ -9,6 +9,8 @@ import {
   savePlatformWhatsApp,
 } from "@/lib/data/platform-whatsapp";
 import { recordInboundMessage } from "@/lib/data/conversations";
+import { flushPlatformQueue } from "@/lib/data/dispatch";
+import { handleInboundForAgent, handleOutgoingForAgent } from "@/lib/agent/agent";
 import { captureInboundMedia } from "@/lib/data/conversationMedia";
 import { mapState } from "@/lib/whatsapp/evolution";
 import { parseEvolutionMessage, type InboundWhatsAppMessage } from "@/lib/whatsapp/inbound";
@@ -268,6 +270,23 @@ async function handleEvent(
       if (recorded.some((message) => message.mediaContent)) {
         after(() => captureInboundMedia(studioId, instanceName, recorded));
       }
+      // Agente de IA (0026). Só `messages.upsert`: `send.message` é o que saiu
+      // pela API — a própria resposta do agente ou a do painel. O que a
+      // cliente manda acorda o agente; o que o estúdio digita no celular o
+      // cala naquela conversa.
+      if (event === "messages.upsert") {
+        for (const message of recorded) {
+          after(async () => {
+            try {
+              await (message.fromMe
+                ? handleOutgoingForAgent(studioId, message)
+                : handleInboundForAgent(studioId, instanceName, message));
+            } catch (cause) {
+              console.error("[webhooks/evolution] agente", cause);
+            }
+          });
+        }
+      }
       return handled;
     }
 
@@ -304,6 +323,17 @@ async function handlePlatformEvent(
           status === "erro" ? "O pareamento não foi concluído. Gere um novo QR code." : null,
         ...(status === "conectado" ? { last_connected_at: new Date().toISOString() } : {}),
       });
+      // Sessão de pé de novo: os avisos de lead que chegaram durante a queda
+      // saem agora, sem esperar o cron.
+      if (status === "conectado") {
+        after(async () => {
+          try {
+            await flushPlatformQueue();
+          } catch (cause) {
+            console.error("[webhooks/evolution] fila da plataforma", cause);
+          }
+        });
+      }
       return true;
     }
 

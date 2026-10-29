@@ -2,6 +2,7 @@ import "server-only";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/service";
 import { isSupabaseServiceConfigured } from "@/lib/supabase/env";
 import { leadNotifyTarget } from "@/lib/data/platform-whatsapp";
+import { sendPlatformMessageNow } from "@/lib/data/dispatch";
 import {
   LEAD_AGENDA_TOOLS,
   LEAD_HOURS_BANDS,
@@ -199,9 +200,15 @@ function line(label: string, value: string | null | undefined): string[] {
  * agora chega no primeiro envio, quando quase tudo do contexto está vazio, e
  * uma lista de dez "não respondeu" enterraria os cinco dados que importam.
  */
-export function buildLeadSummary(lead: MarketResearchLead): string {
+export function buildLeadSummary(
+  lead: MarketResearchLead,
+  options: { repeated?: boolean } = {}
+): string {
   const linhas = [
-    "*NOVO LEAD — TIMELY*",
+    // Quem preenche de novo com o mesmo telefone não vira lead novo (o índice
+    // único descarta), mas o aviso sai do mesmo jeito: a pessoa voltou, e
+    // isso é sinal de interesse que quem atende precisa ver.
+    options.repeated ? "*LEAD PREENCHEU DE NOVO — TIMELY*" : "*NOVO LEAD — TIMELY*",
     "",
     `*Nome:* ${lead.name}`,
     ...line("Negócio", lead.business_name),
@@ -245,29 +252,30 @@ export function buildLeadSummary(lead: MarketResearchLead): string {
   return linhas.join("\n");
 }
 
-export type NotifyOutcome = "enfileirado" | "sem_configuracao" | "falhou";
+export type NotifyOutcome = "enviado" | "enfileirado" | "sem_configuracao" | "falhou";
 
 /**
- * Enfileira o aviso do lead na fila que já existe.
+ * Avisa o lead no WhatsApp da plataforma: enfileira e já tenta enviar.
  *
- * Enfileirar em vez de enviar na hora é a decisão que importa: se a Evolution
- * estiver fora do ar no momento em que o lead chega — justamente quando
- * ninguém está olhando —, um envio direto perderia o aviso. Na fila ele ganha
- * a retentativa, a contagem de tentativas e o histórico do disparador.
+ * Enfileirar SEMPRE que existe destino — inclusive com a sessão caída — é o
+ * ponto. A versão anterior só enfileirava com a sessão de pé, e o lead que
+ * chegava com o WhatsApp desconectado nunca era avisado, nem depois de
+ * reconectar. Agora ele espera na fila e sai quando a sessão voltar (o
+ * reconectar esvazia a fila; o cron também pega).
+ *
+ * O envio imediato tira a dependência do cron para o caso normal: com a
+ * sessão de pé, o aviso chega segundos depois do formulário.
  *
  * Falhar aqui NUNCA derruba o envio do formulário: o lead já está gravado, e
- * é o dado que interessa. O aviso é conveniência.
+ * é o dado que interessa.
  */
 export async function enqueueLeadNotification(
-  lead: MarketResearchLead
+  lead: MarketResearchLead,
+  options: { repeated?: boolean } = {}
 ): Promise<NotifyOutcome> {
   /* Duas origens, nesta ordem: a configuração do superadmin primeiro, o
      ambiente como fallback. Quem já tinha as variáveis não perde o aviso; quem
-     configurar pela tela não precisa mexer em deploy.
-
-     `leadNotifyTarget()` só devolve número quando a sessão da plataforma está
-     DE PÉ. Sem isso o aviso entraria na fila para ser adiado a cada rodada do
-     disparador até expirar — barulho no log para um envio que nunca ia sair. */
+     configurar pela tela não precisa mexer em deploy. */
   const alvoDaPlataforma = await leadNotifyTarget();
 
   const destino = alvoDaPlataforma ?? leadsNotifyPhone;
@@ -278,24 +286,60 @@ export async function enqueueLeadNotification(
   if (!destino) return "sem_configuracao";
   if (!alvoDaPlataforma && !remetente) return "sem_configuracao";
 
+  let messageId: string;
   try {
     const supabase = createServiceRoleSupabaseClient();
     const now = new Date().toISOString();
-    const { error } = await supabase.from("message_outbox").insert({
-      studio_id: remetente,
-      booking_id: null,
-      kind: "lead" as MessageOutboxKind,
-      to_phone: destino,
-      body: buildLeadSummary(lead),
-      scheduled_for: now,
-      status: "pendente",
-      created_at: now,
-      updated_at: now,
-    });
+    const { data, error } = await supabase
+      .from("message_outbox")
+      .insert({
+        studio_id: remetente,
+        booking_id: null,
+        kind: "lead" as MessageOutboxKind,
+        to_phone: destino,
+        body: buildLeadSummary(lead, options),
+        scheduled_for: now,
+        status: "pendente",
+        created_at: now,
+        updated_at: now,
+      })
+      .select("id")
+      .single();
     if (error) throw error;
-    return "enfileirado";
+    messageId = data.id;
   } catch (cause) {
     console.error("[leads/notify]", cause);
     return "falhou";
   }
+
+  // O fallback do ambiente sai pela instância de um estúdio: fica com o cron.
+  if (!alvoDaPlataforma) return "enfileirado";
+
+  try {
+    const outcome = await sendPlatformMessageNow(messageId);
+    if (outcome.status === "enviado") return "enviado";
+    if (outcome.status === "falhou") {
+      console.error("[leads/notify] envio imediato falhou:", outcome.reason);
+    }
+    return "enfileirado";
+  } catch (cause) {
+    // A mensagem já está na fila; o cron ou o próximo reconectar a entrega.
+    console.error("[leads/notify] envio imediato", cause);
+    return "enfileirado";
+  }
+}
+
+/**
+ * O lead já gravado com este telefone — o caminho do formulário repetido, que
+ * não grava linha nova mas ainda avisa.
+ */
+export async function getLeadByPhone(phone: string): Promise<MarketResearchLead | null> {
+  const supabase = createServiceRoleSupabaseClient();
+  const { data, error } = await supabase
+    .from("market_research_leads")
+    .select("*")
+    .eq("phone", phone)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
 }

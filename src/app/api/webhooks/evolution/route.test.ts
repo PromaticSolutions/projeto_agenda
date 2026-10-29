@@ -44,6 +44,34 @@ vi.mock("@/lib/data/conversations", () => ({
     recordMessage(studioId, message),
 }));
 
+// Reconectar a plataforma esvazia a fila de avisos; o envio em si é testado
+// no disparador, aqui só importa que o receptor não dependa do gateway.
+const flushPlatform = vi.fn<() => Promise<{ enviadas: number; pendentes: number }>>();
+
+vi.mock("@/lib/data/dispatch", () => ({
+  flushPlatformQueue: () => flushPlatform(),
+}));
+
+// O agente de IA tem os próprios testes; aqui só importa que o receptor o
+// acione sem depender de IA nem de banco.
+const agentInbound = vi.fn<(studioId: string, instance: string, message: Record<string, unknown>) => Promise<void>>();
+const agentOutgoing = vi.fn<(studioId: string, message: Record<string, unknown>) => Promise<void>>();
+
+vi.mock("@/lib/agent/agent", () => ({
+  handleInboundForAgent: (studioId: string, instance: string, message: Record<string, unknown>) =>
+    agentInbound(studioId, instance, message),
+  handleOutgoingForAgent: (studioId: string, message: Record<string, unknown>) =>
+    agentOutgoing(studioId, message),
+}));
+
+// `after` só existe dentro de uma requisição do Next; no teste, roda na hora.
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after: (task: () => unknown) => {
+    void task();
+  },
+}));
+
 function connectionOf(overrides: Partial<WhatsAppConnection> = {}): WhatsAppConnection {
   return {
     studio_id: "estudio-A",
@@ -79,6 +107,9 @@ beforeEach(() => {
   savePlatform.mockReset();
   savePlatform.mockResolvedValue({});
   recordMessage.mockReset();
+  flushPlatform.mockReset();
+  agentInbound.mockReset();
+  agentOutgoing.mockReset();
   recordMessage.mockResolvedValue(true);
   process.env.EVOLUTION_WEBHOOK_SECRET = SEGREDO;
   process.env.NEXT_PUBLIC_SUPABASE_URL = "https://projeto.supabase.co";
@@ -172,6 +203,8 @@ describe("instância da plataforma", () => {
       status: "conectado",
       connected_phone: "5511934476935",
     });
+    // Reconectou: os avisos de lead que esperavam na fila saem na hora.
+    expect(flushPlatform).toHaveBeenCalledTimes(1);
   });
 
   it("derruba o estado quando a sessão da plataforma some do celular", async () => {

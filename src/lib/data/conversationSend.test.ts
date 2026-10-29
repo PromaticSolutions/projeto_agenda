@@ -35,6 +35,8 @@ const downloadServiceImage =
   vi.fn<(studioId: string, attachmentId: string) => Promise<ImageFile | null>>();
 
 vi.mock("@/lib/data/studios", () => ({ getMyStudio: () => getMyStudio() }));
+// Responder pelo painel pausa o agente de IA; aqui só importa não falar com o banco.
+vi.mock("@/lib/agent/data", () => ({ pauseAgentForHumanReply: async () => {} }));
 vi.mock("@/lib/data/clients", () => ({
   getMyClientByPhone: (studioId: string, phone: string) => getMyClientByPhone(studioId, phone),
 }));
@@ -44,6 +46,10 @@ vi.mock("@/lib/data/whatsappSend", () => ({
 vi.mock("@/lib/data/storage", () => ({
   downloadServiceImage: (studioId: string, attachmentId: string) =>
     downloadServiceImage(studioId, attachmentId),
+}));
+// O agente de IA se cala quando a equipe responde; aqui só importa o envio.
+vi.mock("@/lib/agent/data", () => ({
+  pauseAgentForHumanReply: () => Promise.resolve(),
 }));
 vi.mock("@/lib/data/conversations", () => ({
   recordSentReply: (input: ReplyRecord) => recordSentReply(input),
@@ -117,6 +123,9 @@ describe("sendConversationReply", () => {
       clientId: CLIENTE_A,
       body: "Pode sim, te espero!",
       providerMessageId: "3EB0",
+      // 0026: a autoria é o que impede o agente de IA de tomar a resposta da
+      // equipe pela dele.
+      sentBy: "painel",
     });
   });
 

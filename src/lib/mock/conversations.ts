@@ -56,6 +56,8 @@ function seed(): WhatsAppMessage[] {
       media_path: null,
       media_mime: null,
       media_status: null,
+      sent_by: null,
+      transcript: null,
     });
   }
 

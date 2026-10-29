@@ -40,7 +40,7 @@ export default async function SuperAdminStudiosPage({ searchParams }: StudiosPag
       <header className="space-y-1 border-b border-border pb-5">
         <h1 className="text-xl font-semibold text-foreground">Clientes</h1>
         <p className="text-sm text-muted-foreground">
-          Cada estúdio da plataforma, com uso e cobrança na mesma linha. Clique para abrir a ficha.
+          Cada estúdio da plataforma com o login da dona, uso e cobrança. Clique na linha para ver as métricas; o ícone de entrada abre a conta dela.
         </p>
       </header>
 

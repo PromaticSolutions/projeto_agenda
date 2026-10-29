@@ -1,7 +1,12 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { after, NextResponse, type NextRequest } from "next/server";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/service";
 import { isSupabaseServiceConfigured } from "@/lib/supabase/env";
-import { enqueueLeadNotification, saveLead, updateLeadContext } from "@/lib/data/leads";
+import {
+  enqueueLeadNotification,
+  getLeadByPhone,
+  saveLead,
+  updateLeadContext,
+} from "@/lib/data/leads";
 import { leadCaptureSchema, leadContextSchema } from "@/lib/validation";
 
 /**
@@ -83,20 +88,34 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Não foi possível enviar. Tente novamente." }, { status: 503 });
     }
 
+    /* O aviso no WhatsApp sai DEPOIS da resposta (`after`): o envio imediato
+       consulta o gateway e manda a mensagem, segundos que a pessoa passaria
+       olhando o botão girar. O lead já está gravado; o aviso é conveniência e
+       nunca entra no status da resposta. */
+
     // Telefone que já se cadastrou: para quem preencheu é sucesso — os dados
     // dela estão gravados. Dizer "você já enviou" faria a pessoa achar que
-    // perdeu o trabalho, e não há nada a corrigir.
+    // perdeu o trabalho, e não há nada a corrigir. O aviso sai mesmo assim:
+    // toda vez que o formulário é preenchido, alguém fica sabendo.
     if (result.duplicate) {
+      const phone = parsed.data.phone;
+      after(async () => {
+        try {
+          const existing = await getLeadByPhone(phone);
+          if (existing) await enqueueLeadNotification(existing, { repeated: true });
+        } catch (cause) {
+          console.error("[api/leads] aviso de lead repetido", cause);
+        }
+      });
       return NextResponse.json({ ok: true, duplicate: true, id: null });
     }
 
-    // O aviso é conveniência: se falhar, o lead já está salvo. Por isso não
-    // entra no status da resposta.
-    const notified = await enqueueLeadNotification(result.lead);
+    const lead = result.lead;
+    after(() => enqueueLeadNotification(lead));
 
     // O id volta para a interface poder acrescentar o contexto opcional
     // depois, sem um segundo cadastro.
-    return NextResponse.json({ ok: true, duplicate: false, id: result.lead.id, notified });
+    return NextResponse.json({ ok: true, duplicate: false, id: lead.id });
   } catch (cause) {
     console.error("[api/leads]", cause);
     return NextResponse.json(

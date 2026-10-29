@@ -9,6 +9,8 @@ import {
 } from "lucide-react";
 import { getStudioDetail } from "@/lib/data/platformMetrics";
 import { getStudioBilling, isBillingSchemaReady } from "@/lib/data/billing";
+import { getOwnerAccount } from "@/lib/data/platformAccounts";
+import { EnterAccountButton } from "@/components/superadmin/enter-account-button";
 import { KpiTile } from "@/components/charts/kpi-tile";
 import { ChartCard } from "@/components/charts/chart-card";
 import { CategoryBars } from "@/components/charts/category-bars";
@@ -68,8 +70,11 @@ export default async function StudioDetailPage({ params }: StudioDetailPageProps
   const [detail, billingReady] = await Promise.all([getStudioDetail(id), isBillingSchemaReady()]);
   if (!detail) notFound();
 
-  const billing = billingReady ? await getStudioBilling(id) : null;
   const { studio } = detail;
+  const [billing, account] = await Promise.all([
+    billingReady ? getStudioBilling(id) : null,
+    getOwnerAccount(studio.owner_id),
+  ]);
   const today = utcToLocalDate(new Date());
   const subscription = billing?.current;
 
@@ -106,14 +111,17 @@ export default async function StudioDetailPage({ params }: StudioDetailPageProps
             /{studio.slug} · cliente desde {formatFullDateLocal(new Date(studio.created_at))}
           </p>
         </div>
-        <Link
-          href={getStudioPublicUrl(studio.slug)}
-          target="_blank"
-          rel="noreferrer"
-          className="flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
-        >
-          Abrir página pública <ExternalLink className="size-3.5" />
-        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            href={getStudioPublicUrl(studio.slug)}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+          >
+            Página pública <ExternalLink className="size-3.5" />
+          </Link>
+          <EnterAccountButton studioId={studio.id} studioName={studio.name} />
+        </div>
       </header>
 
       {!billingReady && (
@@ -124,6 +132,15 @@ export default async function StudioDetailPage({ params }: StudioDetailPageProps
       <section className="panel p-4">
         <p className="section-label mb-3">Cadastro</p>
         <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+          <Field label="Login" value={account?.email ?? "sem login"} />
+          <Field
+            label="Último acesso"
+            value={
+              account?.lastSignInAt
+                ? `${formatFullDateLocal(new Date(account.lastSignInAt))} às ${formatTimeLocal(new Date(account.lastSignInAt))}`
+                : "nunca entrou"
+            }
+          />
           <Field label="Responsável" value={studio.owner_name ?? "não informado"} />
           <Field label="WhatsApp do estúdio" value={formatPhoneDisplay(studio.whatsapp)} />
           <Field

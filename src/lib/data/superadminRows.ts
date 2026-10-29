@@ -1,6 +1,7 @@
 import "server-only";
 import { isBillingSchemaReady, mapCurrentSubscriptions, mapStudioRevenue } from "@/lib/data/billing";
 import { listStudiosWithActivity } from "@/lib/data/platformMetrics";
+import { mapOwnerAccounts } from "@/lib/data/platformAccounts";
 import type { PlanInterval, SubscriptionStatus, WhatsAppConnectionStatus } from "@/lib/types";
 
 /**
@@ -17,7 +18,11 @@ export interface StudioListRow {
   id: string;
   name: string;
   slug: string;
+  ownerId: string;
   ownerName: string | null;
+  /** E-mail com que o dono entra no app. Nulo se a conta sumiu do Auth. */
+  ownerEmail: string | null;
+  lastSignInAt: string | null;
   whatsapp: string;
   createdAt: string;
   bookingsLast7d: number;
@@ -48,9 +53,10 @@ export interface StudioRowsResult {
 }
 
 export async function listStudioRows(): Promise<StudioRowsResult> {
-  const [activity, billingReady] = await Promise.all([
+  const [activity, billingReady, accounts] = await Promise.all([
     listStudiosWithActivity(),
     isBillingSchemaReady(),
+    mapOwnerAccounts(),
   ]);
 
   const [subscriptions, revenue] = billingReady
@@ -60,8 +66,11 @@ export async function listStudioRows(): Promise<StudioRowsResult> {
   const rows = activity.map((studio) => {
     const subscription = subscriptions.get(studio.id);
     const money = revenue.get(studio.id);
+    const account = accounts.get(studio.ownerId);
     return {
       ...studio,
+      ownerEmail: account?.email ?? null,
+      lastSignInAt: account?.lastSignInAt ?? null,
       subscriptionStatus: subscription?.subscription.status ?? null,
       planName: subscription?.plan?.name ?? null,
       planInterval: subscription?.interval ?? ("mensal" as PlanInterval),
